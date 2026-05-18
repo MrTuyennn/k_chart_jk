@@ -1,11 +1,11 @@
 name: k_chart_wikex
-description: "A new Flutter package project."
+description: "A Flutter candlestick chart package with support for MA, BOLL, EMA, SAR, ZigZag, MACD, KDJ, RSI, WR, CCI indicators."
 version: 0.0.1
 homepage:
 
 environment:
   sdk: ^3.11.5
-  flutter: ">=1.17.0"
+  flutter: ">=3.0.0"
 
 dependencies:
   flutter:
