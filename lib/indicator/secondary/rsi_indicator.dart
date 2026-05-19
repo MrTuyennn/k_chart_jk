@@ -1,9 +1,7 @@
 part of '../indicator_template.dart';
 
-/**
- * RSI
- * RSI = SUM(MAX(CLOSE - REF(CLOSE,1),0),N) / SUM(ABS(CLOSE - REF(CLOSE,1)),N) × 100
- */
+/// RSI
+/// RSI = SUM(MAX(CLOSE - REF(CLOSE,1),0),N) / SUM(ABS(CLOSE - REF(CLOSE,1)),N) × 100
 class RSIIndicator extends SecondaryIndicator<MACDEntity, RSIStyle> {
   late final Paint _linePaint;
 
@@ -48,7 +46,7 @@ class RSIIndicator extends SecondaryIndicator<MACDEntity, RSIStyle> {
   }) {
     TextPainter maxTp = TextPainter(
       text: TextSpan(
-        text: "${NumberUtil.formatFixed(maxValue, fixedLength) ?? ''}",
+        text: NumberUtil.formatFixed(maxValue, fixedLength) ?? '',
         style: style,
       ),
       textDirection: TextDirection.ltr,
@@ -56,7 +54,7 @@ class RSIIndicator extends SecondaryIndicator<MACDEntity, RSIStyle> {
     maxTp.layout();
     TextPainter minTp = TextPainter(
       text: TextSpan(
-        text: "${NumberUtil.formatFixed(minValue, fixedLength) ?? ''}",
+        text: NumberUtil.formatFixed(minValue, fixedLength) ?? '',
         style: style,
       ),
       textDirection: TextDirection.ltr,

@@ -256,7 +256,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Đang tải thêm ${_batchSize} nến...',
+                'Đang tải thêm $_batchSize nến...',
                 style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ],
@@ -287,7 +287,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           showNowPrice: true,
           showInfoDialog: true,
           mBaseHeight: 280,
-          timeFormat: TimeFormat.YEAR_MONTH_DAY_WITH_HOUR,
+          timeFormat: TimeFormat.yearMonthDayWithHour,
           onLoadMore: _onLoadMore,
           isLoadingMore: _isFetching,
           detailBuilder: _buildInfoCard,

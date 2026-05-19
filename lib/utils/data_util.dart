@@ -3,7 +3,7 @@ import 'package:k_chart_wikex/indicator/indicator_template.dart';
 import '../entity/index.dart';
 
 class DataUtil {
-  static calculateAll(
+  static void calculateAll(
     List<KLineEntity> dataList,
     List<MainIndicator> mainLi,
     List<SecondaryIndicator> secondaryLi,
@@ -12,23 +12,23 @@ class DataUtil {
     calculateIndicators(dataList, mainLi, secondaryLi);
   }
 
-  static calculateIndicators(
+  static void calculateIndicators(
     List<KLineEntity> dataList,
     List<MainIndicator> mainLi,
     List<SecondaryIndicator> secondaryLi,
   ) {
     /// calculate main state
-    mainLi.forEach((e) {
+    for (final e in mainLi) {
       e.calc(dataList);
-    });
+    }
 
     /// calculate secondary state
-    secondaryLi.forEach((e) {
+    for (final e in secondaryLi) {
       e.calc(dataList);
-    });
+    }
   }
 
-  static calculateIndicator(
+  static void calculateIndicator(
     List<KLineEntity> dataList,
     IndicatorTemplate indicator,
   ) {

@@ -8,15 +8,15 @@ import 'package:k_chart_wikex/utils/index.dart';
 import 'renderer/base_dimension.dart';
 
 class TimeFormat {
-  static const List<String> YEAR_MONTH_DAY = [yyyy, '-', mm, '-', dd];
-  static const List<String> YEAR_MONTH_DAY_WITH_HOUR = [
+  static const List<String> yearMonthDay = [yyyy, '-', mm, '-', dd];
+  static const List<String> yearMonthDayWithHour = [
     yyyy,
     '-',
     mm,
     '-',
     dd,
     ' ',
-    HH,
+    hour24Padded,
     ':',
     nn,
   ];
@@ -86,7 +86,7 @@ class KChartWidget extends StatefulWidget {
     this.showNowPrice = true,
     this.showInfoDialog = true,
     this.materialInfoDialog = true,
-    this.timeFormat = TimeFormat.YEAR_MONTH_DAY,
+    this.timeFormat = TimeFormat.yearMonthDay,
     this.onLoadMore,
     this.fixedLength = 2,
     this.flingTime = 600,
@@ -104,7 +104,7 @@ class KChartWidget extends StatefulWidget {
   });
 
   @override
-  _KChartWidgetState createState() => _KChartWidgetState();
+  State<KChartWidget> createState() => _KChartWidgetState();
 }
 
 class _KChartWidgetState extends State<KChartWidget>
@@ -176,7 +176,7 @@ class _KChartWidgetState extends State<KChartWidget>
       secondaryIndicators: widget.secondaryIndicators,
       mainIndicators: widget.mainIndicators,
     );
-    final _painter = ChartPainter(
+    final painter = ChartPainter(
       widget.chartStyle,
       widget.chartColors,
       livePrice: widget.livePrice,
@@ -207,7 +207,7 @@ class _KChartWidgetState extends State<KChartWidget>
     return GestureDetector(
       onTapUp: (details) {
         if (!widget.isTrendLine &&
-            _painter.isInMainRect(details.localPosition)) {
+            painter.isInMainRect(details.localPosition)) {
           isOnTap = true;
           if (mSelectX != details.localPosition.dx &&
               widget.isTapShowInfoDialog) {
@@ -310,7 +310,7 @@ class _KChartWidgetState extends State<KChartWidget>
         children: [
           CustomPaint(
             size: Size(double.infinity, baseDimension.mDisplayHeight),
-            painter: _painter,
+            painter: painter,
           ),
           Positioned(
             right: 0,

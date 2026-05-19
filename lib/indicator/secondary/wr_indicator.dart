@@ -40,7 +40,7 @@ class WRIndicator extends SecondaryIndicator<MACDEntity, WRStyle> {
   }) {
     TextPainter maxTp = TextPainter(
       text: TextSpan(
-        text: "${NumberUtil.formatFixed(maxValue, fixedLength) ?? ''}",
+        text: NumberUtil.formatFixed(maxValue, fixedLength) ?? '',
         style: style,
       ),
       textDirection: TextDirection.ltr,
@@ -48,7 +48,7 @@ class WRIndicator extends SecondaryIndicator<MACDEntity, WRStyle> {
     maxTp.layout();
     TextPainter minTp = TextPainter(
       text: TextSpan(
-        text: "${NumberUtil.formatFixed(minValue, fixedLength) ?? ''}",
+        text: NumberUtil.formatFixed(minValue, fixedLength) ?? '',
         style: style,
       ),
       textDirection: TextDirection.ltr,

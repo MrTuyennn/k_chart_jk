@@ -1,5 +1,3 @@
-library k_chart_plus;
-
 export 'k_chart_widget.dart'; //布局
 export 'styles/k_chart_style.dart';
 export 'styles/depth_chart_style.dart';

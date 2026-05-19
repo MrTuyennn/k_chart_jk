@@ -6,7 +6,6 @@ import '../entity/info_window_entity.dart';
 import '../entity/k_line_entity.dart';
 import 'base_chart_painter.dart';
 import 'base_chart_renderer.dart';
-import 'base_dimension.dart';
 import 'main_renderer.dart';
 import 'secondary_renderer.dart';
 import 'vol_renderer.dart';
@@ -31,7 +30,7 @@ class ChartPainter extends BaseChartPainter {
   final bool isTrendLine; //For TrendLine
   bool isrecordingCord = false; //For TrendLine
   final double selectY; //For TrendLine
-  static get maxScrollX => BaseChartPainter.maxScrollX;
+  static double get maxScrollX => BaseChartPainter.maxScrollX;
   late BaseChartRenderer mMainRenderer;
   BaseChartRenderer? mVolRenderer;
   Set<BaseChartRenderer> mSecondaryRendererList = {};
@@ -46,78 +45,62 @@ class ChartPainter extends BaseChartPainter {
   late Paint nowPriceSelectorPaint,
       nowPriceSelectorBorderPaint,
       nowPriceLinePaint;
-  final KChartStyle chartStyle;
   final bool hideGrid;
   final bool showNowPrice;
   final VerticalTextAlignment verticalTextAlignment;
-  final BaseDimension baseDimension;
   final double? livePrice;
 
   ChartPainter(
-    this.chartStyle,
+    super.chartStyle,
     this.chartColors, {
     required this.lines, //For TrendLine
     required this.isTrendLine, //For TrendLine
     required this.selectY, //For TrendLine
     this.livePrice,
     required this.sink,
-    required datas,
-    required scaleX,
-    required scaleY,
-    required scrollX,
+    required super.datas,
+    required super.scaleX,
+    required super.scaleY,
+    required super.scrollX,
     required isLongPass,
-    required selectX,
-    required xFrontPadding,
-    required this.baseDimension,
-    isOnTap,
-    isTapShowInfoDialog,
+    required super.selectX,
+    required super.xFrontPadding,
+    required super.baseDimension,
+    super.isOnTap,
+    super.isTapShowInfoDialog,
     required this.verticalTextAlignment,
-    mainIndicators,
-    volHidden,
-    secondaryIndicators,
-    bool isLine = false,
+    super.mainIndicators,
+    super.volHidden,
+    super.secondaryIndicators,
+    super.isLine = false,
     this.hideGrid = false,
     this.showNowPrice = true,
     this.fixedLength = 2,
   }) : super(
-         chartStyle,
-         datas: datas,
-         scaleX: scaleX,
-         scaleY: scaleY,
-         scrollX: scrollX,
          isLongPress: isLongPass,
-         baseDimension: baseDimension,
-         isOnTap: isOnTap,
-         isTapShowInfoDialog: isTapShowInfoDialog,
-         selectX: selectX,
-         mainIndicators: mainIndicators,
-         volHidden: volHidden,
-         secondaryIndicators: secondaryIndicators,
-         xFrontPadding: xFrontPadding,
-         isLine: isLine,
        ) {
     paintCross = Paint()
-      ..color = this.chartColors.crossColor
-      ..strokeWidth = this.chartStyle.crossWidth
+      ..color = chartColors.crossColor
+      ..strokeWidth = chartStyle.crossWidth
       ..isAntiAlias = true;
     selectPointPaint = Paint()
       ..isAntiAlias = true
-      ..color = this.chartColors.selectFillColor;
+      ..color = chartColors.selectFillColor;
     selectorBorderPaint = Paint()
       ..isAntiAlias = true
-      ..strokeWidth = this.chartStyle.borderWidth
+      ..strokeWidth = chartStyle.borderWidth
       ..style = PaintingStyle.stroke
-      ..color = this.chartColors.selectBorderColor;
+      ..color = chartColors.selectBorderColor;
 
     nowPriceSelectorPaint = Paint()
-      ..color = this.chartColors.bgColor
+      ..color = chartColors.bgColor
       ..isAntiAlias = true;
     nowPriceSelectorBorderPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = this.chartStyle.borderWidth
+      ..strokeWidth = chartStyle.borderWidth
       ..isAntiAlias = true;
     nowPriceLinePaint = Paint()
-      ..strokeWidth = this.chartStyle.nowPriceLineWidth
+      ..strokeWidth = chartStyle.nowPriceLineWidth
       ..isAntiAlias = true;
   }
 
@@ -135,10 +118,10 @@ class ChartPainter extends BaseChartPainter {
       mainIndicators,
       isLine,
       fixedLength,
-      this.chartStyle,
-      this.chartColors,
-      this.scaleX,
-      this.scaleY,
+      chartStyle,
+      chartColors,
+      scaleX,
+      scaleY,
       verticalTextAlignment,
       mBottomPadding,
     );
@@ -149,8 +132,8 @@ class ChartPainter extends BaseChartPainter {
         mVolMinValue,
         mChildPadding,
         fixedLength,
-        this.chartStyle,
-        this.chartColors,
+        chartStyle,
+        chartColors,
       );
     }
     mSecondaryRendererList.clear();
@@ -209,9 +192,9 @@ class ChartPainter extends BaseChartPainter {
     if (!hideGrid) {
       mMainRenderer.drawGrid(canvas, mGridRows, mGridColumns);
       mVolRenderer?.drawGrid(canvas, mGridRows, mGridColumns);
-      mSecondaryRendererList.forEach((element) {
+      for (final element in mSecondaryRendererList) {
         element.drawGrid(canvas, mGridRows, mGridColumns);
-      });
+      }
     }
   }
 
@@ -228,9 +211,9 @@ class ChartPainter extends BaseChartPainter {
       double lastX = i == 0 ? curX : getX(i - 1);
       mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-      mSecondaryRendererList.forEach((element) {
+      for (final element in mSecondaryRendererList) {
         element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-      });
+      }
     }
 
     if ((isLongPress == true || (isTapShowInfoDialog && isOnTap)) &&
@@ -243,14 +226,14 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void drawVerticalText(canvas) {
-    var textStyle = getTextStyle(this.chartColors.defaultTextColor);
+    var textStyle = getTextStyle(chartColors.defaultTextColor);
     if (!hideGrid) {
       mMainRenderer.drawVerticalText(canvas, textStyle, mGridRows);
     }
     mVolRenderer?.drawVerticalText(canvas, textStyle, mGridRows);
-    mSecondaryRendererList.forEach((element) {
+    for (final element in mSecondaryRendererList) {
       element.drawVerticalText(canvas, textStyle, mGridRows);
-    });
+    }
   }
 
   @override
@@ -388,9 +371,9 @@ class ChartPainter extends BaseChartPainter {
     //Release to display the last data
     mMainRenderer.drawText(canvas, data, x);
     mVolRenderer?.drawText(canvas, data, x);
-    mSecondaryRendererList.forEach((element) {
+    for (final element in mSecondaryRendererList) {
       element.drawText(canvas, data, x);
-    });
+    }
   }
 
   @override
@@ -402,13 +385,13 @@ class ChartPainter extends BaseChartPainter {
     if (x < mWidth / 2) {
       //draw right
       TextPainter tp = getTextPainter(
-        "── " + (NumberUtil.formatFixed(mMainLowMinValue, fixedLength) ?? ''),
+        "── ${NumberUtil.formatFixed(mMainLowMinValue, fixedLength) ?? ''}",
         chartColors.minColor,
       );
       tp.paint(canvas, Offset(x, y - tp.height / 2));
     } else {
       TextPainter tp = getTextPainter(
-        (NumberUtil.formatFixed(mMainLowMinValue, fixedLength) ?? '') + " ──",
+        "${NumberUtil.formatFixed(mMainLowMinValue, fixedLength) ?? ''} ──",
         chartColors.minColor,
       );
       tp.paint(canvas, Offset(x - tp.width, y - tp.height / 2));
@@ -418,13 +401,13 @@ class ChartPainter extends BaseChartPainter {
     if (x < mWidth / 2) {
       //draw right
       TextPainter tp = getTextPainter(
-        "── " + (NumberUtil.formatFixed(mMainHighMaxValue, fixedLength) ?? ''),
+        "── ${NumberUtil.formatFixed(mMainHighMaxValue, fixedLength) ?? ''}",
         chartColors.maxColor,
       );
       tp.paint(canvas, Offset(x, y - tp.height / 2));
     } else {
       TextPainter tp = getTextPainter(
-        (NumberUtil.formatFixed(mMainHighMaxValue, fixedLength) ?? '') + " ──",
+        "${NumberUtil.formatFixed(mMainHighMaxValue, fixedLength) ?? ''} ──",
         chartColors.maxColor,
       );
       tp.paint(canvas, Offset(x - tp.width, y - tp.height / 2));
@@ -433,12 +416,11 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void drawNowPrice(Canvas canvas) {
-    if (!this.showNowPrice) return;
+    if (!showNowPrice) return;
     if (datas == null) return;
 
     // ưu tiên livePrice từ socket, fallback về datas.last.close
     final double value = livePrice ?? datas!.last.close;
-    final double baseValue = datas!.last.close;
 
     double y = getMainY(value);
 
@@ -448,8 +430,8 @@ class ChartPainter extends BaseChartPainter {
 
     // màu dựa theo livePrice so với open của nến cuối
     Color priceColor = value >= datas!.last.open
-        ? this.chartColors.nowPriceUpColor
-        : this.chartColors.nowPriceDnColor;
+        ? chartColors.nowPriceUpColor
+        : chartColors.nowPriceDnColor;
 
     nowPriceSelectorBorderPaint.color = priceColor;
     nowPriceLinePaint.color = priceColor;
@@ -541,7 +523,7 @@ class ChartPainter extends BaseChartPainter {
       );
     }
     if (lines.isNotEmpty) {
-      lines.forEach((element) {
+      for (final element in lines) {
         var y1 = -((element.p1.dy - 35) / element.scale) + element.maxHeight;
         var y2 = -((element.p2.dy - 35) / element.scale) + element.maxHeight;
         var a = (trendLineMax! - y1) * trendLineScale! + trendLineContentRec!;
@@ -555,11 +537,12 @@ class ChartPainter extends BaseChartPainter {
             ..color = Colors.yellow
             ..strokeWidth = 2,
         );
-      });
+      }
     }
   }
 
   ///draw cross lines
+  @override
   void drawCrossLine(Canvas canvas, Size size) {
     var index = calculateSelectedX(selectX);
     KLineEntity point = getItem(index);
@@ -589,11 +572,9 @@ class ChartPainter extends BaseChartPainter {
     }
   }
 
-  TextPainter getTextPainter(text, color) {
-    if (color == null) {
-      color = this.chartColors.defaultTextColor;
-    }
-    TextSpan span = TextSpan(text: "$text", style: getTextStyle(color));
+  TextPainter getTextPainter(String? text, Color? color) {
+    color ??= chartColors.defaultTextColor;
+    TextSpan span = TextSpan(text: text, style: getTextStyle(color));
     TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
     tp.layout();
     return tp;

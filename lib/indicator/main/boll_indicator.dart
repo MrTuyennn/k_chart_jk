@@ -4,7 +4,7 @@ class Boll {
   double? up;
   double? mid;
   double? dn;
-  double? BOLLMA;
+  double? bollMa;
 }
 
 class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
@@ -84,40 +84,40 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
     KChartColors chartColors,
   ) {
     if (lastPoint.boll == null || curPoint.boll == null) return;
-    final List<Offset> _positionLi = [];
+    final List<Offset> positionLi = [];
 
     if (curPoint.boll!.up != null && lastPoint.boll!.up != null) {
-      _positionLi.add(Offset(curX, getY(curPoint.boll!.up!))); //0
-      _positionLi.add(Offset(lastX, getY(lastPoint.boll!.up!))); //1
+      positionLi.add(Offset(curX, getY(curPoint.boll!.up!))); //0
+      positionLi.add(Offset(lastX, getY(lastPoint.boll!.up!))); //1
       /// UB
       canvas.drawLine(
-        _positionLi[0],
-        _positionLi[1],
+        positionLi[0],
+        positionLi[1],
         _linePaint..color = indicatorStyle.ubColor,
       );
     }
 
     if (curPoint.boll!.dn != null && lastPoint.boll!.dn != null) {
-      _positionLi.add(Offset(lastX, getY(lastPoint.boll!.dn!))); //2
-      _positionLi.add(Offset(curX, getY(curPoint.boll!.dn!))); //3
+      positionLi.add(Offset(lastX, getY(lastPoint.boll!.dn!))); //2
+      positionLi.add(Offset(curX, getY(curPoint.boll!.dn!))); //3
 
       /// LB
       canvas.drawLine(
-        _positionLi[2],
-        _positionLi[3],
+        positionLi[2],
+        positionLi[3],
         _linePaint..color = indicatorStyle.lbColor,
       );
     }
 
-    if (_positionLi.length == 4) {
-      Path _fillPath = Path()
-        ..moveTo(_positionLi[0].dx, _positionLi[0].dy)
-        ..lineTo(_positionLi[1].dx, _positionLi[1].dy)
-        ..lineTo(_positionLi[2].dx, _positionLi[2].dy)
-        ..lineTo(_positionLi[3].dx, _positionLi[3].dy)
+    if (positionLi.length == 4) {
+      Path fillPath = Path()
+        ..moveTo(positionLi[0].dx, positionLi[0].dy)
+        ..lineTo(positionLi[1].dx, positionLi[1].dy)
+        ..lineTo(positionLi[2].dx, positionLi[2].dy)
+        ..lineTo(positionLi[3].dx, positionLi[3].dy)
         ..close();
 
-      canvas.drawPath(_fillPath, _fillPaint);
+      canvas.drawPath(fillPath, _fillPaint);
     }
 
     if (curPoint.boll!.mid != null && lastPoint.boll!.mid != null) {
@@ -134,39 +134,39 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
   void calc(List<KLineEntity> dataList) {
     int n = calcParams[0];
     int k = calcParams[1];
-    _calcBOLLMA(n, dataList);
+    _calcbollMa(n, dataList);
     for (int i = 0; i < dataList.length; i++) {
       KLineEntity entity = dataList[i];
       if (i >= n) {
         double md = 0;
         for (int j = i - n + 1; j <= i; j++) {
           double c = dataList[j].close;
-          double m = entity.boll!.BOLLMA!;
+          double m = entity.boll!.bollMa!;
           double value = c - m;
           md += value * value;
         }
         md = md / (n - 1);
         md = sqrt(md);
-        entity.boll!.mid = entity.boll!.BOLLMA!;
+        entity.boll!.mid = entity.boll!.bollMa!;
         entity.boll!.up = entity.boll!.mid! + k * md;
         entity.boll!.dn = entity.boll!.mid! - k * md;
       }
     }
   }
 
-  void _calcBOLLMA(int day, List<KLineEntity> dataList) {
+  void _calcbollMa(int day, List<KLineEntity> dataList) {
     double ma = 0;
     for (int i = 0; i < dataList.length; i++) {
       KLineEntity entity = dataList[i];
       ma += entity.close;
       entity.boll = Boll();
       if (i == day - 1) {
-        entity.boll!.BOLLMA = ma / day;
+        entity.boll!.bollMa = ma / day;
       } else if (i >= day) {
         ma -= dataList[i - day].close;
-        entity.boll!.BOLLMA = ma / day;
+        entity.boll!.bollMa = ma / day;
       } else {
-        entity.boll!.BOLLMA = null;
+        entity.boll!.bollMa = null;
       }
     }
   }

@@ -1,13 +1,11 @@
 part of '../indicator_template.dart';
 
-/**
- * MACD：参数快线移动平均、慢线移动平均、移动平均，
- * 默认参数值12、26、9。
- * 公式：⒈首先分别计算出收盘价12日指数平滑移动平均线与26日指数平滑移动平均线，分别记为EMA(12）与EMA(26）。
- * ⒉求这两条指数平滑移动平均线的差，即：DIFF = EMA(SHORT) － EMA(LONG)。
- * ⒊再计算DIFF的M日的平均的指数平滑移动平均线，记为DEA。
- * ⒋最后用DIFF减DEA，得MACD。MACD通常绘制成围绕零轴线波动的柱形图。MACD柱状大于0涨颜色，小于0跌颜色。
- */
+/// MACD：参数快线移动平均、慢线移动平均、移动平均，
+/// 默认参数值12、26、9。
+/// 公式：⒈首先分别计算出收盘价12日指数平滑移动平均线与26日指数平滑移动平均线，分别记为EMA(12）与EMA(26）。
+/// ⒉求这两条指数平滑移动平均线的差，即：DIFF = EMA(SHORT) － EMA(LONG)。
+/// ⒊再计算DIFF的M日的平均的指数平滑移动平均线，记为DEA。
+/// ⒋最后用DIFF减DEA，得MACD。MACD通常绘制成围绕零轴线波动的柱形图。MACD柱状大于0涨颜色，小于0跌颜色。
 class MACDIndicator extends SecondaryIndicator<MACDEntity, MACDStyle> {
   late final Paint _linePaint;
   late final Paint _rectPaint;
@@ -84,7 +82,7 @@ class MACDIndicator extends SecondaryIndicator<MACDEntity, MACDStyle> {
   }) {
     TextPainter maxTp = TextPainter(
       text: TextSpan(
-        text: "${NumberUtil.formatFixed(maxValue, fixedLength) ?? ''}",
+        text: NumberUtil.formatFixed(maxValue, fixedLength) ?? '',
         style: style,
       ),
       textDirection: TextDirection.ltr,
@@ -93,7 +91,7 @@ class MACDIndicator extends SecondaryIndicator<MACDEntity, MACDStyle> {
 
     TextPainter minTp = TextPainter(
       text: TextSpan(
-        text: "${NumberUtil.formatFixed(minValue, fixedLength) ?? ''}",
+        text: NumberUtil.formatFixed(minValue, fixedLength) ?? '',
         style: style,
       ),
       textDirection: TextDirection.ltr,

@@ -8,7 +8,7 @@ extension CanvasExtension on Canvas {
       double startDy = begin.dy;
       double endDy = end.dy;
       while (startDy < endDy) {
-        this.drawLine(
+        drawLine(
           Offset(begin.dx, startDy),
           Offset(begin.dx, min(startDy + width, endDy)),
           paint,
@@ -22,7 +22,7 @@ extension CanvasExtension on Canvas {
       double startDx = begin.dx;
       double endDx = end.dx;
       while (startDx < endDx) {
-        this.drawLine(
+        drawLine(
           Offset(startDx, begin.dy),
           Offset(min(startDx + width, endDx), begin.dy),
           paint,

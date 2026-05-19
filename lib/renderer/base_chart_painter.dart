@@ -53,7 +53,7 @@ abstract class BaseChartPainter extends CustomPainter {
   final KChartStyle chartStyle;
   late double mPointWidth;
   // format time
-  List<String> mFormats = [yyyy, '-', mm, '-', dd, ' ', HH, ':', nn];
+  List<String> mFormats = [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
   double xFrontPadding;
 
   /// base dimension
@@ -79,27 +79,27 @@ abstract class BaseChartPainter extends CustomPainter {
     this.isLine = false,
   }) {
     mItemCount = datas?.length ?? 0;
-    mPointWidth = this.chartStyle.pointWidth;
+    mPointWidth = chartStyle.pointWidth;
     mTopPadding =
-        this.chartStyle.topPadding +
+        chartStyle.topPadding +
         baseDimension.totalLabelHeight; // space to display text of main chart
-    mBottomPadding = this.chartStyle.bottomPadding;
-    mChildPadding = this.chartStyle.childPadding;
-    mGridRows = this.chartStyle.gridRows;
-    mGridColumns = this.chartStyle.gridColumns;
+    mBottomPadding = chartStyle.bottomPadding;
+    mChildPadding = chartStyle.childPadding;
+    mGridRows = chartStyle.gridRows;
+    mGridColumns = chartStyle.gridColumns;
     mDataLen = mItemCount * mPointWidth;
     initFormats();
   }
 
   /// init format time
   void initFormats() {
-    if (this.chartStyle.dateTimeFormat != null) {
-      mFormats = this.chartStyle.dateTimeFormat!;
+    if (chartStyle.dateTimeFormat != null) {
+      mFormats = chartStyle.dateTimeFormat!;
       return;
     }
 
     if (mItemCount < 2) {
-      mFormats = [yyyy, '-', mm, '-', dd, ' ', HH, ':', nn];
+      mFormats = [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
       return;
     }
 
@@ -115,7 +115,7 @@ abstract class BaseChartPainter extends CustomPainter {
       mFormats = [yy, '-', mm, '-', dd];
     } else {
       // hour line
-      mFormats = [mm, '-', dd, ' ', HH, ':', nn];
+      mFormats = [mm, '-', dd, ' ', hour24Padded, ':', nn];
     }
   }
 
@@ -138,7 +138,7 @@ abstract class BaseChartPainter extends CustomPainter {
       drawVerticalText(canvas);
       drawDate(canvas, size);
 
-      drawText(canvas, datas!.last, this.chartStyle.space);
+      drawText(canvas, datas!.last, chartStyle.space);
       drawMaxAndMin(canvas);
       drawNowPrice(canvas);
 
@@ -156,13 +156,13 @@ abstract class BaseChartPainter extends CustomPainter {
   void drawBg(Canvas canvas, Size size);
 
   /// draw the grid of chart
-  void drawGrid(canvas);
+  void drawGrid(Canvas canvas);
 
   /// draw chart
   void drawChart(Canvas canvas, Size size);
 
   /// draw vertical text
-  void drawVerticalText(canvas);
+  void drawVerticalText(Canvas canvas);
 
   /// draw date
   void drawDate(Canvas canvas, Size size);
@@ -227,7 +227,7 @@ abstract class BaseChartPainter extends CustomPainter {
   }
 
   /// calculate values
-  calculateValue() {
+  void calculateValue() {
     if (datas == null) return;
     if (datas!.isEmpty) return;
     maxScrollX = getMinTranslateX().abs();
@@ -285,7 +285,7 @@ abstract class BaseChartPainter extends CustomPainter {
   }
 
   // compute maximum and minimum of secondary value
-  getSecondaryMaxMinValue(int index, KLineEntity item) {
+  void getSecondaryMaxMinValue(int index, KLineEntity item) {
     SecondaryIndicator indicator = secondaryIndicators[index];
     final value = indicator.getMaxMinValue(
       item,

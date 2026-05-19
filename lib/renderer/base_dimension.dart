@@ -12,7 +12,7 @@ class BaseDimension {
   late double _mSecondaryHeight;
   late double _totalSecondaryHeight;
 
-  double _mLabelHeight = 12;
+  final double _mLabelHeight = 12;
   double _totalLabelHeight = 12;
 
   // total height of chart: _mBaseHeight + _mVolumeHeight + (_mSecondaryHeight * n)

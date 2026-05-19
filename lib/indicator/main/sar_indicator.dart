@@ -43,7 +43,7 @@ class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
     final sar = curPoint.sar;
     if (sar == null) return;
     final halfHL = (curPoint.high + curPoint.low) / 2;
-    late final color;
+    late final Color color;
     if (sar == halfHL) {
       color = chartColors.defaultTextColor;
     } else if (sar < halfHL) {

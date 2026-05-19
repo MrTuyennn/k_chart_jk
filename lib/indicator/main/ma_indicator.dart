@@ -4,13 +4,11 @@ class MAIndicator extends MainIndicator<CandleEntity, MAStyle> {
   late final Paint _linePaint;
 
   MAIndicator({
-    List<int> calcParams = const [5, 10, 30, 60],
-    MAStyle indicatorStyle = const MAStyle(),
+    super.calcParams = const [5, 10, 30, 60],
+    super.indicatorStyle = const MAStyle(),
   }): super(
     name: 'movingAverage',
     shortName: 'MA',
-    calcParams: calcParams,
-    indicatorStyle: indicatorStyle,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
