@@ -66,6 +66,7 @@ class KChartWidget extends StatefulWidget {
   final double? livePrice;
 
   final KChartController? controller;
+  final bool isLoadingMore;
 
   const KChartWidget(
     this.datas,
@@ -98,6 +99,7 @@ class KChartWidget extends StatefulWidget {
     this.controller,
     this.minScale = 0.5,
     this.maxScale = 2.2,
+    this.isLoadingMore = false,
     super.key,
   });
 
@@ -247,6 +249,12 @@ class _KChartWidgetState extends State<KChartWidget>
               .clamp(0.0, ChartPainter.maxScrollX)
               .toDouble();
         }
+        if (!widget.isLoadingMore &&
+            widget.onLoadMore != null &&
+            ChartPainter.maxScrollX > 0 &&
+            mScrollX >= ChartPainter.maxScrollX * 0.8) {
+          widget.onLoadMore!(true);
+        }
         notifyChanged();
       },
       onScaleEnd: (details) {
@@ -363,9 +371,6 @@ class _KChartWidgetState extends State<KChartWidget>
       mScrollX = aniX!.value;
       if (mScrollX <= 0) {
         mScrollX = 0;
-        if (widget.onLoadMore != null) {
-          widget.onLoadMore!(true);
-        }
         _stopAnimation();
       } else if (mScrollX >= ChartPainter.maxScrollX) {
         mScrollX = ChartPainter.maxScrollX;
@@ -373,6 +378,11 @@ class _KChartWidgetState extends State<KChartWidget>
           widget.onLoadMore!(false);
         }
         _stopAnimation();
+      } else if (!widget.isLoadingMore &&
+          widget.onLoadMore != null &&
+          ChartPainter.maxScrollX > 0 &&
+          mScrollX >= ChartPainter.maxScrollX * 0.8) {
+        widget.onLoadMore!(true);
       }
       notifyChanged();
     });

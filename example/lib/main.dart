@@ -79,6 +79,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   bool _volHidden = false;
   bool _isDark = false;
 
+  bool _isFetching = false;        // đang fetch → hiện banner
+  int _totalLoaded = 200;
+  static const int _maxTotal = 500;
+  static const int _batchSize = 50;
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +101,50 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     DataUtil.calculateAll(_data, _mainIndicators, _secondaryIndicators);
   }
 
+  void _onLoadMore(bool isLeft) async {
+    if (!isLeft) return;                  // chỉ xử lý load data cũ hơn
+    if (_isFetching) return;              // đang fetch rồi, bỏ qua
+    if (_totalLoaded >= _maxTotal) return; // đã hết data
+
+    setState(() => _isFetching = true);
+
+    // Giả lập network delay
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (!mounted) return;
+
+    final oldest = _data.first;
+    final olderData = _generateOlderData(_batchSize, oldest);
+    final merged = [...olderData, ..._data];
+    DataUtil.calculateAll(merged, _mainIndicators, _secondaryIndicators);
+
+    setState(() {
+      _data = merged;
+      _totalLoaded += _batchSize;
+      _isFetching = false;
+    });
+  }
+
+  List<KLineEntity> _generateOlderData(int count, KLineEntity oldest) {
+    final random = Random(oldest.time ?? 0);
+    double price = oldest.open;
+    final list = <KLineEntity>[];
+    for (int i = count; i >= 1; i--) {
+      final time = (oldest.time ?? 0) - i * 3600 * 1000;
+      final change = (random.nextDouble() - 0.48) * 800;
+      final open = price;
+      final close = (price - change).clamp(10000.0, 200000.0);
+      final high = max(open, close) + random.nextDouble() * 300;
+      final low = min(open, close) - random.nextDouble() * 300;
+      final vol = 10 + random.nextDouble() * 500;
+      list.add(KLineEntity.fromCustom(
+        time: time, open: open, close: close,
+        high: high, low: low, vol: vol, amount: close * vol,
+      ));
+      price = close;
+    }
+    return list;
+  }
+
   void _setMain(_MainType type) {
     setState(() {
       _mainType = type;
@@ -111,18 +160,18 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   }
 
   List<MainIndicator> get _mainIndicators => switch (_mainType) {
-    _MainType.ma   => [MAIndicator()],
+    _MainType.ma => [MAIndicator()],
     _MainType.boll => [BOLLIndicator()],
-    _MainType.ema  => [EMAIndicator()],
+    _MainType.ema => [EMAIndicator()],
     _MainType.none => [],
   };
 
   List<SecondaryIndicator> get _secondaryIndicators => switch (_secondaryType) {
     _SecondaryType.macd => [MACDIndicator()],
-    _SecondaryType.kdj  => [KDJIndicator()],
-    _SecondaryType.rsi  => [RSIIndicator()],
-    _SecondaryType.wr   => [WRIndicator()],
-    _SecondaryType.cci  => [CCIIndicator()],
+    _SecondaryType.kdj => [KDJIndicator()],
+    _SecondaryType.rsi => [RSIIndicator()],
+    _SecondaryType.wr => [WRIndicator()],
+    _SecondaryType.cci => [CCIIndicator()],
     _SecondaryType.none => [],
   };
 
@@ -190,22 +239,60 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   }
 
   Widget _buildChart() {
-    return KChartWidget(
-      _data,
-      const KChartStyle(),
-      _colors,
-      isTrendLine: false,
-      isLine: _isLine,
-      volHidden: _volHidden,
-      mainIndicators: _mainIndicators,
-      secondaryIndicators: _secondaryIndicators,
-      controller: _controller,
-      showNowPrice: true,
-      showInfoDialog: true,
-      mBaseHeight: 280,
-      timeFormat: TimeFormat.YEAR_MONTH_DAY_WITH_HOUR,
-      onLoadMore: (_) {},
-      detailBuilder: _buildInfoCard,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Banner trạng thái load
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: _isFetching ? 28 : 0,
+          color: const Color(0xFF217AFF),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 12, height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Đang tải thêm ${_batchSize} nến...',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        // Số nến + trạng thái
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Text(
+            '${_data.length} nến'
+            '${_totalLoaded >= _maxTotal ? ' · Đã tải hết' : ' · Kéo trái để tải thêm'}',
+            style: TextStyle(
+              fontSize: 11,
+              color: _isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+        ),
+        KChartWidget(
+          _data,
+          const KChartStyle(),
+          _colors,
+          isTrendLine: false,
+          isLine: _isLine,
+          volHidden: _volHidden,
+          mainIndicators: _mainIndicators,
+          secondaryIndicators: _secondaryIndicators,
+          controller: _controller,
+          showNowPrice: true,
+          showInfoDialog: true,
+          mBaseHeight: 280,
+          timeFormat: TimeFormat.YEAR_MONTH_DAY_WITH_HOUR,
+          onLoadMore: _onLoadMore,
+          isLoadingMore: _isFetching,
+          detailBuilder: _buildInfoCard,
+        ),
+      ],
     );
   }
 
@@ -235,11 +322,15 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _infoRow('Open',  entity.open.toStringAsFixed(2)),
-            _infoRow('High',  entity.high.toStringAsFixed(2)),
-            _infoRow('Low',   entity.low.toStringAsFixed(2)),
-            _infoRow('Close', entity.close.toStringAsFixed(2), valueColor: color),
-            _infoRow('Vol',   entity.vol.toStringAsFixed(2)),
+            _infoRow('Open', entity.open.toStringAsFixed(2)),
+            _infoRow('High', entity.high.toStringAsFixed(2)),
+            _infoRow('Low', entity.low.toStringAsFixed(2)),
+            _infoRow(
+              'Close',
+              entity.close.toStringAsFixed(2),
+              valueColor: color,
+            ),
+            _infoRow('Vol', entity.vol.toStringAsFixed(2)),
           ],
         ),
       ),
@@ -282,9 +373,9 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 () => setState(() => _volHidden = !_volHidden),
               ),
               const Spacer(),
-              _iconBtn(Icons.zoom_in,  () => _controller.zoomIn(),  'Zoom In'),
+              _iconBtn(Icons.zoom_in, () => _controller.zoomIn(), 'Zoom In'),
               _iconBtn(Icons.zoom_out, () => _controller.zoomOut(), 'Zoom Out'),
-              _iconBtn(Icons.refresh,  () => _controller.reset(),   'Reset'),
+              _iconBtn(Icons.refresh, () => _controller.reset(), 'Reset'),
             ],
           ),
           const SizedBox(height: 12),
@@ -294,10 +385,26 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             spacing: 6,
             runSpacing: 6,
             children: [
-              _chip('MA',   _mainType == _MainType.ma,   () => _setMain(_MainType.ma)),
-              _chip('BOLL', _mainType == _MainType.boll, () => _setMain(_MainType.boll)),
-              _chip('EMA',  _mainType == _MainType.ema,  () => _setMain(_MainType.ema)),
-              _chip('None', _mainType == _MainType.none, () => _setMain(_MainType.none)),
+              _chip(
+                'MA',
+                _mainType == _MainType.ma,
+                () => _setMain(_MainType.ma),
+              ),
+              _chip(
+                'BOLL',
+                _mainType == _MainType.boll,
+                () => _setMain(_MainType.boll),
+              ),
+              _chip(
+                'EMA',
+                _mainType == _MainType.ema,
+                () => _setMain(_MainType.ema),
+              ),
+              _chip(
+                'None',
+                _mainType == _MainType.none,
+                () => _setMain(_MainType.none),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -307,12 +414,36 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             spacing: 6,
             runSpacing: 6,
             children: [
-              _chip('MACD', _secondaryType == _SecondaryType.macd, () => _setSecondary(_SecondaryType.macd)),
-              _chip('KDJ',  _secondaryType == _SecondaryType.kdj,  () => _setSecondary(_SecondaryType.kdj)),
-              _chip('RSI',  _secondaryType == _SecondaryType.rsi,  () => _setSecondary(_SecondaryType.rsi)),
-              _chip('WR',   _secondaryType == _SecondaryType.wr,   () => _setSecondary(_SecondaryType.wr)),
-              _chip('CCI',  _secondaryType == _SecondaryType.cci,  () => _setSecondary(_SecondaryType.cci)),
-              _chip('None', _secondaryType == _SecondaryType.none, () => _setSecondary(_SecondaryType.none)),
+              _chip(
+                'MACD',
+                _secondaryType == _SecondaryType.macd,
+                () => _setSecondary(_SecondaryType.macd),
+              ),
+              _chip(
+                'KDJ',
+                _secondaryType == _SecondaryType.kdj,
+                () => _setSecondary(_SecondaryType.kdj),
+              ),
+              _chip(
+                'RSI',
+                _secondaryType == _SecondaryType.rsi,
+                () => _setSecondary(_SecondaryType.rsi),
+              ),
+              _chip(
+                'WR',
+                _secondaryType == _SecondaryType.wr,
+                () => _setSecondary(_SecondaryType.wr),
+              ),
+              _chip(
+                'CCI',
+                _secondaryType == _SecondaryType.cci,
+                () => _setSecondary(_SecondaryType.cci),
+              ),
+              _chip(
+                'None',
+                _secondaryType == _SecondaryType.none,
+                () => _setSecondary(_SecondaryType.none),
+              ),
             ],
           ),
         ],
