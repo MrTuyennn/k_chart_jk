@@ -312,6 +312,8 @@ class _KChartWidgetState extends State<KChartWidget>
             size: Size(double.infinity, baseDimension.mDisplayHeight),
             painter: painter,
           ),
+          // TODO: bottom offset giới hạn vùng scaleY chỉ trong main chart
+          // nếu muốn gesture phủ toàn bộ thì đổi lại bottom: 0
           Positioned(
             right: 0,
             top: 0,

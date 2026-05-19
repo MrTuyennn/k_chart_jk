@@ -38,7 +38,6 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
     this.chartStyle,
     this.chartColors,
     this.scaleX,
-    double userScaleY,
     this.verticalTextAlignment,
     this.mBottomPadding,
   ) : super(
@@ -66,16 +65,6 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
       maxValue *= 1.5;
       minValue /= 2;
     }
-
-    // Zoom đều 2 phía quanh center
-    final double centerValue = (maxValue + minValue) / 2;
-    final double halfRange = (maxValue - minValue) / 2 / userScaleY;
-
-    // Override maxValue/minValue của BaseChartRenderer
-    this.maxValue = centerValue + halfRange;
-    this.minValue = centerValue - halfRange;
-
-    // Tính scaleY dựa trên range mới
     scaleY = _contentRect.height / (this.maxValue - this.minValue);
   }
 

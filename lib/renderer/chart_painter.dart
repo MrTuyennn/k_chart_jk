@@ -76,9 +76,7 @@ class ChartPainter extends BaseChartPainter {
     this.hideGrid = false,
     this.showNowPrice = true,
     this.fixedLength = 2,
-  }) : super(
-         isLongPress: isLongPass,
-       ) {
+  }) : super(isLongPress: isLongPass) {
     paintCross = Paint()
       ..color = chartColors.crossColor
       ..strokeWidth = chartStyle.crossWidth
@@ -110,8 +108,14 @@ class ChartPainter extends BaseChartPainter {
     //   var t = datas![0];
     //   fixedLength = NumberUtil.getMaxDecimalLength(t.open, t.close, t.high, t.low);
     // }
+    // TODO: mainContentRect tách main chart và volume thành 2 vùng riêng biệt, không đè lên nhau
+    // nếu muốn volume đè lên main chart thì đổi lại mainContentRect = mMainRect
+    final Rect mainContentRect = mVolRect != null
+        ? Rect.fromLTRB(mMainRect.left, mMainRect.top, mMainRect.right, mVolRect!.top)
+        : mMainRect;
+
     mMainRenderer = MainRenderer(
-      mMainRect,
+      mainContentRect,
       mMainMaxValue,
       mMainMinValue,
       mTopPadding,
@@ -121,7 +125,6 @@ class ChartPainter extends BaseChartPainter {
       chartStyle,
       chartColors,
       scaleX,
-      scaleY,
       verticalTextAlignment,
       mBottomPadding,
     );
@@ -164,15 +167,7 @@ class ChartPainter extends BaseChartPainter {
     );
     canvas.drawRect(mainRect, mBgPaint);
 
-    if (mVolRect != null) {
-      Rect volRect = Rect.fromLTRB(
-        0,
-        mVolRect!.top - mChildPadding,
-        mVolRect!.width,
-        mVolRect!.bottom,
-      );
-      canvas.drawRect(volRect, mBgPaint);
-    }
+    // Volume được overlay lên main chart nên không cần vẽ nền riêng
 
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
       Rect? mSecondaryRect = mSecondaryRectList[i].mRect;
@@ -203,6 +198,18 @@ class ChartPainter extends BaseChartPainter {
     canvas.save();
     canvas.translate(mTranslateX * scaleX, 0.0);
     canvas.scale(scaleX, 1.0);
+
+    // TODO: scaleY dùng canvas transform thay vì scale value range từng component
+    // giúp main chart và volume scale cùng nhau như 1 đơn vị (tương tự cách scaleX hoạt động)
+    canvas.save();
+    // Clip theo chiều Y vào đúng vùng mMainRect — tránh nội dung tràn ra ngoài
+    // đè lên time bar, secondary indicators hoặc top padding khi scaleY thay đổi
+    canvas.clipRect(
+      Rect.fromLTRB(-mDataLen - mWidth, mMainRect.top, mDataLen + mWidth, mMainRect.bottom),
+    );
+    final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
+    canvas.translate(0, centerY * (1 - scaleY));
+    canvas.scale(1.0, scaleY);
     for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
       KLineEntity? curPoint = datas?[i];
       if (curPoint == null) continue;
@@ -211,6 +218,16 @@ class ChartPainter extends BaseChartPainter {
       double lastX = i == 0 ? curX : getX(i - 1);
       mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
+    }
+    canvas.restore();
+
+    // Secondary indicators không bị ảnh hưởng bởi scaleY
+    for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
+      KLineEntity? curPoint = datas?[i];
+      if (curPoint == null) continue;
+      KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
+      double curX = getX(i);
+      double lastX = i == 0 ? curX : getX(i - 1);
       for (final element in mSecondaryRendererList) {
         element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       }
@@ -381,7 +398,7 @@ class ChartPainter extends BaseChartPainter {
     if (isLine == true) return;
     //plot maxima and minima
     double x = translateXtoX(getX(mMainMinIndex));
-    double y = getMainY(mMainLowMinValue);
+    double y = _applyScaleY(getMainY(mMainLowMinValue));
     if (x < mWidth / 2) {
       //draw right
       TextPainter tp = getTextPainter(
@@ -397,7 +414,7 @@ class ChartPainter extends BaseChartPainter {
       tp.paint(canvas, Offset(x - tp.width, y - tp.height / 2));
     }
     x = translateXtoX(getX(mMainMaxIndex));
-    y = getMainY(mMainHighMaxValue);
+    y = _applyScaleY(getMainY(mMainHighMaxValue));
     if (x < mWidth / 2) {
       //draw right
       TextPainter tp = getTextPainter(
@@ -422,11 +439,11 @@ class ChartPainter extends BaseChartPainter {
     // ưu tiên livePrice từ socket, fallback về datas.last.close
     final double value = livePrice ?? datas!.last.close;
 
-    double y = getMainY(value);
+    double y = _applyScaleY(getMainY(value));
 
-    // giữ trong vùng hiển thị
-    if (y > getMainY(mMainLowMinValue)) y = getMainY(mMainLowMinValue);
-    if (y < getMainY(mMainHighMaxValue)) y = getMainY(mMainHighMaxValue);
+    // giữ trong vùng hiển thị (đã tính scaleY)
+    if (y > _applyScaleY(getMainY(mMainLowMinValue))) y = _applyScaleY(getMainY(mMainLowMinValue));
+    if (y < _applyScaleY(getMainY(mMainHighMaxValue))) y = _applyScaleY(getMainY(mMainHighMaxValue));
 
     // màu dựa theo livePrice so với open của nến cuối
     Color priceColor = value >= datas!.last.open
@@ -588,6 +605,14 @@ class ChartPainter extends BaseChartPainter {
   );
 
   double getMainY(double y) => mMainRenderer.getY(y);
+
+  // Chuyển Y gốc sang Y đã scale — dùng cho các label vẽ ngoài canvas transform
+  double _applyScaleY(double rawY) {
+    if (scaleY == 1.0) return rawY;
+    final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
+    return (centerY + (rawY - centerY) * scaleY)
+        .clamp(mMainRect.top, mMainRect.bottom);
+  }
 
   /// Whether the point is in the SecondaryRect
   // bool isInSecondaryRect(Offset point) {

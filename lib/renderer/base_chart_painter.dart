@@ -191,26 +191,29 @@ abstract class BaseChartPainter extends CustomPainter {
     mainHeight -= volHeight;
     mainHeight -= baseDimension.totalSecondaryHeight;
 
+    // TODO: thứ tự layout có thể thay đổi — hiện tại: main chart (gộp volume) → thời gian → indicator phụ
     mMainRect = Rect.fromLTRB(0, mTopPadding, mWidth, mTopPadding + mainHeight);
 
+    // TODO: điều chỉnh tỉ lệ 0.2 nếu muốn volume chiếm nhiều/ít hơn trong main chart
     if (volHidden != true) {
+      final double overlayHeight = mMainRect.height * 0.2;
       mVolRect = Rect.fromLTRB(
         0,
-        mMainRect.bottom + mChildPadding,
+        mMainRect.bottom - overlayHeight,
         mWidth,
-        mMainRect.bottom + volHeight,
+        mMainRect.bottom,
       );
     }
 
-    double afterVol = volHidden != true ? mVolRect!.bottom : mMainRect.bottom;
-
+    // Thanh thời gian nằm ngay sau main chart
     mDateRect = Rect.fromLTRB(
       0,
-      afterVol,
+      mMainRect.bottom,
       mWidth,
-      afterVol + mBottomPadding,
+      mMainRect.bottom + mBottomPadding,
     );
 
+    // Các indicator phụ xếp chồng bên dưới thanh thời gian
     mSecondaryRectList.clear();
     for (int i = 0; i < secondaryIndicators.length; ++i) {
       mSecondaryRectList.add(

@@ -46,7 +46,9 @@ class BaseDimension {
     required List<MainIndicator> mainIndicators,
   }) {
     _mBaseHeight = mBaseHeight;
-    _mVolumeHeight = volHidden != true ? mSecondaryHeight : 0;
+    // TODO: bật lại nếu muốn volume có panel riêng bên dưới chart chính
+    // _mVolumeHeight = volHidden != true ? mSecondaryHeight : 0;
+    _mVolumeHeight = 0; // volume gộp vào main chart dưới dạng overlay
     _mSecondaryHeight = mSecondaryHeight;
 
     _totalSecondaryHeight = _mSecondaryHeight * secondaryIndicators.length;

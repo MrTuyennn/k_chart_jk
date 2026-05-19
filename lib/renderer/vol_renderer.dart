@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:k_chart_wikex/entity/index.dart';
-import 'package:k_chart_wikex/extension/num_ext.dart';
 import 'package:k_chart_wikex/renderer/index.dart';
 import 'package:k_chart_wikex/utils/index.dart';
 
@@ -41,36 +40,39 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
     double top = getVolY(curPoint.vol);
     double bottom = chartRect.bottom;
     if (curPoint.vol != 0) {
+      // withOpacity để cột volume không che khuất nến phía dưới
       canvas.drawRect(
         Rect.fromLTRB(curX - r, top, curX + r, bottom),
         chartPaint
-          ..color = curPoint.close > curPoint.open
-              ? chartColors.volUpColor
-              : chartColors.volDnColor,
+          ..color = (curPoint.close > curPoint.open
+                  ? chartColors.volUpColor
+                  : chartColors.volDnColor)
+              .withOpacity(0.5),
       );
     }
 
-    if (lastPoint.MA5Volume != 0) {
-      drawLine(
-        lastPoint.MA5Volume,
-        curPoint.MA5Volume,
-        canvas,
-        lastX,
-        curX,
-        chartColors.ma5Color,
-      );
-    }
+    // TODO: bật lại khi cần hiển thị đường MA5 và MA10 trên volume
+    // if (lastPoint.MA5Volume != 0) {
+    //   drawLine(
+    //     lastPoint.MA5Volume,
+    //     curPoint.MA5Volume,
+    //     canvas,
+    //     lastX,
+    //     curX,
+    //     chartColors.ma5Color,
+    //   );
+    // }
 
-    if (lastPoint.MA10Volume != 0) {
-      drawLine(
-        lastPoint.MA10Volume,
-        curPoint.MA10Volume,
-        canvas,
-        lastX,
-        curX,
-        chartColors.ma10Color,
-      );
-    }
+    // if (lastPoint.MA10Volume != 0) {
+    //   drawLine(
+    //     lastPoint.MA10Volume,
+    //     curPoint.MA10Volume,
+    //     canvas,
+    //     lastX,
+    //     curX,
+    //     chartColors.ma10Color,
+    //   );
+    // }
   }
 
   double getVolY(double value) =>
@@ -78,27 +80,28 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
 
   @override
   void drawText(Canvas canvas, VolumeEntity data, double x) {
-    TextSpan span = TextSpan(
-      children: [
-        TextSpan(
-          text: "VOL:${NumberUtil.formatCompact(data.vol)}   ",
-          style: getTextStyle(chartColors.volColor),
-        ),
-        if (data.MA5Volume.notNullOrZero)
-          TextSpan(
-            text: "MA5:${NumberUtil.formatCompact(data.MA5Volume!)}   ",
-            style: getTextStyle(chartColors.ma5Color),
-          ),
-        if (data.MA10Volume.notNullOrZero)
-          TextSpan(
-            text: "MA10:${NumberUtil.formatCompact(data.MA10Volume!)}   ",
-            style: getTextStyle(chartColors.ma10Color),
-          ),
-      ],
-    );
-    TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
-    tp.layout();
-    tp.paint(canvas, Offset(x, chartRect.top - topPadding));
+    // TODO: bật lại khi cần hiển thị text VOL, MA5, MA10 phía trên volume
+    // TextSpan span = TextSpan(
+    //   children: [
+    //     TextSpan(
+    //       text: "VOL:${NumberUtil.formatCompact(data.vol)}   ",
+    //       style: getTextStyle(chartColors.volColor),
+    //     ),
+    //     if (data.MA5Volume.notNullOrZero)
+    //       TextSpan(
+    //         text: "MA5:${NumberUtil.formatCompact(data.MA5Volume!)}   ",
+    //         style: getTextStyle(chartColors.ma5Color),
+    //       ),
+    //     if (data.MA10Volume.notNullOrZero)
+    //       TextSpan(
+    //         text: "MA10:${NumberUtil.formatCompact(data.MA10Volume!)}   ",
+    //         style: getTextStyle(chartColors.ma10Color),
+    //       ),
+    //   ],
+    // );
+    // TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
+    // tp.layout();
+    // tp.paint(canvas, Offset(x, chartRect.top - topPadding));
   }
 
   @override
