@@ -315,7 +315,10 @@ class _KChartWidgetState extends State<KChartWidget>
           Positioned(
             right: 0,
             top: 0,
-            bottom: 0,
+            bottom:
+                baseDimension.mVolumeHeight +
+                baseDimension.totalSecondaryHeight +
+                widget.chartStyle.bottomPadding,
             child: GestureDetector(
               onVerticalDragStart: (details) {
                 _scaleYDragStart = details.localPosition.dy;

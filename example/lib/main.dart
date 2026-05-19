@@ -79,7 +79,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   bool _volHidden = false;
   bool _isDark = false;
 
-  bool _isFetching = false;        // đang fetch → hiện banner
+  bool _isFetching = false; // đang fetch → hiện banner
   int _totalLoaded = 200;
   static const int _maxTotal = 500;
   static const int _batchSize = 50;
@@ -102,8 +102,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   }
 
   void _onLoadMore(bool isLeft) async {
-    if (!isLeft) return;                  // chỉ xử lý load data cũ hơn
-    if (_isFetching) return;              // đang fetch rồi, bỏ qua
+    if (!isLeft) return; // chỉ xử lý load data cũ hơn
+    if (_isFetching) return; // đang fetch rồi, bỏ qua
     if (_totalLoaded >= _maxTotal) return; // đã hết data
 
     setState(() => _isFetching = true);
@@ -136,10 +136,17 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       final high = max(open, close) + random.nextDouble() * 300;
       final low = min(open, close) - random.nextDouble() * 300;
       final vol = 10 + random.nextDouble() * 500;
-      list.add(KLineEntity.fromCustom(
-        time: time, open: open, close: close,
-        high: high, low: low, vol: vol, amount: close * vol,
-      ));
+      list.add(
+        KLineEntity.fromCustom(
+          time: time,
+          open: open,
+          close: close,
+          high: high,
+          low: low,
+          vol: vol,
+          amount: close * vol,
+        ),
+      );
       price = close;
     }
     return list;
@@ -251,8 +258,12 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const SizedBox(
-                width: 12, height: 12,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 8),
               Text(

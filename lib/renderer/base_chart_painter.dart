@@ -192,21 +192,24 @@ abstract class BaseChartPainter extends CustomPainter {
     mainHeight -= baseDimension.totalSecondaryHeight;
 
     mMainRect = Rect.fromLTRB(0, mTopPadding, mWidth, mTopPadding + mainHeight);
-    mDateRect = Rect.fromLTRB(
-      0,
-      mMainRect.bottom,
-      mWidth,
-      mMainRect.bottom + mBottomPadding,
-    );
 
     if (volHidden != true) {
       mVolRect = Rect.fromLTRB(
         0,
-        mDateRect.bottom + mChildPadding,
+        mMainRect.bottom + mChildPadding,
         mWidth,
-        mDateRect.bottom + volHeight,
+        mMainRect.bottom + volHeight,
       );
     }
+
+    double afterVol = volHidden != true ? mVolRect!.bottom : mMainRect.bottom;
+
+    mDateRect = Rect.fromLTRB(
+      0,
+      afterVol,
+      mWidth,
+      afterVol + mBottomPadding,
+    );
 
     mSecondaryRectList.clear();
     for (int i = 0; i < secondaryIndicators.length; ++i) {
@@ -214,12 +217,9 @@ abstract class BaseChartPainter extends CustomPainter {
         RenderRect(
           Rect.fromLTRB(
             0,
-            mDateRect.bottom + volHeight + i * secondaryHeight + mChildPadding,
+            mDateRect.bottom + i * secondaryHeight + mChildPadding,
             mWidth,
-            mDateRect.bottom +
-                volHeight +
-                i * secondaryHeight +
-                secondaryHeight,
+            mDateRect.bottom + i * secondaryHeight + secondaryHeight,
           ),
         ),
       );
