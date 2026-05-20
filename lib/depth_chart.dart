@@ -1,7 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:k_chart_wikex/chart_translations.dart';
 import 'package:k_chart_wikex/extension/canvas_extension.dart';
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_wikex/styles/depth_chart_style.dart';
+import 'package:k_chart_wikex/utils/number_util.dart';
+import 'entity/depth_entity.dart';
 
 class DepthChart extends StatefulWidget {
   final List<DepthEntity> bids, asks;
@@ -12,11 +15,10 @@ class DepthChart extends StatefulWidget {
   final DepthChartStyle chartStyle;
   final DepthChartTranslations chartTranslations;
 
-  const DepthChart(
+  DepthChart(
     this.bids,
     this.asks,
     this.chartColors, {
-    super.key,
     this.baseUnit = 2,
     this.quoteUnit = 6,
     this.offset = const Offset(8, 0),
@@ -25,7 +27,7 @@ class DepthChart extends StatefulWidget {
   });
 
   @override
-  State<DepthChart> createState() => _DepthChartState();
+  _DepthChartState createState() => _DepthChartState();
 }
 
 class _DepthChartState extends State<DepthChart> {
@@ -119,28 +121,28 @@ class DepthChartPainter extends CustomPainter {
   ) {
     mBuyLinePaint ??= Paint()
       ..isAntiAlias = true
-      ..color = chartColors.upColor
+      ..color = this.chartColors.upColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = chartStyle.lineWidth;
     mSellLinePaint ??= Paint()
       ..isAntiAlias = true
-      ..color = chartColors.dnColor
+      ..color = this.chartColors.dnColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = chartStyle.lineWidth;
 
     mBuyPathPaint ??= Paint()
       ..isAntiAlias = true
-      ..color = chartColors.upFillPathColor;
+      ..color = this.chartColors.upFillPathColor;
     mSellPathPaint ??= Paint()
       ..isAntiAlias = true
-      ..color = chartColors.dnFillPathColor;
+      ..color = this.chartColors.dnFillPathColor;
     mBarrierPathPaint ??= Paint()
       ..isAntiAlias = true
-      ..color = chartColors.barrierColor;
+      ..color = this.chartColors.barrierColor;
     crossPaint = Paint()
       ..isAntiAlias = true
-      ..strokeWidth = chartStyle.crossWidth
-      ..color = chartColors.crossColor;
+      ..strokeWidth = this.chartStyle.crossWidth
+      ..color = this.chartColors.crossColor;
 
     mBuyPath ??= Path();
     mSellPath ??= Path();
@@ -151,9 +153,8 @@ class DepthChartPainter extends CustomPainter {
     if (mBuyData == null ||
         mSellData == null ||
         mBuyData!.isEmpty ||
-        mSellData!.isEmpty) {
+        mSellData!.isEmpty)
       return;
-    }
     mMaxVolume = max(mBuyData!.first.vol, mSellData!.last.vol);
     mMaxVolume = mMaxVolume! * 1.08;
     mMultiple = mMaxVolume! / mLineCount;
@@ -173,9 +174,8 @@ class DepthChartPainter extends CustomPainter {
     if (mBuyData == null ||
         mSellData == null ||
         mBuyData!.isEmpty ||
-        mSellData!.isEmpty) {
+        mSellData!.isEmpty)
       return;
-    }
     mWidth = size.width;
     mDrawWidth = mWidth / 2;
     mDrawHeight = size.height - mPaddingBottom;
@@ -409,9 +409,9 @@ class DepthChartPainter extends CustomPainter {
     ///draw popup info
     ///
     _PopupPainter popupPainter = _PopupPainter(
-      translations: chartTranslations,
-      chartColors: chartColors,
-      chartStyle: chartStyle,
+      translations: this.chartTranslations,
+      chartColors: this.chartColors,
+      chartStyle: this.chartStyle,
       price: NumberUtil.format(entity.price, quoteUnit) ?? '',
       amount: NumberUtil.formatCompact(entity.vol, baseUnit),
     );
@@ -471,9 +471,9 @@ class DepthChartPainter extends CustomPainter {
     ///draw popup info
     ///
     _PopupPainter popupPainter = _PopupPainter(
-      translations: chartTranslations,
-      chartColors: chartColors,
-      chartStyle: chartStyle,
+      translations: this.chartTranslations,
+      chartColors: this.chartColors,
+      chartStyle: this.chartStyle,
       price: NumberUtil.format(entity.price, quoteUnit) ?? '',
       amount: NumberUtil.formatCompact(entity.vol, baseUnit),
     );
@@ -528,9 +528,9 @@ class DepthChartPainter extends CustomPainter {
 
   double getSellX(int position) => position * mSellPointWidth! + mDrawWidth;
 
-  TextPainter getTextPainter(String text) => TextPainter(
+  getTextPainter(String text) => TextPainter(
     text: TextSpan(
-      text: text,
+      text: "$text",
       style: TextStyle(color: chartColors.defaultTextColor, fontSize: 10),
     ),
     textDirection: TextDirection.ltr,
@@ -576,10 +576,10 @@ class _PopupPainter {
     required String price,
     required String amount,
   }) {
-    pricePaint = _getTextPainter(translations.price, price);
-    amountPaint = _getTextPainter(translations.amount, amount);
-    pricePaint.layout();
-    amountPaint.layout();
+    this.pricePaint = _getTextPainter(translations.price, price);
+    this.amountPaint = _getTextPainter(translations.amount, amount);
+    this.pricePaint.layout();
+    this.amountPaint.layout();
   }
 
   void paint(Canvas canvas, Offset offset) {
@@ -601,7 +601,7 @@ class _PopupPainter {
     return TextPainter(
       text: TextSpan(
         text: '$label $content',
-        style: TextStyle(color: chartColors.annotationColor, fontSize: 9),
+        style: TextStyle(color: this.chartColors.annotationColor, fontSize: 9),
       ),
       textAlign: TextAlign.start,
       textDirection: TextDirection.ltr,
