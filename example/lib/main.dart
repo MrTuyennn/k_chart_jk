@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:k_chart_wikex/k_chart_plus.dart';
 
 void main() {
@@ -302,6 +303,17 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           onLoadMore: _onLoadMore,
           isLoadingMore: _isFetching,
           detailBuilder: _buildInfoCard,
+          backgroundLogo: Builder(
+            builder: (context) {
+              final size = MediaQuery.sizeOf(context).width / 12;
+              return SvgPicture.asset(
+                'assets/logo_wikex.svg',
+                width: size,
+                height: size,
+              );
+            },
+          ),
+          backgroundLogoOpacity: 1,
         ),
       ],
     );
