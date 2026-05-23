@@ -27,6 +27,8 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
   late Paint mLinePaint;
   final VerticalTextAlignment verticalTextAlignment;
   final double mBottomPadding;
+  final double externalScaleY;
+  final double scaleCenterY;
   MainRenderer(
     Rect mainRect,
     double maxValue,
@@ -40,6 +42,8 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
     this.scaleX,
     this.verticalTextAlignment,
     this.mBottomPadding,
+    this.externalScaleY,
+    this.scaleCenterY,
   ) : super(
         chartRect: mainRect,
         maxValue: maxValue,
@@ -243,7 +247,11 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
   void drawVerticalText(Canvas canvas, TextStyle textStyle, int gridRows) {
     double rowSpace = chartRect.height / gridRows;
     for (var i = 0; i <= gridRows; ++i) {
-      double value = (gridRows - i) * rowSpace / scaleY + minValue;
+      double yScreen = i == 0 ? topPadding : rowSpace * i + topPadding;
+      double yContent = externalScaleY == 1.0
+          ? yScreen
+          : scaleCenterY + (yScreen - scaleCenterY) / externalScaleY;
+      double value = maxValue - (yContent - _contentRect.top) / scaleY;
       TextSpan span = TextSpan(
         text: NumberUtil.formatFixed(value, fixedLength) ?? '',
         style: textStyle,

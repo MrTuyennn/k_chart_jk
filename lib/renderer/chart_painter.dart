@@ -127,6 +127,8 @@ class ChartPainter extends BaseChartPainter {
       scaleX,
       verticalTextAlignment,
       mBottomPadding,
+      scaleY,
+      (mMainRect.top + mMainRect.bottom) / 2,
     );
     if (mVolRect != null) {
       mVolRenderer = VolRenderer(
