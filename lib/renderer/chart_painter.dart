@@ -73,6 +73,7 @@ class ChartPainter extends BaseChartPainter {
     super.volHidden,
     super.secondaryIndicators,
     super.isLine = false,
+    super.offsetY = 0.0,
     this.hideGrid = false,
     this.showNowPrice = true,
     this.fixedLength = 2,
@@ -129,6 +130,7 @@ class ChartPainter extends BaseChartPainter {
       mBottomPadding,
       scaleY,
       (mMainRect.top + mMainRect.bottom) / 2,
+      offsetY,
     );
     if (mVolRect != null) {
       mVolRenderer = VolRenderer(
@@ -210,7 +212,8 @@ class ChartPainter extends BaseChartPainter {
       Rect.fromLTRB(-mDataLen - mWidth, mMainRect.top, mDataLen + mWidth, mMainRect.bottom),
     );
     final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
-    canvas.translate(0, centerY * (1 - scaleY));
+    // offsetY dịch chuyển chart dọc (pan Y), neo tại centerY để scaleY không bị lệch
+    canvas.translate(0, centerY * (1 - scaleY) + offsetY);
     canvas.scale(1.0, scaleY);
     for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
       KLineEntity? curPoint = datas?[i];
@@ -608,11 +611,11 @@ class ChartPainter extends BaseChartPainter {
 
   double getMainY(double y) => mMainRenderer.getY(y);
 
-  // Chuyển Y gốc sang Y đã scale — dùng cho các label vẽ ngoài canvas transform
+  // Chuyển Y gốc sang Y screen — dùng cho labels vẽ ngoài canvas transform (nowPrice, maxMin)
+  // công thức đảo ngược của canvas.translate + canvas.scale, có tính offsetY
   double _applyScaleY(double rawY) {
-    if (scaleY == 1.0) return rawY;
     final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
-    return (centerY + (rawY - centerY) * scaleY)
+    return (centerY + (rawY - centerY) * scaleY + offsetY)
         .clamp(mMainRect.top, mMainRect.bottom);
   }
 

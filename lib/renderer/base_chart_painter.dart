@@ -19,6 +19,7 @@ abstract class BaseChartPainter extends CustomPainter {
   bool volHidden;
   bool isTapShowInfoDialog;
   double scaleX = 1.0, scaleY = 1.0, scrollX = 0.0, selectX;
+  double offsetY = 0.0;
   bool isLongPress = false;
   bool isOnTap;
   bool isLine;
@@ -72,6 +73,7 @@ abstract class BaseChartPainter extends CustomPainter {
     required this.xFrontPadding,
     required this.baseDimension,
     this.isOnTap = false,
+    this.offsetY = 0.0,
     this.mainIndicators = const [],
     this.volHidden = false,
     this.isTapShowInfoDialog = false,

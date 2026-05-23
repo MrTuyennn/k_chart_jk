@@ -29,6 +29,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
   final double mBottomPadding;
   final double externalScaleY;
   final double scaleCenterY;
+  final double offsetY;
   MainRenderer(
     Rect mainRect,
     double maxValue,
@@ -44,6 +45,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
     this.mBottomPadding,
     this.externalScaleY,
     this.scaleCenterY,
+    this.offsetY,
   ) : super(
         chartRect: mainRect,
         maxValue: maxValue,
@@ -248,9 +250,8 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
     double rowSpace = chartRect.height / gridRows;
     for (var i = 0; i <= gridRows; ++i) {
       double yScreen = i == 0 ? topPadding : rowSpace * i + topPadding;
-      double yContent = externalScaleY == 1.0
-          ? yScreen
-          : scaleCenterY + (yScreen - scaleCenterY) / externalScaleY;
+      // đảo ngược canvas transform (scaleY + offsetY) để tính đúng giá tại vị trí screen của từng grid line
+      double yContent = scaleCenterY + (yScreen - scaleCenterY - offsetY) / externalScaleY;
       double value = maxValue - (yContent - _contentRect.top) / scaleY;
       TextSpan span = TextSpan(
         text: NumberUtil.formatFixed(value, fixedLength) ?? '',

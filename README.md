@@ -5,7 +5,13 @@ A Flutter candlestick chart package with support for multiple technical indicato
 ## Features
 
 - Candlestick and line chart rendering
-- Pan, pinch-to-zoom, and fling gestures
+- **Free pan:** drag 1 ngón tay di chuyển chart theo cả X (scroll nến) lẫn Y (dịch vùng giá)
+- **Zoom X:** pinch 2 ngón tay, giới hạn bởi `minScale` / `maxScale`
+- **Zoom Y:** drag dọc trong vùng 100px bên phải chart
+- **Double tap** vùng phải: reset zoom Y và pan Y về mặc định
+- **Tap-to-toggle crosshair:** tap hiện crosshair, tap lại ẩn; kéo khi crosshair đang hiện sẽ di chuyển crosshair thay vì scroll
+- **Price labels đồng bộ scaleY + offsetY:** labels trục Y luôn hiển thị đúng giá theo vị trí visual của nến
+- Fling (quán tính) khi scroll, không fling khi đang kéo crosshair
 - **Main indicators:** MA, EMA, BOLL, SAR, ZigZag
 - **Secondary indicators:** MACD, KDJ, RSI, WR, CCI
 - Volume bar chart with MA5 / MA10 overlay

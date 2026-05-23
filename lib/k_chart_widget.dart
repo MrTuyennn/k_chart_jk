@@ -112,7 +112,8 @@ class _KChartWidgetState extends State<KChartWidget>
   final StreamController<InfoWindowEntity?> mInfoWindowStream =
       StreamController<InfoWindowEntity?>();
   double mScaleX = 1.0, mScrollX = 0.0, mSelectX = 0.0;
-  double mScaleY = 1.0;
+  // mOffsetY: độ dịch chuyển Y của chart (pan dọc), reset về 0 khi double tap
+  double mScaleY = 1.0, mOffsetY = 0.0;
   double _scaleYDragStart = 0.0;
   AnimationController? _controller;
   Animation<double>? aniX;
@@ -131,6 +132,10 @@ class _KChartWidgetState extends State<KChartWidget>
 
   double _lastScale = 1.0;
   bool isScale = false, isDrag = false, isLongPress = false, isOnTap = false;
+  // true khi gesture bắt đầu trong vùng 100px phải → drag dọc = scaleY
+  bool _isScaleYGesture = false;
+  // true khi drag bắt đầu trong lúc crosshair đang hiển thị → drag di chuyển crosshair thay vì scroll
+  bool _dragStartedInTapMode = false;
 
   @override
   void dispose() {
@@ -190,6 +195,7 @@ class _KChartWidgetState extends State<KChartWidget>
       scaleX: mScaleX,
       scaleY: mScaleY,
       scrollX: mScrollX,
+      offsetY: mOffsetY,
       selectX: mSelectX,
       isLongPass: isLongPress,
       isOnTap: isOnTap,
@@ -208,11 +214,18 @@ class _KChartWidgetState extends State<KChartWidget>
       onTapUp: (details) {
         if (!widget.isTrendLine &&
             painter.isInMainRect(details.localPosition)) {
-          isOnTap = true;
-          if (mSelectX != details.localPosition.dx &&
-              widget.isTapShowInfoDialog) {
-            mSelectX = details.localPosition.dx;
+          // tap-to-toggle: tap lần đầu → hiện crosshair, tap lại → ẩn crosshair
+          if (isOnTap) {
+            isOnTap = false;
+            mInfoWindowStream.sink.add(null);
             notifyChanged();
+          } else {
+            isOnTap = true;
+            if (mSelectX != details.localPosition.dx &&
+                widget.isTapShowInfoDialog) {
+              mSelectX = details.localPosition.dx;
+              notifyChanged();
+            }
           }
         }
         if (widget.isTrendLine && !isLongPress && enableCordRecord) {
@@ -236,32 +249,60 @@ class _KChartWidgetState extends State<KChartWidget>
       },
       onScaleStart: (details) {
         isScale = true;
-        isOnTap = false;
         isLongPress = false;
+        // lưu trạng thái tap trước khi gesture bắt đầu để quyết định mode drag
+        _dragStartedInTapMode = isOnTap;
+        if (!isOnTap) isOnTap = false;
         _stopAnimation();
         _lastScale = mScaleX;
+        _scaleYDragStart = details.localFocalPoint.dy;
+        // xác định scaleY gesture: 1 ngón tay trong vùng 100px bên phải
+        final renderBox = context.findRenderObject() as RenderBox?;
+        final width = renderBox?.size.width ?? 0.0;
+        _isScaleYGesture =
+            details.pointerCount == 1 &&
+            details.localFocalPoint.dx > width - 100;
       },
       onScaleUpdate: (details) {
-        if (details.scale != 1.0) {
-          mScaleX = (_lastScale * details.scale).clamp(0.5, 2.2);
+        if (_dragStartedInTapMode && details.pointerCount == 1 && !_isScaleYGesture) {
+          // crosshair đang hiển thị → drag di chuyển crosshair theo ngón tay
+          mSelectX = details.localFocalPoint.dx;
+        } else if (_isScaleYGesture && details.pointerCount == 1) {
+          // vùng phải + drag dọc → điều chỉnh scaleY (zoom dọc)
+          final double delta =
+              details.localFocalPoint.dy - _scaleYDragStart;
+          mScaleY = (mScaleY - delta * 0.005).clamp(0.3, 5.0);
+          _scaleYDragStart = details.localFocalPoint.dy;
+        } else if (details.scale != 1.0) {
+          // 2 ngón tay → zoom scaleX, clamp theo widget.minScale/maxScale
+          isOnTap = false;
+          mScaleX = (_lastScale * details.scale)
+              .clamp(widget.minScale, widget.maxScale);
         } else {
+          // 1 ngón tay drag tự do → scroll X + pan Y đồng thời
+          isOnTap = false;
           mScrollX = (mScrollX + details.focalPointDelta.dx / mScaleX)
               .clamp(0.0, ChartPainter.maxScrollX)
               .toDouble();
-        }
-        if (!widget.isLoadingMore &&
-            widget.onLoadMore != null &&
-            ChartPainter.maxScrollX > 0 &&
-            mScrollX >= ChartPainter.maxScrollX * 0.8) {
-          widget.onLoadMore!(true);
+          mOffsetY += details.focalPointDelta.dy;
+          if (!widget.isLoadingMore &&
+              widget.onLoadMore != null &&
+              ChartPainter.maxScrollX > 0 &&
+              mScrollX >= ChartPainter.maxScrollX * 0.8) {
+            widget.onLoadMore!(true);
+          }
         }
         notifyChanged();
       },
       onScaleEnd: (details) {
         isScale = false;
         _lastScale = mScaleX;
-        final velocity = details.velocity.pixelsPerSecond.dx;
-        _onFling(velocity);
+        // fling chỉ chạy khi drag là scroll thường, không phải kéo crosshair
+        if (!_dragStartedInTapMode) {
+          final velocity = details.velocity.pixelsPerSecond.dx;
+          _onFling(velocity);
+        }
+        _dragStartedInTapMode = false;
       },
       onLongPressStart: (details) {
         isOnTap = false;
@@ -322,18 +363,10 @@ class _KChartWidgetState extends State<KChartWidget>
                 baseDimension.totalSecondaryHeight +
                 widget.chartStyle.bottomPadding,
             child: GestureDetector(
-              onVerticalDragStart: (details) {
-                _scaleYDragStart = details.localPosition.dy;
-              },
-              onVerticalDragUpdate: (details) {
-                final double delta =
-                    details.localPosition.dy - _scaleYDragStart;
-                mScaleY = (mScaleY - delta * 0.005).clamp(0.3, 5.0);
-                _scaleYDragStart = details.localPosition.dy;
-                notifyChanged();
-              },
               onDoubleTap: () {
+                // double tap vùng phải → reset scaleY và offsetY về mặc định
                 mScaleY = 1.0;
+                mOffsetY = 0.0;
                 notifyChanged();
               },
               child: Container(color: Colors.transparent, width: 100),
