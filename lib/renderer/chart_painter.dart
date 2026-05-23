@@ -49,6 +49,8 @@ class ChartPainter extends BaseChartPainter {
   final bool showNowPrice;
   final VerticalTextAlignment verticalTextAlignment;
   final double? livePrice;
+  // khi true, bỏ qua drawBg để canvas trong suốt — dùng khi có backgroundLogo widget ở layer dưới
+  final bool skipBg;
 
   ChartPainter(
     super.chartStyle,
@@ -77,6 +79,7 @@ class ChartPainter extends BaseChartPainter {
     this.hideGrid = false,
     this.showNowPrice = true,
     this.fixedLength = 2,
+    this.skipBg = false,
   }) : super(isLongPress: isLongPass) {
     paintCross = Paint()
       ..color = chartColors.crossColor
@@ -162,6 +165,7 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void drawBg(Canvas canvas, Size size) {
+    if (skipBg) return;
     Paint mBgPaint = Paint()..color = chartColors.bgColor;
     Rect mainRect = Rect.fromLTRB(
       0,

@@ -68,6 +68,12 @@ class KChartWidget extends StatefulWidget {
   final KChartController? controller;
   final bool isLoadingMore;
 
+  /// Widget hiển thị như watermark ở giữa vùng main chart (vd: SvgPicture.asset(...))
+  final Widget? backgroundLogo;
+
+  /// Độ trong suốt của backgroundLogo (0.0 = ẩn hoàn toàn, 1.0 = hiện đầy đủ)
+  final double backgroundLogoOpacity;
+
   const KChartWidget(
     this.datas,
     this.chartStyle,
@@ -100,6 +106,8 @@ class KChartWidget extends StatefulWidget {
     this.minScale = 0.5,
     this.maxScale = 2.2,
     this.isLoadingMore = false,
+    this.backgroundLogo,
+    this.backgroundLogoOpacity = 1,
     super.key,
   });
 
@@ -181,6 +189,7 @@ class _KChartWidgetState extends State<KChartWidget>
       secondaryIndicators: widget.secondaryIndicators,
       mainIndicators: widget.mainIndicators,
     );
+    final bool hasLogo = widget.backgroundLogo != null;
     final painter = ChartPainter(
       widget.chartStyle,
       widget.chartColors,
@@ -208,6 +217,8 @@ class _KChartWidgetState extends State<KChartWidget>
       showNowPrice: widget.showNowPrice,
       fixedLength: widget.fixedLength,
       verticalTextAlignment: widget.verticalTextAlignment,
+      // khi có logo, background tách thành Container riêng để logo nằm giữa
+      skipBg: hasLogo,
     );
 
     return GestureDetector(
@@ -264,20 +275,23 @@ class _KChartWidgetState extends State<KChartWidget>
             details.localFocalPoint.dx > width - 100;
       },
       onScaleUpdate: (details) {
-        if (_dragStartedInTapMode && details.pointerCount == 1 && !_isScaleYGesture) {
+        if (_dragStartedInTapMode &&
+            details.pointerCount == 1 &&
+            !_isScaleYGesture) {
           // crosshair đang hiển thị → drag di chuyển crosshair theo ngón tay
           mSelectX = details.localFocalPoint.dx;
         } else if (_isScaleYGesture && details.pointerCount == 1) {
           // vùng phải + drag dọc → điều chỉnh scaleY (zoom dọc)
-          final double delta =
-              details.localFocalPoint.dy - _scaleYDragStart;
+          final double delta = details.localFocalPoint.dy - _scaleYDragStart;
           mScaleY = (mScaleY - delta * 0.005).clamp(0.3, 5.0);
           _scaleYDragStart = details.localFocalPoint.dy;
         } else if (details.scale != 1.0) {
           // 2 ngón tay → zoom scaleX, clamp theo widget.minScale/maxScale
           isOnTap = false;
-          mScaleX = (_lastScale * details.scale)
-              .clamp(widget.minScale, widget.maxScale);
+          mScaleX = (_lastScale * details.scale).clamp(
+            widget.minScale,
+            widget.maxScale,
+          );
         } else {
           // 1 ngón tay drag tự do → scroll X + pan Y đồng thời
           isOnTap = false;
@@ -349,6 +363,28 @@ class _KChartWidgetState extends State<KChartWidget>
       },
       child: Stack(
         children: [
+          // layer 1: background color (luôn render, tách khỏi painter khi có logo)
+          if (hasLogo)
+            Positioned.fill(
+              child: ColoredBox(color: widget.chartColors.bgColor),
+            ),
+          // layer 2: logo watermark — trên background, dưới chart content
+          if (hasLogo)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: widget.mBaseHeight + baseDimension.totalLabelHeight,
+              child: IgnorePointer(
+                child: Center(
+                  child: Opacity(
+                    opacity: widget.backgroundLogoOpacity.clamp(0.0, 1.0),
+                    child: widget.backgroundLogo!,
+                  ),
+                ),
+              ),
+            ),
+          // layer 3: chart content (canvas transparent khi hasLogo)
           CustomPaint(
             size: Size(double.infinity, baseDimension.mDisplayHeight),
             painter: painter,

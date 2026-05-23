@@ -164,6 +164,52 @@ DataUtil.calculateAll(data, mainIndicators, secondaryIndicators);
 | `detailBuilder`       | `WidgetDetailBuilder`      | —                  | Custom info card widget        |
 | `controller`          | `KChartController?`        | —                  | Programmatic control           |
 | `livePrice`           | `double?`                  | —                  | Real-time price override       |
+| `backgroundLogo`      | `Widget?`                  | `null`             | Watermark widget giữa main chart (dưới candles, trên nền) |
+| `backgroundLogoOpacity` | `double`               | `1.0`              | Độ mờ của watermark (0.0–1.0)  |
+
+---
+
+## Background logo (watermark)
+
+Truyền bất kỳ widget nào vào `backgroundLogo` để hiển thị như watermark ở giữa vùng main chart — nằm **trên nền** (`bgColor`) nhưng **dưới candles và indicators**.
+
+```dart
+KChartWidget(
+  data,
+  chartStyle,
+  chartColors,
+  // SVG (cần flutter_svg)
+  backgroundLogo: Builder(
+    builder: (context) {
+      final size = MediaQuery.sizeOf(context).width / 6;
+      return SvgPicture.asset('assets/logo.svg', width: size, height: size);
+    },
+  ),
+  backgroundLogoOpacity: 0.15,
+  ...
+)
+```
+
+> **Lưu ý:** Khi `backgroundLogo != null`, `ChartPainter` bỏ qua `drawBg` (canvas trong suốt). Background được render bằng `ColoredBox(bgColor)` ở layer riêng trong Stack, đảm bảo thứ tự layer: **nền → logo → chart content**.
+>
+> Logo dùng `IgnorePointer` nên không ảnh hưởng đến gesture.
+
+---
+
+## Gesture interaction
+
+| Gesture | Hành động |
+|---|---|
+| 1 ngón kéo ngang | Scroll qua các nến (X) |
+| 1 ngón kéo dọc | Pan vùng giá lên/xuống (Y) |
+| 1 ngón kéo tự do | Scroll X + pan Y đồng thời |
+| Pinch 2 ngón | Zoom scaleX (thu phóng số nến hiển thị) |
+| Kéo dọc trong 100px phải | Zoom scaleY (thu phóng vùng giá) |
+| Double tap vùng phải | Reset scaleY và offsetY về mặc định |
+| Tap vào nến | Hiện crosshair + info dialog |
+| Tap lại | Ẩn crosshair |
+| Kéo khi crosshair đang hiện | Di chuyển crosshair theo ngón tay |
+| Long press + kéo | Di chuyển crosshair |
 
 ---
 
