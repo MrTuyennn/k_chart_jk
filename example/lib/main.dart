@@ -75,7 +75,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   final KChartController _controller = KChartController();
 
   _MainType _mainType = _MainType.ma;
-  _SecondaryType _secondaryType = _SecondaryType.macd;
+  Set<_SecondaryType> _secondaryTypes = {_SecondaryType.macd};
   bool _isLine = false;
   bool _volHidden = false;
   bool _isDark = false;
@@ -160,9 +160,13 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     });
   }
 
-  void _setSecondary(_SecondaryType type) {
+  void _toggleSecondary(_SecondaryType type) {
     setState(() {
-      _secondaryType = type;
+      if (_secondaryTypes.contains(type)) {
+        _secondaryTypes.remove(type);
+      } else {
+        _secondaryTypes.add(type);
+      }
       _recalculate();
     });
   }
@@ -174,20 +178,34 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     _MainType.none => [],
   };
 
-  List<SecondaryIndicator> get _secondaryIndicators => switch (_secondaryType) {
-    _SecondaryType.macd => [MACDIndicator()],
-    _SecondaryType.kdj => [KDJIndicator()],
-    _SecondaryType.rsi => [RSIIndicator()],
-    _SecondaryType.wr => [WRIndicator()],
-    _SecondaryType.cci => [CCIIndicator()],
-    _SecondaryType.none => [],
-  };
+  List<SecondaryIndicator> get _secondaryIndicators {
+    const order = [
+      _SecondaryType.macd,
+      _SecondaryType.kdj,
+      _SecondaryType.rsi,
+      _SecondaryType.wr,
+      _SecondaryType.cci,
+    ];
+    return order
+        .where((t) => _secondaryTypes.contains(t))
+        .map<SecondaryIndicator>(
+          (t) => switch (t) {
+            _SecondaryType.macd => MACDIndicator(),
+            _SecondaryType.kdj => KDJIndicator(),
+            _SecondaryType.rsi => RSIIndicator(),
+            _SecondaryType.wr => WRIndicator(),
+            _SecondaryType.cci => CCIIndicator(),
+            _ => throw StateError('unreachable'),
+          },
+        )
+        .toList();
+  }
 
   KChartColors get _colors => _isDark
       ? const KChartColors(
           bgColor: Color(0xFF1C1C1E),
           defaultTextColor: Color(0xFF8E8E93),
-          gridColor: Color(0xFF2C2C2E),
+          gridColor: Color.fromARGB(255, 187, 187, 187),
           selectFillColor: Color(0xFF2C2C2E),
           selectBorderColor: Color(0xFF636366),
           crossColor: Color(0xFFEBEBF5),
@@ -195,7 +213,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           maxColor: Color(0xFFEBEBF5),
           minColor: Color(0xFFEBEBF5),
         )
-      : const KChartColors();
+      : const KChartColors(gridColor: Color.fromARGB(255, 237, 237, 237));
 
   @override
   Widget build(BuildContext context) {
@@ -439,33 +457,28 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             children: [
               _chip(
                 'MACD',
-                _secondaryType == _SecondaryType.macd,
-                () => _setSecondary(_SecondaryType.macd),
+                _secondaryTypes.contains(_SecondaryType.macd),
+                () => _toggleSecondary(_SecondaryType.macd),
               ),
               _chip(
                 'KDJ',
-                _secondaryType == _SecondaryType.kdj,
-                () => _setSecondary(_SecondaryType.kdj),
+                _secondaryTypes.contains(_SecondaryType.kdj),
+                () => _toggleSecondary(_SecondaryType.kdj),
               ),
               _chip(
                 'RSI',
-                _secondaryType == _SecondaryType.rsi,
-                () => _setSecondary(_SecondaryType.rsi),
+                _secondaryTypes.contains(_SecondaryType.rsi),
+                () => _toggleSecondary(_SecondaryType.rsi),
               ),
               _chip(
                 'WR',
-                _secondaryType == _SecondaryType.wr,
-                () => _setSecondary(_SecondaryType.wr),
+                _secondaryTypes.contains(_SecondaryType.wr),
+                () => _toggleSecondary(_SecondaryType.wr),
               ),
               _chip(
                 'CCI',
-                _secondaryType == _SecondaryType.cci,
-                () => _setSecondary(_SecondaryType.cci),
-              ),
-              _chip(
-                'None',
-                _secondaryType == _SecondaryType.none,
-                () => _setSecondary(_SecondaryType.none),
+                _secondaryTypes.contains(_SecondaryType.cci),
+                () => _toggleSecondary(_SecondaryType.cci),
               ),
             ],
           ),

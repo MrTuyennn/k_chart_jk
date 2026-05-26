@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:k_chart_wikex/entity/index.dart';
 import 'package:k_chart_wikex/renderer/index.dart';
-import 'package:k_chart_wikex/utils/index.dart';
 
 class VolRenderer extends BaseChartRenderer<VolumeEntity> {
   late double mVolWidth;
@@ -44,35 +43,36 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
       canvas.drawRect(
         Rect.fromLTRB(curX - r, top, curX + r, bottom),
         chartPaint
-          ..color = (curPoint.close > curPoint.open
-                  ? chartColors.volUpColor
-                  : chartColors.volDnColor)
-              .withOpacity(0.5),
+          ..color =
+              (curPoint.close > curPoint.open
+                      ? chartColors.volUpColor
+                      : chartColors.volDnColor)
+                  .withValues(alpha: 0.5),
       );
     }
 
     // TODO: bật lại khi cần hiển thị đường MA5 và MA10 trên volume
-    // if (lastPoint.MA5Volume != 0) {
-    //   drawLine(
-    //     lastPoint.MA5Volume,
-    //     curPoint.MA5Volume,
-    //     canvas,
-    //     lastX,
-    //     curX,
-    //     chartColors.ma5Color,
-    //   );
-    // }
+    if (lastPoint.MA5Volume != 0) {
+      drawLine(
+        lastPoint.MA5Volume,
+        curPoint.MA5Volume,
+        canvas,
+        lastX,
+        curX,
+        chartColors.ma5Color,
+      );
+    }
 
-    // if (lastPoint.MA10Volume != 0) {
-    //   drawLine(
-    //     lastPoint.MA10Volume,
-    //     curPoint.MA10Volume,
-    //     canvas,
-    //     lastX,
-    //     curX,
-    //     chartColors.ma10Color,
-    //   );
-    // }
+    if (lastPoint.MA10Volume != 0) {
+      drawLine(
+        lastPoint.MA10Volume,
+        curPoint.MA10Volume,
+        canvas,
+        lastX,
+        curX,
+        chartColors.ma10Color,
+      );
+    }
   }
 
   double getVolY(double value) =>
@@ -106,19 +106,19 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
 
   @override
   void drawVerticalText(Canvas canvas, TextStyle textStyle, int gridRows) {
-    TextSpan span = TextSpan(
-      text: NumberUtil.formatCompact(maxValue),
-      style: textStyle,
-    );
-    TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
-    tp.layout();
-    tp.paint(
-      canvas,
-      Offset(
-        chartRect.width - tp.width - chartStyle.space,
-        chartRect.top - topPadding,
-      ),
-    );
+    // TextSpan span = TextSpan(
+    //   text: NumberUtil.formatCompact(maxValue),
+    //   style: textStyle,
+    // );
+    // TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
+    // tp.layout();
+    // tp.paint(
+    //   canvas,
+    //   Offset(
+    //     chartRect.width - tp.width - chartStyle.space,
+    //     chartRect.top - topPadding,
+    //   ),
+    // );
   }
 
   @override
