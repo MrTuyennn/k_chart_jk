@@ -112,8 +112,9 @@ class ChartPainter extends BaseChartPainter {
     //   var t = datas![0];
     //   fixedLength = NumberUtil.getMaxDecimalLength(t.open, t.close, t.high, t.low);
     // }
-    // TODO: mainContentRect tách main chart và volume thành 2 vùng riêng biệt, không đè lên nhau
-    // nếu muốn volume đè lên main chart thì đổi lại mainContentRect = mMainRect
+    // mainContentRect = phần nến chính (không bao gồm vùng volume 20% dưới).
+    // mVolRect chiếm 20% dưới mMainRect (xem base_chart_painter.initRect).
+    // Nếu muốn volume đè hoàn toàn lên main chart: dùng mMainRect thay vì mainContentRect.
     final Rect mainContentRect = mVolRect != null
         ? Rect.fromLTRB(mMainRect.left, mMainRect.top, mMainRect.right, mVolRect!.top)
         : mMainRect;
@@ -389,12 +390,12 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void drawText(Canvas canvas, KLineEntity data, double x) {
-    //Long press to display the data in the press
+    // Khi long press / tap: hiển thị data của nến được chọn (cross line)
+    // Bình thường: data đến từ getItem(mStopIndex) — candle phải nhất đang thấy
     if (isLongPress || (isTapShowInfoDialog && isOnTap)) {
       var index = calculateSelectedX(selectX);
       data = getItem(index);
     }
-    //Release to display the last data
     mMainRenderer.drawText(canvas, data, x);
     mVolRenderer?.drawText(canvas, data, x);
     for (final element in mSecondaryRendererList) {

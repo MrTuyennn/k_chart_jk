@@ -1,10 +1,112 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
+- [Thay đổi gần đây](#thay-đổi-gần-đây)
 - [KChartWidget — Tham số](#kchartwidget--tham-số)
 - [KChartColors — Màu sắc](#kchartcolors--màu-sắc)
 - [KChartStyle — Kích thước & layout](#kchartstyle--kích-thước--layout)
+- [Kiến trúc renderer](#kiến-trúc-renderer)
 - [Lazy Load Data](#lazy-load-data)
+
+---
+
+## Thay đổi gần đây
+
+### 1. Label indicator cập nhật theo scroll (`base_chart_painter.dart`)
+
+**File:** `lib/renderer/base_chart_painter.dart` — `paint()`
+
+```dart
+// Trước:
+drawText(canvas, datas!.last, chartStyle.space);
+
+// Sau:
+drawText(canvas, getItem(mStopIndex), chartStyle.space);
+```
+
+**Lý do:** `datas!.last` luôn cố định ở nến cuối cùng. Dùng `getItem(mStopIndex)` (candle phải nhất đang hiển thị) để label MA, VOL, MACD... cập nhật khi người dùng scroll sang trái.
+
+**Hành vi khi long press / tap:** vẫn hiển thị data của nến được chọn (xử lý trong `chart_painter.drawText`).
+
+---
+
+### 2. Multi-select secondary indicator (`example/main.dart`)
+
+**Trước:** Chỉ 1 indicator phụ cùng lúc (single enum `_secondaryType`). Bấm indicator khác → đổi, không cộng dồn.
+
+**Sau:** Dùng `Set<_SecondaryType> _secondaryTypes` — bấm để thêm/bỏ từng panel độc lập.
+
+```dart
+// Toggle thêm/bỏ indicator
+void _toggleSecondary(_SecondaryType type) {
+  setState(() {
+    if (_secondaryTypes.contains(type)) {
+      _secondaryTypes.remove(type);
+    } else {
+      _secondaryTypes.add(type);
+    }
+    _recalculate();
+  });
+}
+
+// Map theo thứ tự cố định (MACD → KDJ → RSI → WR → CCI)
+List<SecondaryIndicator> get _secondaryIndicators {
+  const order = [macd, kdj, rsi, wr, cci];
+  return order
+      .where((t) => _secondaryTypes.contains(t))
+      .map<SecondaryIndicator>((t) => switch (t) { ... })
+      .toList();
+}
+```
+
+**Thứ tự panel:** luôn theo thứ tự cố định `MACD → KDJ → RSI → WR → CCI`, không phụ thuộc thứ tự bấm.
+
+---
+
+### 3. Layout volume overlay (`chart_painter.dart` + `base_chart_painter.dart`)
+
+Volume **không phải panel riêng bên dưới** mà là overlay chiếm **20% dưới của `mMainRect`**:
+
+```
+mMainRect
+├── mainContentRect  (80% trên) ← nến, MA, BOLL...
+└── mVolRect         (20% dưới) ← vol bars
+```
+
+```dart
+// base_chart_painter.initRect()
+final double overlayHeight = mMainRect.height * 0.2;
+mVolRect = Rect.fromLTRB(0, mMainRect.bottom - overlayHeight, mWidth, mMainRect.bottom);
+
+// chart_painter.initChartRenderer()
+final Rect mainContentRect = mVolRect != null
+    ? Rect.fromLTRB(mMainRect.left, mMainRect.top, mMainRect.right, mVolRect!.top)
+    : mMainRect;
+```
+
+Cả `mMainRenderer` và `mVolRenderer` đều được vẽ trong cùng canvas transform (`scaleY`), clip vào `mMainRect`.
+
+---
+
+### 4. ScaleY + offsetY transform (`chart_painter.drawChart`)
+
+Main chart và volume đều được scale/pan bằng canvas transform, **không** scale giá trị:
+
+```dart
+canvas.translate(0, centerY * (1 - scaleY) + offsetY);
+canvas.scale(1.0, scaleY);
+// vẽ main + vol bên trong transform này
+```
+
+**Secondary indicators** vẽ ngoài transform này → không bị ảnh hưởng bởi scaleY.
+
+Các label vẽ ngoài transform (nowPrice, maxMin, volText) phải tính lại vị trí screen bằng:
+```dart
+double _applyScaleY(double rawY) {
+  final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
+  return centerY + (rawY - centerY) * scaleY + offsetY;
+}
+```
 
 ---
 
@@ -311,3 +413,49 @@ KChartWidget(
 - **Append** (thêm vào cuối list) = `isLeft: false` = data mới hơn.
 - Widget tự detect khi `datas.length` thay đổi và `datas.first.time` thay đổi → tự bù scroll.
 - Nếu sau 30 giây widget không nhận data mới, spinner tự tắt (timeout fallback).
+
+---
+
+## Kiến trúc renderer
+
+### Luồng vẽ mỗi frame (`BaseChartPainter.paint`)
+
+```
+paint()
+├── initRect()          — tính mMainRect, mVolRect, mDateRect, mSecondaryRectList
+├── calculateValue()    — tính mStartIndex/mStopIndex và max/min giá cho từng vùng
+├── initChartRenderer() — tạo MainRenderer, VolRenderer, SecondaryRenderer
+├── drawBg()
+├── drawGrid()
+├── drawChart()
+│   ├── canvas transform (scaleX, translateX)
+│   ├── canvas transform (scaleY, offsetY) → clip mMainRect
+│   │   ├── MainRenderer.drawChart()   (nến, MA, BOLL...)
+│   │   └── VolRenderer.drawChart()    (vol bars)
+│   └── SecondaryRenderer.drawChart()  (MACD, KDJ... — ngoài scaleY)
+├── drawVerticalText()  — nhãn giá trục Y
+├── drawDate()          — trục X
+├── drawText()          — label MA/VOL/MACD... (dùng getItem(mStopIndex))
+├── drawMaxAndMin()     — nhãn giá cao/thấp nhất
+└── drawNowPrice()      — đường & nhãn giá hiện tại
+```
+
+### Tại sao label vẽ ngoài scaleY transform
+
+`drawText`, `drawMaxAndMin`, `drawNowPrice` được gọi sau khi `canvas.restore()` — canvas đã về trạng thái gốc. Tọa độ Y các hàm này truyền vào là tọa độ màn hình thực.
+
+Để tính vị trí màn hình của một điểm `rawY` trong không gian chart (sau scaleY):
+```dart
+double screenY = centerY + (rawY - centerY) * scaleY + offsetY;
+// centerY = (mMainRect.top + mMainRect.bottom) / 2
+```
+
+### Các rect chính
+
+| Rect | Vùng | Ghi chú |
+|------|------|---------|
+| `mMainRect` | Toàn bộ khung nến + vol | `top = mTopPadding`, `bottom = mTopPadding + mainHeight` |
+| `mainContentRect` | Phần nến thuần | `mMainRect.top → mVolRect.top` (80% trên) |
+| `mVolRect` | Vol bars | `mMainRect.bottom - 20% height → mMainRect.bottom` |
+| `mDateRect` | Trục X ngày giờ | Ngay dưới `mMainRect.bottom` |
+| `mSecondaryRectList[i]` | Panel indicator phụ | Xếp chồng bên dưới `mDateRect` |

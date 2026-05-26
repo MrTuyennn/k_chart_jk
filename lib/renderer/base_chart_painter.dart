@@ -140,6 +140,8 @@ abstract class BaseChartPainter extends CustomPainter {
       drawVerticalText(canvas);
       drawDate(canvas, size);
 
+      // Dùng candle phải nhất đang hiển thị (mStopIndex) thay vì datas!.last
+      // → label MA/VOL/secondary cập nhật theo vị trí scroll, không cố định ở nến cuối
       drawText(canvas, getItem(mStopIndex), chartStyle.space);
       drawMaxAndMin(canvas);
       drawNowPrice(canvas);
