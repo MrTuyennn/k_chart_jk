@@ -2,11 +2,109 @@
 
 ## Mục lục
 - [Thay đổi gần đây](#thay-đổi-gần-đây)
+- [OBV Indicator](#obv-indicator)
+- [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
 - [KChartWidget — Tham số](#kchartwidget--tham-số)
 - [KChartColors — Màu sắc](#kchartcolors--màu-sắc)
 - [KChartStyle — Kích thước & layout](#kchartstyle--kích-thước--layout)
 - [Kiến trúc renderer](#kiến-trúc-renderer)
 - [Lazy Load Data](#lazy-load-data)
+
+---
+
+## OBV Indicator
+
+### Tổng quan
+
+OBV (On-Balance Volume) là indicator phụ, hiển thị trong panel riêng bên dưới chart chính giống MACD/RSI/KDJ.
+
+| Đường | Màu mặc định | Ý nghĩa |
+|-------|-------------|---------|
+| OBV | `#217AFF` (xanh) | Giá trị OBV tích lũy |
+| Signal | `#FFC634` (vàng) | MA5 của OBV |
+
+### Công thức
+
+```
+obv[0] = vol[0]
+obv[i] = obv[i-1] + vol[i]   // nến tăng (close > close trước)
+obv[i] = obv[i-1] - vol[i]   // nến giảm (close < close trước)
+obv[i] = obv[i-1]            // close bằng nhau
+signal = SMA(obv, 5)         // MA5 của OBV
+```
+
+### Cách đọc tín hiệu
+
+| Tình huống | Ý nghĩa |
+|-----------|---------|
+| OBV tăng + giá tăng | Xu hướng tăng được xác nhận |
+| OBV tăng + giá đi ngang/giảm | **Bullish divergence** — tiền đang vào dù giá chưa phản ánh |
+| OBV giảm + giá giảm | Xu hướng giảm được xác nhận |
+| OBV giảm + giá tăng/đi ngang | **Bearish divergence** — tiền đang thoát dù giá còn cao |
+| OBV cắt lên signal line | Tín hiệu mua |
+| OBV cắt xuống signal line | Tín hiệu bán |
+
+### Dùng trong code
+
+```dart
+// Thêm vào secondaryIndicators
+KChartWidget(
+  _data,
+  chartStyle,
+  chartColors,
+  secondaryIndicators: [OBVIndicator()],
+  ...
+)
+
+// Tuỳ chỉnh màu và period signal
+OBVIndicator(
+  indicatorStyle: OBVStyle(
+    obvColor: Colors.blue,
+    signalColor: Colors.orange,
+  ),
+)
+// Đổi period signal (ví dụ MA10): sửa calcParams trong OBVIndicator constructor
+```
+
+### Files liên quan
+
+| File | Vai trò |
+|------|---------|
+| `lib/entity/obv_entity.dart` | Mixin `OBVEntity` — 2 field: `obv`, `obvSignal` |
+| `lib/indicator/secondary/obv_indicator.dart` | Toàn bộ logic: calc, drawChart, drawFigure, drawVerticalText |
+| `lib/indicator/indicator_style.dart` | `OBVStyle` — cấu hình màu sắc |
+| `lib/entity/k_entity.dart` | `KEntity` mixes `OBVEntity` |
+
+---
+
+## Thêm secondary indicator mới
+
+Pattern để implement thêm một indicator phụ bất kỳ:
+
+```
+1. Tạo lib/entity/<name>_entity.dart
+   └─ mixin <Name>Entity { double? field1; ... }
+
+2. Thêm mixin vào lib/entity/k_entity.dart
+   └─ class KEntity with ..., <Name>Entity {}
+
+3. Export trong lib/entity/index.dart
+
+4. Thêm <Name>Style vào lib/indicator/indicator_style.dart
+
+5. Tạo lib/indicator/secondary/<name>_indicator.dart
+   └─ part of '../indicator_template.dart';
+   └─ class <Name>Indicator extends SecondaryIndicator<<Name>Entity, <Name>Style>
+      ├─ getMaxMinValue() — cho secondary renderer biết scale
+      ├─ drawFigure()     — label text khi scroll/long press
+      ├─ drawVerticalText() — nhãn max/min bên phải panel
+      ├─ drawChart()      — vẽ đường/bar lên canvas
+      └─ calc()           — tính giá trị, gán vào từng KLineEntity
+
+6. Thêm part '<name>_indicator.dart' vào indicator_template.dart
+
+7. Thêm button + case vào example/main.dart
+```
 
 ---
 

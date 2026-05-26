@@ -61,7 +61,7 @@ List<KLineEntity> _generateMockData(int count) {
 
 enum _MainType { ma, boll, ema, none }
 
-enum _SecondaryType { macd, kdj, rsi, wr, cci, none }
+enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, none }
 
 class ChartDemoPage extends StatefulWidget {
   const ChartDemoPage({super.key});
@@ -185,6 +185,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       _SecondaryType.rsi,
       _SecondaryType.wr,
       _SecondaryType.cci,
+      _SecondaryType.obv,
     ];
     return order
         .where((t) => _secondaryTypes.contains(t))
@@ -195,6 +196,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             _SecondaryType.rsi => RSIIndicator(),
             _SecondaryType.wr => WRIndicator(),
             _SecondaryType.cci => CCIIndicator(),
+            _SecondaryType.obv => OBVIndicator(),
             _ => throw StateError('unreachable'),
           },
         )
@@ -479,6 +481,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 'CCI',
                 _secondaryTypes.contains(_SecondaryType.cci),
                 () => _toggleSecondary(_SecondaryType.cci),
+              ),
+              _chip(
+                'OBV',
+                _secondaryTypes.contains(_SecondaryType.obv),
+                () => _toggleSecondary(_SecondaryType.obv),
               ),
             ],
           ),

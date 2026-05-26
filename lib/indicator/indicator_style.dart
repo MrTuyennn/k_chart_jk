@@ -122,3 +122,13 @@ class ZigZagStyle extends IndicatorStyle {
     super.lineWidth = 1.0,
   });
 }
+
+class OBVStyle extends IndicatorStyle {
+  final Color obvColor;
+  final Color signalColor;
+
+  const OBVStyle({
+    this.obvColor = const Color(0xFF217AFF),
+    this.signalColor = const Color(0xFFFFC634),
+  });
+}
