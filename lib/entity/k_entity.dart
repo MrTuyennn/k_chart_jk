@@ -16,6 +16,6 @@ class KEntity
         RSIEntity,
         WREntity,
         CCIEntity,
+        OBVEntity,
         MACDEntity,
-        ZigZagEntity,
-        OBVEntity {}
+        ZigZagEntity {}

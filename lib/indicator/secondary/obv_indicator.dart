@@ -18,7 +18,9 @@ part of '../indicator_template.dart';
 ///
 /// Tham số:
 ///   calcParams[0] = period của signal MA (mặc định 5)
-class OBVIndicator extends SecondaryIndicator<OBVEntity, OBVStyle> {
+// Dùng MACDEntity làm T (nhất quán với RSI/KDJ/WR/CCI).
+// MACDEntity on OBVEntity nên truy cập .obv / .obvSignal không cần cast.
+class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> {
   // Paint cho đường OBV chính (màu obvColor)
   late final Paint _linePaint;
   // Paint cho đường signal MA (màu signalColor)
@@ -58,7 +60,7 @@ class OBVIndicator extends SecondaryIndicator<OBVEntity, OBVStyle> {
   /// Label text hiển thị ở đầu panel khi scroll / long press
   /// Dùng formatCompact vì OBV là giá trị tích lũy — có thể rất lớn
   @override
-  TextSpan? drawFigure(OBVEntity entity, int precision, KChartColors chartColors) {
+  TextSpan? drawFigure(MACDEntity entity, int precision, KChartColors chartColors) {
     return TextSpan(
       children: [
         TextSpan(
@@ -104,8 +106,8 @@ class OBVIndicator extends SecondaryIndicator<OBVEntity, OBVStyle> {
   /// Vẽ 2 đường: OBV chính và signal MA
   @override
   void drawChart(
-    OBVEntity lastPoint,
-    OBVEntity curPoint,
+    MACDEntity lastPoint,
+    MACDEntity curPoint,
     double lastX,
     double curX,
     GetYFunction getY,
