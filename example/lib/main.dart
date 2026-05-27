@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -80,10 +81,19 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   bool _volHidden = false;
   bool _isDark = false;
 
-  bool _isFetching = false; // đang fetch → hiện banner
+  bool _isFetching = false;
   int _totalLoaded = 200;
   static const int _maxTotal = 500;
   static const int _batchSize = 50;
+
+  // Real-time simulation
+  Timer? _liveTimer;
+  bool _isLive = false;
+  int _tickCount = 0;
+  // Mỗi tick: cập nhật nến cuối. Mỗi _ticksPerCandle tick: đóng nến + mở nến mới.
+  static const int _ticksPerCandle = 10;
+  static const Duration _tickInterval = Duration(milliseconds: 500);
+  final Random _liveRandom = Random();
 
   @override
   void initState() {
@@ -94,8 +104,79 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
 
   @override
   void dispose() {
+    _liveTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  // ── Real-time simulation ───────────────────────────────────────────────────
+
+  void _toggleLive() {
+    if (_isLive) {
+      _liveTimer?.cancel();
+      setState(() => _isLive = false);
+    } else {
+      _tickCount = 0;
+      _liveTimer = Timer.periodic(_tickInterval, (_) => _onLiveTick());
+      setState(() => _isLive = true);
+    }
+  }
+
+  void _onLiveTick() {
+    if (!mounted) return;
+    _tickCount++;
+
+    final last = _data.last;
+    // Biến động giá nhỏ mỗi tick (~0.3% của giá hiện tại)
+    final change = (last.close * 0.003) * (_liveRandom.nextDouble() - 0.48);
+    final newClose = (last.close + change).clamp(1.0, double.infinity);
+
+    if (_tickCount % _ticksPerCandle == 0) {
+      // Đóng nến hiện tại, mở nến mới
+      _addNewCandle(newClose);
+    } else {
+      // Cập nhật nến cuối (tick trong cùng 1 nến)
+      _updateLastCandle(newClose);
+    }
+  }
+
+  void _updateLastCandle(double newClose) {
+    final last = _data.last;
+    // Tạo entity mới thay thế nến cuối với giá close mới
+    final updated = KLineEntity.fromCustom(
+      time: last.time!,
+      open: last.open,
+      close: newClose,
+      high: max(last.high, newClose),
+      low: min(last.low, newClose),
+      vol: last.vol + _liveRandom.nextDouble() * 5,
+      amount: last.amount ?? 0,
+    );
+    final newData = [..._data.sublist(0, _data.length - 1), updated];
+    DataUtil.calculateAll(newData, _mainIndicators, _secondaryIndicators);
+    setState(() => _data = newData);
+  }
+
+  void _addNewCandle(double prevClose) {
+    // Mở nến mới với open = close của nến trước
+    final last = _data.last;
+    final newCandle = KLineEntity.fromCustom(
+      time: last.time! + _ticksPerCandle * _tickInterval.inMilliseconds,
+      open: prevClose,
+      close: prevClose,
+      high: prevClose,
+      low: prevClose,
+      vol: _liveRandom.nextDouble() * 50 + 10,
+      amount: 0,
+    );
+    final newData = [..._data, newCandle];
+    DataUtil.calculateAll(newData, _mainIndicators, _secondaryIndicators);
+    setState(() {
+      _data = newData;
+      _totalLoaded++;
+    });
+    // Cuộn đến nến mới nhất
+    _controller.reset();
   }
 
   void _recalculate() {
@@ -415,6 +496,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 !_volHidden,
                 () => setState(() => _volHidden = !_volHidden),
               ),
+              const SizedBox(width: 6),
+              _liveChip(),
               const Spacer(),
               _iconBtn(Icons.zoom_in, () => _controller.zoomIn(), 'Zoom In'),
               _iconBtn(Icons.zoom_out, () => _controller.zoomOut(), 'Zoom Out'),
@@ -527,6 +610,50 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 ? Colors.white
                 : (_isDark ? Colors.white60 : Colors.black54),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _liveChip() {
+    return GestureDetector(
+      onTap: _toggleLive,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: _isLive
+              ? const Color(0xFFD5405D)
+              : (_isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F3F5)),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_isLive) ...[
+              // Dot nhấp nháy khi đang live
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.3, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                builder: (_, v, __) => Opacity(
+                  opacity: v,
+                  child: const Icon(Icons.circle, size: 6, color: Colors.white),
+                ),
+                onEnd: () => setState(() {}),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              _isLive ? 'Live' : 'Live',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _isLive
+                    ? Colors.white
+                    : (_isDark ? Colors.white60 : Colors.black54),
+              ),
+            ),
+          ],
         ),
       ),
     );
