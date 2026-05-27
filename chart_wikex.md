@@ -3,6 +3,7 @@
 ## Mục lục
 - [Thay đổi gần đây](#thay-đổi-gần-đây)
 - [OBV Indicator](#obv-indicator)
+- [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
 - [KChartWidget — Tham số](#kchartwidget--tham-số)
 - [KChartColors — Màu sắc](#kchartcolors--màu-sắc)
@@ -77,6 +78,58 @@ OBVIndicator(
 
 ---
 
+## Mixin type system — generic indicator
+
+### Vấn đề
+
+Khi dùng `List<SecondaryIndicator<MACDEntity, dynamic>>`, tất cả indicator phải có `T = MACDEntity`. Nếu một indicator mới dùng entity riêng (ví dụ `OBVEntity`), Dart báo lỗi:
+
+```
+The element type 'OBVIndicator' can't be assigned to the list type
+'SecondaryIndicator<MACDEntity, dynamic>'.
+```
+
+### Nguyên nhân
+
+Dart generics **không covariant** — `SecondaryIndicator<OBVEntity, X>` và `SecondaryIndicator<MACDEntity, X>` là 2 type khác nhau dù `OBVEntity` và `MACDEntity` đều là mixin của `KEntity`.
+
+### Giải pháp áp dụng
+
+Thêm entity mới vào `on` clause của `MACDEntity`, và đặt nó trước `MACDEntity` trong `KEntity`:
+
+```dart
+// entity/macd_entity.dart
+// Thêm OBVEntity vào on clause → MACDEntity có thể truy cập .obv / .obvSignal
+mixin MACDEntity on KDJEntity, RSIEntity, WREntity, CCIEntity, OBVEntity {
+  double? dea;
+  double? dif;
+  double? macd;
+}
+
+// entity/k_entity.dart
+// OBVEntity phải đứng TRƯỚC MACDEntity vì MACDEntity khai báo `on OBVEntity`
+class KEntity with ..., OBVEntity, MACDEntity, ZigZagEntity {}
+
+// indicator/secondary/obv_indicator.dart
+// Dùng MACDEntity làm T thay vì OBVEntity
+class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> { ... }
+```
+
+Sau fix, `OBVIndicator` fit vào `List<SecondaryIndicator<MACDEntity, dynamic>>` như MACD/RSI/KDJ.
+
+### Quy tắc khi thêm entity mới
+
+Nếu indicator mới cần entity riêng và phải dùng chung `List<SecondaryIndicator<MACDEntity, dynamic>>`:
+
+1. Tạo `<Name>Entity` mixin đơn giản (không có `on`)
+2. Thêm `<Name>Entity` vào `on` clause của `MACDEntity`
+3. Đặt `<Name>Entity` **trước** `MACDEntity` trong `KEntity`
+4. Dùng `MACDEntity` làm T trong `<Name>Indicator`
+
+> **Lưu ý:** Nếu chỉ dùng `List<SecondaryIndicator>` (raw type, không generic) ở phía app thì không cần làm các bước trên — nhưng mất type safety.
+
+---
+
 ## Thêm secondary indicator mới
 
 Pattern để implement thêm một indicator phụ bất kỳ:
@@ -85,25 +138,29 @@ Pattern để implement thêm một indicator phụ bất kỳ:
 1. Tạo lib/entity/<name>_entity.dart
    └─ mixin <Name>Entity { double? field1; ... }
 
-2. Thêm mixin vào lib/entity/k_entity.dart
-   └─ class KEntity with ..., <Name>Entity {}
+2. Thêm vào lib/entity/macd_entity.dart
+   └─ mixin MACDEntity on ..., <Name>Entity { ... }
+   (để indicator dùng MACDEntity làm T mà vẫn truy cập field của <Name>Entity)
 
-3. Export trong lib/entity/index.dart
+3. Thêm vào lib/entity/k_entity.dart
+   └─ class KEntity with ..., <Name>Entity, MACDEntity, ...
+   (đặt <Name>Entity TRƯỚC MACDEntity)
 
-4. Thêm <Name>Style vào lib/indicator/indicator_style.dart
+4. Export trong lib/entity/index.dart
 
-5. Tạo lib/indicator/secondary/<name>_indicator.dart
-   └─ part of '../indicator_template.dart';
-   └─ class <Name>Indicator extends SecondaryIndicator<<Name>Entity, <Name>Style>
+5. Thêm <Name>Style vào lib/indicator/indicator_style.dart
+
+6. Tạo lib/indicator/secondary/<name>_indicator.dart
+   └─ class <Name>Indicator extends SecondaryIndicator<MACDEntity, <Name>Style>
       ├─ getMaxMinValue() — cho secondary renderer biết scale
       ├─ drawFigure()     — label text khi scroll/long press
       ├─ drawVerticalText() — nhãn max/min bên phải panel
       ├─ drawChart()      — vẽ đường/bar lên canvas
       └─ calc()           — tính giá trị, gán vào từng KLineEntity
 
-6. Thêm part '<name>_indicator.dart' vào indicator_template.dart
+7. Thêm part '<name>_indicator.dart' vào indicator_template.dart
 
-7. Thêm button + case vào example/main.dart
+8. Thêm button + case vào example/main.dart
 ```
 
 ---

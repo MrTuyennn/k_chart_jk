@@ -18,8 +18,11 @@ part of '../indicator_template.dart';
 ///
 /// Tham số:
 ///   calcParams[0] = period của signal MA (mặc định 5)
-// Dùng MACDEntity làm T (nhất quán với RSI/KDJ/WR/CCI).
-// MACDEntity on OBVEntity nên truy cập .obv / .obvSignal không cần cast.
+///
+/// Generic type T = MACDEntity (nhất quán với RSI/KDJ/WR/CCI) thay vì OBVEntity.
+/// Lý do: MACDEntity khai báo `on OBVEntity` nên có thể truy cập .obv / .obvSignal
+/// trực tiếp không cần cast. Nhờ đó OBVIndicator fit vào
+/// List<SecondaryIndicator<MACDEntity, dynamic>> mà không gây lỗi type.
 class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> {
   // Paint cho đường OBV chính (màu obvColor)
   late final Paint _linePaint;
