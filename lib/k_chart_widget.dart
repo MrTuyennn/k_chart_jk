@@ -74,6 +74,11 @@ class KChartWidget extends StatefulWidget {
   /// Độ trong suốt của backgroundLogo (0.0 = ẩn hoàn toàn, 1.0 = hiện đầy đủ)
   final double backgroundLogoOpacity;
 
+  /// Callback khi pan dọc vượt qua clamp boundary của offsetY (50%).
+  /// delta > 0: drag xuống quá biên dưới; delta < 0: drag lên quá biên trên.
+  /// Parent có thể dùng để forward sang outer ScrollController (handoff).
+  final ValueChanged<double>? onVerticalOverscroll;
+
   const KChartWidget(
     this.datas,
     this.chartStyle,
@@ -108,6 +113,7 @@ class KChartWidget extends StatefulWidget {
     this.isLoadingMore = false,
     this.backgroundLogo,
     this.backgroundLogoOpacity = 1,
+    this.onVerticalOverscroll,
     super.key,
   });
 
@@ -136,6 +142,17 @@ class _KChartWidgetState extends State<KChartWidget>
 
   double getMinScrollX() {
     return mScaleX;
+  }
+
+  // Giới hạn offsetY: giữ tối thiểu 50% chart content trong view ở mọi scaleY
+  // Công thức: |offsetY| ≤ baseHeight * scaleY / 2
+  // Tại |offsetY| = max, đúng 1 nửa content height bị đẩy ra khỏi viewport.
+  //   scaleY = 1   → ±0.5 * baseHeight (1/2 chart có thể trượt khỏi view)
+  //   scaleY = 0.3 → ±0.15 * baseHeight (content nhỏ, pan range nhỏ tương ứng)
+  //   scaleY = 5   → ±2.5 * baseHeight (zoom in nhiều → pan range lớn)
+  double _clampOffsetY(double value) {
+    final double maxOffset = widget.mBaseHeight * mScaleY / 2;
+    return value.clamp(-maxOffset, maxOffset);
   }
 
   double _lastScale = 1.0;
@@ -285,6 +302,8 @@ class _KChartWidgetState extends State<KChartWidget>
           final double delta = details.localFocalPoint.dy - _scaleYDragStart;
           mScaleY = (mScaleY - delta * 0.005).clamp(0.3, 5.0);
           _scaleYDragStart = details.localFocalPoint.dy;
+          // Bound của offsetY phụ thuộc vào mScaleY → clamp lại sau khi đổi scaleY
+          mOffsetY = _clampOffsetY(mOffsetY);
         } else if (details.scale != 1.0) {
           // 2 ngón tay → zoom scaleX, clamp theo widget.minScale/maxScale
           isOnTap = false;
@@ -293,12 +312,24 @@ class _KChartWidgetState extends State<KChartWidget>
             widget.maxScale,
           );
         } else {
-          // 1 ngón tay drag tự do → scroll X + pan Y đồng thời
+          // 1 ngón tay drag tự do → scroll X
+          // Pan Y chỉ active sau khi user đã scaleY qua vùng Positioned bên phải
           isOnTap = false;
           mScrollX = (mScrollX + details.focalPointDelta.dx / mScaleX)
               .clamp(0.0, ChartPainter.maxScrollX)
               .toDouble();
-          mOffsetY += details.focalPointDelta.dy;
+          if (mScaleY != 1.0) {
+            final double dy = details.focalPointDelta.dy;
+            final double newOffsetY = mOffsetY + dy;
+            final double clampedOffsetY = _clampOffsetY(newOffsetY);
+            mOffsetY = clampedOffsetY;
+            // Phần delta vượt clamp (chart đã đến biên 50% và user vẫn drag tiếp)
+            // → forward cho parent để cuộn outer scrollview
+            final double overscroll = newOffsetY - clampedOffsetY;
+            if (overscroll != 0 && widget.onVerticalOverscroll != null) {
+              widget.onVerticalOverscroll!(overscroll);
+            }
+          }
           if (!widget.isLoadingMore &&
               widget.onLoadMore != null &&
               ChartPainter.maxScrollX > 0 &&

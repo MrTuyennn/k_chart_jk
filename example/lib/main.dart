@@ -58,11 +58,49 @@ List<KLineEntity> _generateMockData(int count) {
   return list;
 }
 
+// ── Mock orderbook ────────────────────────────────────────────────────────────
+
+({List<DepthEntity> bids, List<DepthEntity> asks}) _generateMockDepth(
+  double midPrice, {
+  int levels = 40,
+  double stepRatio = 0.0005,
+}) {
+  final random = Random(7);
+  final bids = <DepthEntity>[];
+  final asks = <DepthEntity>[];
+  double bidCum = 0;
+  double askCum = 0;
+
+  for (int i = 1; i <= levels; i++) {
+    final bidPrice = midPrice * (1 - stepRatio * i);
+    final askPrice = midPrice * (1 + stepRatio * i);
+    final bidVol = 0.5 + random.nextDouble() * 4;
+    final askVol = 0.5 + random.nextDouble() * 4;
+    bidCum += bidVol;
+    askCum += askVol;
+    bids.add(DepthEntity(bidPrice, bidCum));
+    asks.add(DepthEntity(askPrice, askCum));
+  }
+  return (bids: bids, asks: asks);
+}
+
 // ── Demo page ─────────────────────────────────────────────────────────────────
 
 enum _MainType { ma, boll, ema, none }
 
 enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, none }
+
+class _OrderBookItem {
+  final DepthEntity? entity;
+  final Color? sideColor;
+  final bool isSpread;
+
+  _OrderBookItem.row(this.entity, this.sideColor) : isSpread = false;
+  _OrderBookItem.spread()
+      : entity = null,
+        sideColor = null,
+        isSpread = true;
+}
 
 class ChartDemoPage extends StatefulWidget {
   const ChartDemoPage({super.key});
@@ -74,6 +112,7 @@ class ChartDemoPage extends StatefulWidget {
 class _ChartDemoPageState extends State<ChartDemoPage> {
   late List<KLineEntity> _data;
   final KChartController _controller = KChartController();
+  final ScrollController _outerScrollController = ScrollController();
 
   _MainType _mainType = _MainType.ma;
   Set<_SecondaryType> _secondaryTypes = {_SecondaryType.macd};
@@ -85,6 +124,23 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   int _totalLoaded = 200;
   static const int _maxTotal = 500;
   static const int _batchSize = 50;
+
+  // Gesture priority cho chart vs outer scroll
+  // true sau khi user drag dọc vùng phải chart (scaleY) — kích hoạt chart focused mode
+  // → outer scroll bị khoá khi finger chạm chart, chart độc quyền xử lý gesture
+  // false khi user double-tap vùng phải để reset scaleY
+  bool _scaleYActive = false;
+  // true khi finger đang chạm vùng chart
+  bool _pointerOnChart = false;
+  Offset? _chartPointerDownPos;
+  int _chartPointerCount = 0;
+  double _chartWidth = 0;
+  DateTime? _lastTapTime;
+  Offset? _lastTapPos;
+  static const double _scaleYZoneWidth = 100.0;
+  static const double _scaleYDragThreshold = 8.0;
+  static const Duration _doubleTapMaxGap = Duration(milliseconds: 300);
+  static const double _doubleTapMaxDistance = 20.0;
 
   // Real-time simulation
   Timer? _liveTimer;
@@ -106,6 +162,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   void dispose() {
     _liveTimer?.cancel();
     _controller.dispose();
+    _outerScrollController.dispose();
     super.dispose();
   }
 
@@ -181,6 +238,73 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
 
   void _recalculate() {
     DataUtil.calculateAll(_data, _mainIndicators, _secondaryIndicators);
+  }
+
+  // ── Chart pointer tracking ─────────────────────────────────────────────────
+
+  bool _inScaleYZone(Offset pos) =>
+      _chartWidth > 0 && pos.dx > _chartWidth - _scaleYZoneWidth;
+
+  void _onChartPointerDown(PointerDownEvent e) {
+    _chartPointerCount++;
+    _chartPointerDownPos = e.localPosition;
+    if (!_pointerOnChart) {
+      setState(() => _pointerOnChart = true);
+    }
+    // Double-tap trong scaleY zone → khớp với hành vi reset scaleY của chart
+    // → tắt scaleY active mode để outer scroll hoạt động lại
+    if (_scaleYActive &&
+        _inScaleYZone(e.localPosition) &&
+        _lastTapTime != null &&
+        _lastTapPos != null &&
+        DateTime.now().difference(_lastTapTime!) < _doubleTapMaxGap &&
+        (e.localPosition - _lastTapPos!).distance < _doubleTapMaxDistance) {
+      setState(() => _scaleYActive = false);
+      _lastTapTime = null;
+      _lastTapPos = null;
+    }
+  }
+
+  void _onChartPointerMove(PointerMoveEvent e) {
+    if (_scaleYActive || _chartPointerDownPos == null) return;
+    // Chỉ active khi: drag bắt đầu trong scaleY zone + vertical-dominant + > threshold
+    if (!_inScaleYZone(_chartPointerDownPos!)) return;
+    final delta = e.localPosition - _chartPointerDownPos!;
+    if (delta.dy.abs() > _scaleYDragThreshold &&
+        delta.dy.abs() > delta.dx.abs()) {
+      setState(() => _scaleYActive = true);
+    }
+  }
+
+  void _onChartPointerUp(PointerUpEvent e) {
+    // Ghi nhận tap để detect double-tap ở lần down kế tiếp
+    if (_chartPointerDownPos != null) {
+      final dist = (e.localPosition - _chartPointerDownPos!).distance;
+      if (dist < _doubleTapMaxDistance) {
+        _lastTapTime = DateTime.now();
+        _lastTapPos = e.localPosition;
+      } else {
+        _lastTapTime = null;
+        _lastTapPos = null;
+      }
+    }
+    _releaseChartPointer();
+  }
+
+  void _onChartPointerCancel(PointerCancelEvent e) {
+    _lastTapTime = null;
+    _lastTapPos = null;
+    _releaseChartPointer();
+  }
+
+  void _releaseChartPointer() {
+    _chartPointerCount = (_chartPointerCount - 1).clamp(0, 10);
+    if (_chartPointerCount == 0) {
+      _chartPointerDownPos = null;
+      if (_pointerOnChart) {
+        setState(() => _pointerOnChart = false);
+      }
+    }
   }
 
   void _onLoadMore(bool isLeft) async {
@@ -337,13 +461,233 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           ),
         ],
       ),
-      body: Column(
+      body: SingleChildScrollView(
+        controller: _outerScrollController,
+        physics: (_scaleYActive && _pointerOnChart)
+            ? const NeverScrollableScrollPhysics()
+            : const ClampingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildChart(),
+            const SizedBox(height: 8),
+            _sectionHeader('Order Book'),
+            _buildOrderBook(),
+            const SizedBox(height: 8),
+            _buildControls(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: _isDark ? Colors.white70 : Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderBook() {
+    final midPrice = _data.last.close;
+    final depth = _generateMockDepth(midPrice, levels: 30);
+    // Asks hiển thị từ giá cao → giá thấp (gần spread nhất ở dưới)
+    final asks = depth.asks.reversed.toList();
+    final bids = depth.bids;
+
+    final maxVol = [
+      ...asks.map((e) => e.vol),
+      ...bids.map((e) => e.vol),
+    ].fold<double>(0, max);
+
+    final upColor = const Color(0xFF14AD8F);
+    final dnColor = const Color(0xFFD5405D);
+    final textColor = _isDark ? Colors.white70 : Colors.black87;
+    final mutedColor = _isDark ? Colors.white38 : Colors.black38;
+    final isUp = _data.last.close >= _data.last.open;
+
+    // Gộp asks + spread + bids thành 1 list duy nhất
+    final items = <_OrderBookItem>[
+      ...asks.map((e) => _OrderBookItem.row(e, dnColor)),
+      _OrderBookItem.spread(),
+      ...bids.map((e) => _OrderBookItem.row(e, upColor)),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildChart(),
+          // Header
+          Row(
+            children: [
+              Expanded(
+                flex: 4,
+                child: Text(
+                  'Price (USDT)',
+                  style: TextStyle(fontSize: 11, color: mutedColor),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Amount',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 11, color: mutedColor),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'Total',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 11, color: mutedColor),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
-          Expanded(child: _buildControls()),
+          // Inline list (không tự cuộn — cuộn theo scroll cha)
+          ListView.builder(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            itemBuilder: (_, i) {
+              final item = items[i];
+              if (item.isSpread) {
+                return _spreadRow(midPrice, isUp, upColor, dnColor, mutedColor);
+              }
+              return _orderBookRow(
+                item.entity!,
+                maxVol,
+                item.sideColor!,
+                textColor,
+              );
+            },
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _spreadRow(
+    double midPrice,
+    bool isUp,
+    Color upColor,
+    Color dnColor,
+    Color mutedColor,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: mutedColor.withValues(alpha: 0.2),
+            width: 0.5,
+          ),
+          bottom: BorderSide(
+            color: mutedColor.withValues(alpha: 0.2),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isUp ? Icons.arrow_upward : Icons.arrow_downward,
+            size: 14,
+            color: isUp ? upColor : dnColor,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            midPrice.toStringAsFixed(2),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isUp ? upColor : dnColor,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '≈ \$${midPrice.toStringAsFixed(2)}',
+            style: TextStyle(fontSize: 11, color: mutedColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _orderBookRow(
+    DepthEntity entity,
+    double maxVol,
+    Color sideColor,
+    Color textColor,
+  ) {
+    final ratio = maxVol == 0 ? 0.0 : (entity.vol / maxVol).clamp(0.0, 1.0);
+    final amount = entity.vol;
+    return Stack(
+      children: [
+        // Bar nền theo volume (vẽ từ phải sang trái)
+        Positioned.fill(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: ratio,
+              child: Container(color: sideColor.withValues(alpha: 0.12)),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 4,
+                child: Text(
+                  entity.price.toStringAsFixed(2),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: sideColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  amount.toStringAsFixed(4),
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  (entity.price * amount).toStringAsFixed(2),
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -378,46 +722,105 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         // Số nến + trạng thái
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Text(
-            '${_data.length} nến'
-            '${_totalLoaded >= _maxTotal ? ' · Đã tải hết' : ' · Kéo trái để tải thêm'}',
-            style: TextStyle(
-              fontSize: 11,
-              color: _isDark ? Colors.white38 : Colors.black38,
-            ),
+          child: Row(
+            children: [
+              Text(
+                '${_data.length} nến'
+                '${_totalLoaded >= _maxTotal ? ' · Đã tải hết' : ' · Kéo trái để tải thêm'}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _isDark ? Colors.white38 : Colors.black38,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _scaleYActive
+                      ? const Color(0xFF217AFF).withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  _scaleYActive ? 'Chart focused' : 'Scroll mode',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: _scaleYActive
+                        ? const Color(0xFF217AFF)
+                        : (_isDark ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        KChartWidget(
-          _data,
-          const KChartStyle(),
-          _colors,
-          isTrendLine: false,
-          isLine: _isLine,
-          volHidden: _volHidden,
-          mainIndicators: _mainIndicators,
-          secondaryIndicators: _secondaryIndicators,
-          controller: _controller,
-          showNowPrice: true,
-          showInfoDialog: true,
-          mBaseHeight: 280,
-          timeFormat: TimeFormat.yearMonthDayWithHour,
-          onLoadMore: _onLoadMore,
-          isLoadingMore: _isFetching,
-          detailBuilder: _buildInfoCard,
-          backgroundLogo: Builder(
-            builder: (context) {
-              final size = MediaQuery.sizeOf(context).width / 12;
-              return SvgPicture.asset(
-                'assets/logo_wikex.svg',
-                width: size,
-                height: size,
-              );
-            },
-          ),
-          backgroundLogoOpacity: 1,
+        LayoutBuilder(
+          builder: (ctx, constraints) {
+            _chartWidth = constraints.maxWidth;
+            return Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: _onChartPointerDown,
+              onPointerMove: _onChartPointerMove,
+              onPointerUp: _onChartPointerUp,
+              onPointerCancel: _onChartPointerCancel,
+              child: _buildKChart(),
+            );
+          },
         ),
       ],
     );
+  }
+
+  Widget _buildKChart() {
+    return KChartWidget(
+      _data,
+      const KChartStyle(),
+      _colors,
+      isTrendLine: false,
+      isLine: _isLine,
+      volHidden: _volHidden,
+      mainIndicators: _mainIndicators,
+      secondaryIndicators: _secondaryIndicators,
+      controller: _controller,
+      showNowPrice: true,
+      showInfoDialog: true,
+      mBaseHeight: 280,
+      timeFormat: TimeFormat.yearMonthDayWithHour,
+      onLoadMore: _onLoadMore,
+      isLoadingMore: _isFetching,
+      detailBuilder: _buildInfoCard,
+      onVerticalOverscroll: _onChartVerticalOverscroll,
+      backgroundLogo: Builder(
+        builder: (context) {
+          final size = MediaQuery.sizeOf(context).width / 12;
+          return SvgPicture.asset(
+            'assets/logo_wikex.svg',
+            width: size,
+            height: size,
+          );
+        },
+      ),
+      backgroundLogoOpacity: 1,
+    );
+  }
+
+  void _onChartVerticalOverscroll(double delta) {
+    if (!_outerScrollController.hasClients) return;
+    final pos = _outerScrollController.position;
+    // Convention: chart pan Y dùng mOffsetY += dy (content theo finger).
+    // Scroll Flutter ngược lại: pos.pixels TĂNG = reveal content bên dưới
+    // (finger drag UP). Vì vậy phải NEGATE delta khi forward sang outer:
+    //   finger drag DOWN → overscroll > 0 → outer pos giảm (reveal content trên)
+    //   finger drag UP   → overscroll < 0 → outer pos tăng (reveal content dưới)
+    final target = (pos.pixels - delta).clamp(
+      pos.minScrollExtent,
+      pos.maxScrollExtent,
+    );
+    if (target != pos.pixels) {
+      // jumpTo bypass physics → vẫn cuộn được khi outer đang NeverScrollableScrollPhysics
+      _outerScrollController.jumpTo(target);
+    }
   }
 
   Widget _buildInfoCard(KLineEntity entity) {
@@ -479,7 +882,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   }
 
   Widget _buildControls() {
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

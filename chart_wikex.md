@@ -1,7 +1,7 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
-- [Thay đổi gần đây](#thay-đổi-gần-đây)
+- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: label theo scroll, multi-select secondary, volume overlay, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
 - [OBV Indicator](#obv-indicator)
 - [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
@@ -262,6 +262,130 @@ double _applyScaleY(double rawY) {
   return centerY + (rawY - centerY) * scaleY + offsetY;
 }
 ```
+
+---
+
+### 5. Pan Y gate theo scaleY + clamp 50% (`k_chart_widget.dart`)
+
+**Vấn đề:** 1-finger drag tự do trước đây cộng dồn cả `mScrollX` và `mOffsetY` — pan Y luôn active kể cả khi `mScaleY = 1.0` (chart fit viewport, không có gì để pan). Ngoài ra chart có thể pan ra ngoài viewport quá xa.
+
+**Fix:** Pan Y chỉ active sau khi user đã scaleY (drag dọc vùng `Positioned` 100px bên phải) → `mScaleY != 1.0`. Đồng thời clamp `mOffsetY` để giữ tối thiểu 50% chart content trong view.
+
+```dart
+} else {
+  // 1 ngón tay drag tự do → scroll X
+  mScrollX = (mScrollX + dx / mScaleX).clamp(0.0, ChartPainter.maxScrollX);
+  // Pan Y chỉ active sau khi user đã scaleY qua vùng Positioned bên phải
+  if (mScaleY != 1.0) {
+    mOffsetY = _clampOffsetY(mOffsetY + dy);
+  }
+  // ...
+}
+```
+
+**Helper clamp:**
+```dart
+// |offsetY| ≤ baseHeight * scaleY / 2 → đúng 50% content height bị đẩy ra
+// khỏi viewport tại biên, 50% còn lại luôn hiển thị.
+double _clampOffsetY(double v) {
+  final double maxOffset = widget.mBaseHeight * mScaleY / 2;
+  return v.clamp(-maxOffset, maxOffset);
+}
+```
+
+Re-clamp `mOffsetY` mỗi khi `mScaleY` thay đổi (bound phụ thuộc scaleY).
+
+| `mScaleY` | `|mOffsetY|` max |
+|---|---|
+| 0.3 | 0.15 × baseHeight |
+| 1.0 | 0.5 × baseHeight |
+| 5.0 | 2.5 × baseHeight |
+
+**UX:**
+- Mặc định (`mScaleY = 1`): drag bình thường chỉ cuộn timeline (X), không trôi dọc.
+- Drag dọc vùng phải 100px → scaleY (zoom dọc). Sau đó drag bất kỳ đâu → pan Y, giới hạn 50%.
+- Double-tap vùng phải → reset scaleY=1, offsetY=0 → tắt pan Y.
+
+---
+
+### 6. Vertical overscroll handoff (`k_chart_widget.dart` + parent)
+
+**Vấn đề:** Khi nhúng chart trong `SingleChildScrollView` (có UI khác như OrderBook bên dưới), nếu user pan chart đến biên 50% và tiếp tục drag dọc, chart sẽ "tắc" — chart đã clamp, outer scroll bị khoá (do `_scaleYActive`), không gì cuộn nữa.
+
+**Fix:** Emit phần delta vượt clamp ra ngoài qua callback `onVerticalOverscroll`, parent forward sang `ScrollController` của outer.
+
+#### Bên `KChartWidget`
+
+Thêm callback:
+```dart
+/// delta > 0: drag xuống quá biên dưới; delta < 0: drag lên quá biên trên.
+final ValueChanged<double>? onVerticalOverscroll;
+```
+
+Detect overscroll trong `onScaleUpdate` (normal drag branch):
+```dart
+if (mScaleY != 1.0) {
+  final double dy = details.focalPointDelta.dy;
+  final double newOffsetY = mOffsetY + dy;
+  final double clampedOffsetY = _clampOffsetY(newOffsetY);
+  mOffsetY = clampedOffsetY;
+  final double overscroll = newOffsetY - clampedOffsetY;
+  if (overscroll != 0 && widget.onVerticalOverscroll != null) {
+    widget.onVerticalOverscroll!(overscroll);
+  }
+}
+```
+
+Khi `mScaleY == 1`: chart không claim pan Y, vertical drag tự nhiên thuộc outer scroll qua gesture arena → không cần forward.
+
+#### Bên parent
+
+```dart
+final _outerScrollController = ScrollController();
+
+SingleChildScrollView(
+  controller: _outerScrollController,
+  physics: (_scaleYActive && _pointerOnChart)
+      ? const NeverScrollableScrollPhysics()  // khoá outer khi chart đang focused
+      : const ClampingScrollPhysics(),
+  child: ...,
+)
+
+KChartWidget(
+  ...,
+  onVerticalOverscroll: _onChartVerticalOverscroll,
+)
+
+void _onChartVerticalOverscroll(double delta) {
+  if (!_outerScrollController.hasClients) return;
+  final pos = _outerScrollController.position;
+  // Đảo dấu: convention scroll Flutter ngược chiều với pan finger.
+  // Finger drag DOWN (delta > 0) → outer pos GIẢM (reveal content trên).
+  // Finger drag UP (delta < 0) → outer pos TĂNG (reveal content dưới).
+  final target = (pos.pixels - delta).clamp(
+    pos.minScrollExtent,
+    pos.maxScrollExtent,
+  );
+  if (target != pos.pixels) {
+    // jumpTo bypass physics → vẫn cuộn được khi outer đang NeverScrollableScrollPhysics
+    _outerScrollController.jumpTo(target);
+  }
+}
+```
+
+#### Cơ chế chuyển giao
+
+```
+mOffsetY     -max          0         +max
+              │             │           │
+finger UP ────┼─chart pan─→ │ ←─pan────┼──── finger DOWN
+              │                         │
+   overscroll ↓                         ↓ overscroll
+   outer pos TĂNG                outer pos GIẢM
+   (xuống OrderBook)             (lên đầu trang)
+```
+
+Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở lại 0), outer dừng. Chỉ khi mOffsetY chạm biên ngược → outer mới scroll tiếp ở hướng ngược.
 
 ---
 
