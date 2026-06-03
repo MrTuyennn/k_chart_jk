@@ -15,6 +15,15 @@ class DepthChart extends StatefulWidget {
   final DepthChartStyle chartStyle;
   final DepthChartTranslations chartTranslations;
 
+  /// Widget hiển thị như watermark ở giữa vùng depth chart (vd: SvgPicture.asset(...))
+  final Widget? backgroundLogo;
+
+  /// Độ trong suốt của backgroundLogo (0.0 = ẩn hoàn toàn, 1.0 = hiện đầy đủ)
+  final double backgroundLogoOpacity;
+
+  /// Số mốc giá hiển thị ở trục dưới (>=2). Mặc định 5.
+  final int bottomLabelCount;
+
   DepthChart(
     this.bids,
     this.asks,
@@ -24,6 +33,9 @@ class DepthChart extends StatefulWidget {
     this.offset = const Offset(8, 0),
     this.chartTranslations = const DepthChartTranslations(),
     this.chartStyle = const DepthChartStyle(),
+    this.backgroundLogo,
+    this.backgroundLogoOpacity = 1,
+    this.bottomLabelCount = 5,
   });
 
   @override
@@ -36,6 +48,24 @@ class _DepthChartState extends State<DepthChart> {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasLogo = widget.backgroundLogo != null;
+    final chart = CustomPaint(
+      size: Size(double.infinity, double.infinity),
+      painter: DepthChartPainter(
+        widget.bids,
+        widget.asks,
+        pressOffset,
+        isLongPress,
+        widget.baseUnit,
+        widget.quoteUnit,
+        widget.chartColors,
+        widget.chartStyle,
+        widget.offset,
+        widget.chartTranslations,
+        bottomLabelCount: widget.bottomLabelCount,
+      ),
+    );
+
     return GestureDetector(
       onLongPressStart: (details) {
         pressOffset = details.localPosition;
@@ -52,21 +82,25 @@ class _DepthChartState extends State<DepthChart> {
         isLongPress = false;
         setState(() {});
       },
-      child: CustomPaint(
-        size: Size(double.infinity, double.infinity),
-        painter: DepthChartPainter(
-          widget.bids,
-          widget.asks,
-          pressOffset,
-          isLongPress,
-          widget.baseUnit,
-          widget.quoteUnit,
-          widget.chartColors,
-          widget.chartStyle,
-          widget.offset,
-          widget.chartTranslations,
-        ),
-      ),
+      child: hasLogo
+          ? Stack(
+              children: [
+                // layer 1: logo watermark ở giữa vùng depth chart
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Opacity(
+                        opacity: widget.backgroundLogoOpacity.clamp(0.0, 1.0),
+                        child: widget.backgroundLogo!,
+                      ),
+                    ),
+                  ),
+                ),
+                // layer 2: chart content
+                Positioned.fill(child: chart),
+              ],
+            )
+          : chart,
     );
   }
 }
@@ -87,6 +121,9 @@ class DepthChartPainter extends CustomPainter {
 
   Offset offset;
   DepthChartTranslations chartTranslations;
+
+  /// Số mốc giá hiển thị ở trục dưới (>=2).
+  final int bottomLabelCount;
 
   //最大的委托量
   //Maximum commission amount
@@ -117,8 +154,9 @@ class DepthChartPainter extends CustomPainter {
     this.chartColors,
     this.chartStyle,
     this.offset,
-    this.chartTranslations,
-  ) {
+    this.chartTranslations, {
+    this.bottomLabelCount = 5,
+  }) {
     mBuyLinePaint ??= Paint()
       ..isAntiAlias = true
       ..color = this.chartColors.upColor
@@ -292,62 +330,33 @@ class DepthChartPainter extends CustomPainter {
       );
     }
 
-    var startText =
-        NumberUtil.formatFixed(mBuyData!.first.price, quoteUnit) ?? '';
-    TextPainter startTP = getTextPainter(startText);
-    startTP.layout();
-    startTP.paint(canvas, Offset(0, getBottomTextY(startTP.height)));
+    final double startPrice = mBuyData!.first.price;
+    final double endPrice = mSellData!.last.price;
+    final double centerPrice =
+        (mBuyData!.last.price + mSellData!.first.price) / 2;
 
-    double centerPrice = (mBuyData!.last.price + mSellData!.first.price) / 2;
-
-    var center = NumberUtil.formatFixed(centerPrice, quoteUnit) ?? '';
-    TextPainter centerTP = getTextPainter(center);
-    centerTP.layout();
-    centerTP.paint(
-      canvas,
-      Offset(mDrawWidth - centerTP.width / 2, getBottomTextY(centerTP.height)),
-    );
-
-    var endText =
-        NumberUtil.formatFixed(mSellData!.last.price, quoteUnit) ?? '';
-    TextPainter endTP = getTextPainter(endText);
-    endTP.layout();
-    endTP.paint(
-      canvas,
-      Offset(mWidth - endTP.width, getBottomTextY(endTP.height)),
-    );
-
-    var leftHalfText =
-        NumberUtil.formatFixed(
-          (mBuyData!.first.price + centerPrice) / 2,
-          quoteUnit,
-        ) ??
-        '';
-    TextPainter leftHalfTP = getTextPainter(leftHalfText);
-    leftHalfTP.layout();
-    leftHalfTP.paint(
-      canvas,
-      Offset(
-        (mDrawWidth - leftHalfTP.width) / 2,
-        getBottomTextY(leftHalfTP.height),
-      ),
-    );
-
-    var rightHalfText =
-        NumberUtil.formatFixed(
-          (mSellData!.last.price + centerPrice) / 2,
-          quoteUnit,
-        ) ??
-        '';
-    TextPainter rightHalfTP = getTextPainter(rightHalfText);
-    rightHalfTP.layout();
-    rightHalfTP.paint(
-      canvas,
-      Offset(
-        (mDrawWidth + mWidth - rightHalfTP.width) / 2,
-        getBottomTextY(rightHalfTP.height),
-      ),
-    );
+    // Vẽ bottomLabelCount mốc giá, phân bố đều theo trục X.
+    // Giá nội suy tuyến tính từng đoạn: [start..center] ở nửa trái, [center..end] ở nửa phải.
+    final int n = bottomLabelCount < 2 ? 2 : bottomLabelCount;
+    for (int i = 0; i < n; i++) {
+      final double t = i / (n - 1); // 0..1
+      final double x = t * mWidth;
+      final double price = t <= 0.5
+          ? startPrice + (centerPrice - startPrice) * (t * 2)
+          : centerPrice + (endPrice - centerPrice) * ((t - 0.5) * 2);
+      final String label = NumberUtil.formatFixed(price, quoteUnit) ?? '';
+      final TextPainter tp = getTextPainter(label);
+      tp.layout();
+      final double dx;
+      if (i == 0) {
+        dx = 0;
+      } else if (i == n - 1) {
+        dx = mWidth - tp.width;
+      } else {
+        dx = (x - tp.width / 2).clamp(0.0, mWidth - tp.width);
+      }
+      tp.paint(canvas, Offset(dx, getBottomTextY(tp.height)));
+    }
 
     if (isLongPress == true) {
       if (pressOffset!.dx <= mDrawWidth) {

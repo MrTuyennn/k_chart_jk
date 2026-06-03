@@ -96,10 +96,7 @@ class _OrderBookItem {
   final bool isSpread;
 
   _OrderBookItem.row(this.entity, this.sideColor) : isSpread = false;
-  _OrderBookItem.spread()
-      : entity = null,
-        sideColor = null,
-        isSpread = true;
+  _OrderBookItem.spread() : entity = null, sideColor = null, isSpread = true;
 }
 
 class ChartDemoPage extends StatefulWidget {
@@ -119,6 +116,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   bool _isLine = false;
   bool _volHidden = false;
   bool _isDark = false;
+  bool _showDepth = false;
+  int _depthBottomLabelCount = 3;
 
   bool _isFetching = false;
   int _totalLoaded = 200;
@@ -452,6 +451,21 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           ],
         ),
         actions: [
+          Row(
+            children: [
+              Text(
+                'Depth',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              Switch(
+                value: _showDepth,
+                onChanged: (v) => setState(() => _showDepth = v),
+              ),
+            ],
+          ),
           IconButton(
             icon: Icon(
               _isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
@@ -469,7 +483,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildChart(),
+            _showDepth ? _buildDepthChartSection() : _buildChart(),
             const SizedBox(height: 8),
             _sectionHeader('Order Book'),
             _buildOrderBook(),
@@ -589,10 +603,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(
-            color: mutedColor.withValues(alpha: 0.2),
-            width: 0.5,
-          ),
+          top: BorderSide(color: mutedColor.withValues(alpha: 0.2), width: 0.5),
           bottom: BorderSide(
             color: mutedColor.withValues(alpha: 0.2),
             width: 0.5,
@@ -802,6 +813,65 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         },
       ),
       backgroundLogoOpacity: 1,
+    );
+  }
+
+  Widget _buildDepthChartSection() {
+    final midPrice = _data.last.close;
+    final depth = _generateMockDepth(midPrice, levels: 40);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Bộ chọn số mốc giá ở trục dưới
+          Row(
+            children: [
+              Text(
+                'Bottom labels:',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+              const SizedBox(width: 8),
+              for (final n in const [3, 5, 7, 9]) ...[
+                _chip(
+                  '$n',
+                  _depthBottomLabelCount == n,
+                  () => setState(() => _depthBottomLabelCount = n),
+                ),
+                const SizedBox(width: 6),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 280,
+            child: DepthChart(
+              depth.bids,
+              depth.asks,
+              DepthChartColors(
+                defaultTextColor: _isDark
+                    ? const Color(0xFF8E8E93)
+                    : const Color(0xFF909196),
+              ),
+              bottomLabelCount: _depthBottomLabelCount,
+              backgroundLogo: Builder(
+                builder: (context) {
+                  final size = MediaQuery.sizeOf(context).width / 12;
+                  return SvgPicture.asset(
+                    'assets/logo_wikex.svg',
+                    width: size,
+                    height: size,
+                  );
+                },
+              ),
+              backgroundLogoOpacity: 1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

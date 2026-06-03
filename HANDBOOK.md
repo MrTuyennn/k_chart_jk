@@ -552,8 +552,17 @@ DepthChart(
   offset = const Offset(8, 0),
   chartTranslations = const DepthChartTranslations(),
   chartStyle = const DepthChartStyle(),
+  backgroundLogo,                    // Widget? — watermark giữa vùng depth chart
+  backgroundLogoOpacity = 1,         // 0.0–1.0
+  bottomLabelCount = 5,              // số mốc giá ở trục dưới (>=2)
 })
 ```
+
+| Field | Default | Ý nghĩa |
+|---|---|---|
+| `backgroundLogo` | `null` | Widget overlay ở giữa vùng depth chart (logo SVG, image…). Có `IgnorePointer` nội bộ — không nhận touch. Khi `null`, widget render `CustomPaint` trực tiếp (không tạo Stack thừa). |
+| `backgroundLogoOpacity` | `1.0` | 0.0 ẩn — 1.0 hiện đầy đủ. |
+| `bottomLabelCount` | `5` | Số mốc giá ở trục dưới. Mốc đầu align trái, mốc cuối align phải, các mốc giữa center quanh vị trí X (clamp để không tràn). Giá nội suy tuyến tính từng đoạn: `[bids.first.price..centerPrice]` ở nửa trái và `[centerPrice..asks.last.price]` ở nửa phải, với `centerPrice = (bids.last.price + asks.first.price) / 2`. Tối thiểu `2`. |
 
 ### Gesture
 

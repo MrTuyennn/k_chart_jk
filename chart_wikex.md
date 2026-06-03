@@ -1,7 +1,7 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
-- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: label theo scroll, multi-select secondary, volume overlay, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
+- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, volume overlay, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
 - [OBV Indicator](#obv-indicator)
 - [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
@@ -166,6 +166,44 @@ Pattern để implement thêm một indicator phụ bất kỳ:
 ---
 
 ## Thay đổi gần đây
+
+### 0. DepthChart: watermark logo + số mốc giá tuỳ chỉnh (`depth_chart.dart`)
+
+**File:** `lib/depth_chart.dart`, `example/lib/main.dart`
+
+Thêm 3 tham số mới cho `DepthChart`:
+
+| Param | Default | Mô tả |
+|---|---|---|
+| `backgroundLogo` | `null` | Widget watermark đặt giữa vùng depth chart (giống `KChartWidget.backgroundLogo`). Có `IgnorePointer` nội bộ. Khi `null`, không tạo `Stack` thừa. |
+| `backgroundLogoOpacity` | `1.0` | Độ trong suốt watermark, 0.0–1.0. |
+| `bottomLabelCount` | `5` | Số mốc giá ở trục dưới — có thể đổi 3, 5, 7, 9… (tối thiểu 2). |
+
+**Render logo:** Khi `backgroundLogo != null`, `build` bọc `CustomPaint` trong `Stack` với logo `Center` + `IgnorePointer` ở dưới, chart vẽ chồng lên trên.
+
+**Vẽ mốc giá động:** thay 5 nhãn hardcoded (start, leftHalf, center, rightHalf, end) bằng vòng lặp `n = bottomLabelCount`:
+
+```dart
+for (int i = 0; i < n; i++) {
+  final t = i / (n - 1);              // 0..1
+  final x = t * mWidth;
+  // Nội suy tuyến tính từng đoạn: trái [startPrice..centerPrice], phải [centerPrice..endPrice]
+  final price = t <= 0.5
+      ? startPrice + (centerPrice - startPrice) * (t * 2)
+      : centerPrice + (endPrice - centerPrice) * ((t - 0.5) * 2);
+  // ... layout text, align: i==0 trái, i==n-1 phải, còn lại center quanh x với clamp
+}
+```
+
+`centerPrice = (bids.last.price + asks.first.price) / 2` — giữ ý nghĩa giá mid như cũ.
+
+**Example (`example/lib/main.dart`):**
+
+- Thêm `Switch "Depth"` ở `AppBar.actions` để toggle giữa candle chart và depth chart (state `_showDepth`).
+- `_buildDepthChartSection()` dựng `DepthChart` từ `_generateMockDepth`, gắn cùng `logo_wikex.svg` watermark như candle chart.
+- Hàng chip `3 | 5 | 7 | 9` phía trên depth chart bind vào state `_depthBottomLabelCount` để xem nhanh hiệu ứng của `bottomLabelCount`.
+
+---
 
 ### 1. Label indicator cập nhật theo scroll (`base_chart_painter.dart`)
 
