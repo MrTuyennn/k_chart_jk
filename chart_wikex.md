@@ -1,7 +1,7 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
-- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, volume overlay, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
+- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, **VolIndicator (tách volume khỏi main)**, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
 - [OBV Indicator](#obv-indicator)
 - [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
@@ -256,9 +256,9 @@ List<SecondaryIndicator> get _secondaryIndicators {
 
 ---
 
-### 3. Layout volume overlay (`chart_painter.dart` + `base_chart_painter.dart`)
+### 3. Volume tách thành Secondary Indicator (`vol_indicator.dart`)
 
-Volume **không phải panel riêng bên dưới** mà là overlay chiếm **20% dưới của `mMainRect`**:
+**Trước:** Volume là overlay chiếm 20% dưới của `mMainRect`. `KChartWidget` có flag `volHidden` để tắt, `VolRenderer` được vẽ chung canvas transform với main → bị ảnh hưởng bởi `scaleY`. Layout:
 
 ```
 mMainRect
@@ -266,34 +266,72 @@ mMainRect
 └── mVolRect         (20% dưới) ← vol bars
 ```
 
-```dart
-// base_chart_painter.initRect()
-final double overlayHeight = mMainRect.height * 0.2;
-mVolRect = Rect.fromLTRB(0, mMainRect.bottom - overlayHeight, mWidth, mMainRect.bottom);
+**Sau:** Volume là một `SecondaryIndicator` tương đương MACD/KDJ/RSI/OBV — toggle bằng cách thêm/bỏ `VolIndicator()` trong `secondaryIndicators`. Layout chính trở về đơn giản:
 
-// chart_painter.initChartRenderer()
-final Rect mainContentRect = mVolRect != null
-    ? Rect.fromLTRB(mMainRect.left, mMainRect.top, mMainRect.right, mVolRect!.top)
-    : mMainRect;
+```
+mMainRect          ← nến + main indicators (full height)
+mDateRect          ← trục thời gian
+mSecondaryRect[0]  ← VOL (nếu user bật)
+mSecondaryRect[1]  ← MACD
+...
 ```
 
-Cả `mMainRenderer` và `mVolRenderer` đều được vẽ trong cùng canvas transform (`scaleY`), clip vào `mMainRect`.
+**Files đã đổi:**
+
+| File | Thay đổi |
+|---|---|
+| `lib/indicator/secondary/vol_indicator.dart` | **Mới** — `VolIndicator extends SecondaryIndicator<MACDEntity, VolStyle>`. Vẽ bar + MA5/MA10. `calc` no-op (đã có `DataUtil.calcVolumeMA`). |
+| `lib/indicator/indicator_style.dart` | Thêm `VolStyle` (volUpColor/dnColor, ma5Color/ma10Color, volWidth, barOpacity). |
+| `lib/indicator/indicator_template.dart` | Thêm `part 'secondary/vol_indicator.dart'`. |
+| `lib/entity/macd_entity.dart` | Thêm `VolumeEntity` vào `on` clause để MACDEntity truy cập `.vol/.MA5Volume/.MA10Volume`. |
+| `lib/entity/k_entity.dart` | VolumeEntity đã ở trước MACDEntity — chỉ cập nhật comment. |
+| `lib/renderer/base_chart_painter.dart` | Xoá field `mVolRect`, `mVolMaxValue/MinValue`, `volHidden`, hàm `getVolMaxMinValue`, khối tạo `mVolRect` 20% trong `initRect`. |
+| `lib/renderer/chart_painter.dart` | Xoá field `mVolRenderer`, import `vol_renderer.dart`, mọi nhánh `mVolRenderer?.drawX`. `mainContentRect` không còn — main dùng `mMainRect` trực tiếp. |
+| `lib/renderer/vol_renderer.dart` | **Xoá** — chức năng chuyển vào `VolIndicator.drawChart`. |
+| `lib/renderer/index.dart` | Xoá `export 'vol_renderer.dart'`. |
+| `lib/renderer/base_dimension.dart` | Xoá field `_mVolumeHeight` và param `volHidden`. |
+| `lib/k_chart_widget.dart` | Xoá param `volHidden`. Phần `Positioned` của scaleY zone không còn cộng `mVolumeHeight`. |
+
+**Hệ quả về scaleY:** trước đây volume scale/pan cùng main; nay vol nằm trong panel secondary riêng → **không** chịu ảnh hưởng `scaleY`, hành vi giống các indicator phụ khác.
+
+**Cách dùng:**
+
+```dart
+KChartWidget(
+  _data,
+  chartStyle,
+  chartColors,
+  secondaryIndicators: [
+    VolIndicator(),                          // bật vol panel
+    MACDIndicator(),
+  ],
+)
+
+// Tuỳ chỉnh màu / opacity bar
+VolIndicator(
+  indicatorStyle: VolStyle(
+    volUpColor: Color(0xFF14AD8F),
+    volDnColor: Color(0xFFD5405D),
+    barOpacity: 0.85,
+  ),
+)
+```
 
 ---
 
 ### 4. ScaleY + offsetY transform (`chart_painter.drawChart`)
 
-Main chart và volume đều được scale/pan bằng canvas transform, **không** scale giá trị:
+Main chart được scale/pan bằng canvas transform, **không** scale giá trị:
 
 ```dart
 canvas.translate(0, centerY * (1 - scaleY) + offsetY);
 canvas.scale(1.0, scaleY);
-// vẽ main + vol bên trong transform này
+// vẽ main bên trong transform này
 ```
 
-**Secondary indicators** vẽ ngoài transform này → không bị ảnh hưởng bởi scaleY.
+**Secondary indicators** (gồm cả `VolIndicator`) vẽ ngoài transform này → không bị ảnh hưởng bởi scaleY.
 
-Các label vẽ ngoài transform (nowPrice, maxMin, volText) phải tính lại vị trí screen bằng:
+Các label vẽ ngoài transform (nowPrice, maxMin) phải tính lại vị trí screen bằng:
 ```dart
 double _applyScaleY(double rawY) {
   final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
@@ -441,8 +479,7 @@ Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở 
 | Tham số | Kiểu | Giải thích |
 |---------|------|-----------|
 | `mainIndicators` | `List<MainIndicator>` | Indicator hiển thị trên khung nến chính. Hỗ trợ: `MAIndicator`, `BOLLIndicator`, `EMAIndicator`, `SARIndicator`, `ZigZagIndicator`. |
-| `secondaryIndicators` | `List<SecondaryIndicator>` | Indicator phụ, mỗi cái sinh ra 1 khung riêng bên dưới. Hỗ trợ: `MACDIndicator`, `KDJIndicator`, `RSIIndicator`, `WRIndicator`, `CCIIndicator`. |
-| `volHidden` | `bool` | `true` = ẩn khung volume. Chỉ nên ẩn khi dùng MA/BOLL/SAR. |
+| `secondaryIndicators` | `List<SecondaryIndicator>` | Indicator phụ, mỗi cái sinh ra 1 khung riêng bên dưới. Hỗ trợ: `VolIndicator`, `MACDIndicator`, `KDJIndicator`, `RSIIndicator`, `WRIndicator`, `CCIIndicator`, `OBVIndicator`. Volume bật bằng cách thêm `VolIndicator()`. |
 
 ### Kiểu hiển thị chart
 

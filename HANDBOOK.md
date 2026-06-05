@@ -219,9 +219,8 @@ File: `lib/k_chart_widget.dart`.
 | Param | Default | Ý nghĩa |
 |---|---|---|
 | `mainIndicators` | `[]` | List `MainIndicator` overlay trên main chart (MA, BOLL, EMA, SAR, ZigZag). |
-| `secondaryIndicators` | `[]` | List `SecondaryIndicator` thành panel riêng bên dưới (MACD, KDJ, RSI, WR, CCI, OBV). |
+| `secondaryIndicators` | `[]` | List `SecondaryIndicator` thành panel riêng bên dưới (VOL, MACD, KDJ, RSI, WR, CCI, OBV). Volume bật bằng cách thêm `VolIndicator()` vào list. |
 | `isLine` | `false` | `true` = line chart (chỉ đường close), `false` = candlestick. |
-| `volHidden` | `false` | Ẩn volume overlay. (Trong base dimension `mVolumeHeight = 0` cố định — volume hiện overlay trên main chart, ko có panel riêng.) |
 | `hideGrid` | `false` | Ẩn lưới ngang/dọc. |
 | `showNowPrice` | `true` | Vẽ đường giá hiện tại (nến cuối) ngang qua chart, kèm label bên phải. |
 | `showInfoDialog` | `true` | Cho phép hiện dialog detail. |

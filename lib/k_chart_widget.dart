@@ -28,8 +28,6 @@ class KChartWidget extends StatefulWidget {
   final List<KLineEntity>? datas;
   final List<MainIndicator> mainIndicators;
 
-  ///warning only using MA, BOLL, SAR
-  final bool volHidden;
   final List<SecondaryIndicator> secondaryIndicators;
 
   ///SecondaryState { MACD, KDJ, RSI, WR, CCI }
@@ -90,7 +88,6 @@ class KChartWidget extends StatefulWidget {
     this.mainIndicators = const [],
     this.secondaryIndicators = const [],
     // this.onSecondaryTap,
-    this.volHidden = false,
     this.isLine = false,
     this.isTapShowInfoDialog = false,
     this.hideGrid = false,
@@ -202,7 +199,6 @@ class _KChartWidgetState extends State<KChartWidget>
     final BaseDimension baseDimension = BaseDimension(
       mBaseHeight: widget.mBaseHeight,
       mSecondaryHeight: widget.mSecondaryHeight ?? widget.mBaseHeight * .2,
-      volHidden: widget.volHidden,
       secondaryIndicators: widget.secondaryIndicators,
       mainIndicators: widget.mainIndicators,
     );
@@ -227,7 +223,6 @@ class _KChartWidgetState extends State<KChartWidget>
       isOnTap: isOnTap,
       isTapShowInfoDialog: widget.isTapShowInfoDialog,
       mainIndicators: widget.mainIndicators,
-      volHidden: widget.volHidden,
       secondaryIndicators: widget.secondaryIndicators,
       isLine: widget.isLine,
       hideGrid: widget.hideGrid,
@@ -426,7 +421,6 @@ class _KChartWidgetState extends State<KChartWidget>
             right: 0,
             top: 0,
             bottom:
-                baseDimension.mVolumeHeight +
                 baseDimension.totalSecondaryHeight +
                 widget.chartStyle.bottomPadding,
             child: GestureDetector(

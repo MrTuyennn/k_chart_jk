@@ -88,7 +88,7 @@ List<KLineEntity> _generateMockData(int count) {
 
 enum _MainType { ma, boll, ema, none }
 
-enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, none }
+enum _SecondaryType { vol, macd, kdj, rsi, wr, cci, obv, none }
 
 class _OrderBookItem {
   final DepthEntity? entity;
@@ -112,9 +112,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   final ScrollController _outerScrollController = ScrollController();
 
   _MainType _mainType = _MainType.ma;
-  Set<_SecondaryType> _secondaryTypes = {_SecondaryType.macd};
+  Set<_SecondaryType> _secondaryTypes = {
+    _SecondaryType.vol,
+    _SecondaryType.macd,
+  };
   bool _isLine = false;
-  bool _volHidden = false;
   bool _isDark = false;
   bool _showDepth = false;
   int _depthBottomLabelCount = 3;
@@ -384,6 +386,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
 
   List<SecondaryIndicator> get _secondaryIndicators {
     const order = [
+      _SecondaryType.vol,
       _SecondaryType.macd,
       _SecondaryType.kdj,
       _SecondaryType.rsi,
@@ -395,6 +398,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         .where((t) => _secondaryTypes.contains(t))
         .map<SecondaryIndicator>(
           (t) => switch (t) {
+            _SecondaryType.vol => VolIndicator(),
             _SecondaryType.macd => MACDIndicator(),
             _SecondaryType.kdj => KDJIndicator(),
             _SecondaryType.rsi => RSIIndicator(),
@@ -486,7 +490,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             _showDepth ? _buildDepthChartSection() : _buildChart(),
             const SizedBox(height: 8),
             _sectionHeader('Order Book'),
-            _buildOrderBook(),
+            // _buildOrderBook(),
             const SizedBox(height: 8),
             _buildControls(),
           ],
@@ -790,7 +794,6 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       _colors,
       isTrendLine: false,
       isLine: _isLine,
-      volHidden: _volHidden,
       mainIndicators: _mainIndicators,
       secondaryIndicators: _secondaryIndicators,
       controller: _controller,
@@ -964,12 +967,6 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
               const SizedBox(width: 6),
               _chip('Line', _isLine, () => setState(() => _isLine = true)),
               const SizedBox(width: 6),
-              _chip(
-                'Volume',
-                !_volHidden,
-                () => setState(() => _volHidden = !_volHidden),
-              ),
-              const SizedBox(width: 6),
               _liveChip(),
               const Spacer(),
               _iconBtn(Icons.zoom_in, () => _controller.zoomIn(), 'Zoom In'),
@@ -1013,6 +1010,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             spacing: 6,
             runSpacing: 6,
             children: [
+              _chip(
+                'VOL',
+                _secondaryTypes.contains(_SecondaryType.vol),
+                () => _toggleSecondary(_SecondaryType.vol),
+              ),
               _chip(
                 'MACD',
                 _secondaryTypes.contains(_SecondaryType.macd),

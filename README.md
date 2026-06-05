@@ -85,9 +85,8 @@ KChartWidget(
   const KChartColors(),
   isTrendLine: false,
   isLine: false,
-  volHidden: false,
   mainIndicators: [MAIndicator()],
-  secondaryIndicators: [MACDIndicator()],
+  secondaryIndicators: [VolIndicator(), MACDIndicator()],
   showNowPrice: true,
   showInfoDialog: true,
   mBaseHeight: 300,
@@ -119,11 +118,13 @@ KChartWidget(
 
 | Class             | Description             | Default params |
 | ----------------- | ----------------------- | -------------- |
+| `VolIndicator()`  | Volume (bars + MA5/MA10)| 5, 10          |
 | `MACDIndicator()` | MACD                    | 12, 26, 9      |
 | `KDJIndicator()`  | KDJ                     | 9, 1, 3        |
 | `RSIIndicator()`  | Relative Strength Index | 6, 12, 24      |
 | `WRIndicator()`   | Williams %R             | 14             |
 | `CCIIndicator()`  | Commodity Channel Index | 14             |
+| `OBVIndicator()`  | On-Balance Volume       | 5              |
 
 Combine multiple indicators by passing a list:
 
@@ -150,7 +151,6 @@ DataUtil.calculateAll(data, mainIndicators, secondaryIndicators);
 | `mainIndicators`      | `List<MainIndicator>`      | `[]`               | Main overlay indicators        |
 | `secondaryIndicators` | `List<SecondaryIndicator>` | `[]`               | Secondary panel indicators     |
 | `isLine`              | `bool`                     | `false`            | Line chart mode                |
-| `volHidden`           | `bool`                     | `false`            | Hide volume panel              |
 | `isTrendLine`         | `bool`                     | —                  | Enable trend line drawing      |
 | `showNowPrice`        | `bool`                     | `true`             | Show current price line        |
 | `showInfoDialog`      | `bool`                     | `true`             | Show info on long-press/tap    |

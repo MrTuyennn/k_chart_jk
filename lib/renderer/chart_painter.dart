@@ -8,7 +8,6 @@ import 'base_chart_painter.dart';
 import 'base_chart_renderer.dart';
 import 'main_renderer.dart';
 import 'secondary_renderer.dart';
-import 'vol_renderer.dart';
 
 class TrendLine {
   final Offset p1;
@@ -32,7 +31,6 @@ class ChartPainter extends BaseChartPainter {
   final double selectY; //For TrendLine
   static double get maxScrollX => BaseChartPainter.maxScrollX;
   late BaseChartRenderer mMainRenderer;
-  BaseChartRenderer? mVolRenderer;
   Set<BaseChartRenderer> mSecondaryRendererList = {};
   StreamSink<InfoWindowEntity?> sink;
   Color? upColor, dnColor;
@@ -72,7 +70,6 @@ class ChartPainter extends BaseChartPainter {
     super.isTapShowInfoDialog,
     required this.verticalTextAlignment,
     super.mainIndicators,
-    super.volHidden,
     super.secondaryIndicators,
     super.isLine = false,
     super.offsetY = 0.0,
@@ -108,19 +105,8 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void initChartRenderer() {
-    // if (datas != null && datas!.isNotEmpty) {
-    //   var t = datas![0];
-    //   fixedLength = NumberUtil.getMaxDecimalLength(t.open, t.close, t.high, t.low);
-    // }
-    // mainContentRect = phần nến chính (không bao gồm vùng volume 20% dưới).
-    // mVolRect chiếm 20% dưới mMainRect (xem base_chart_painter.initRect).
-    // Nếu muốn volume đè hoàn toàn lên main chart: dùng mMainRect thay vì mainContentRect.
-    final Rect mainContentRect = mVolRect != null
-        ? Rect.fromLTRB(mMainRect.left, mMainRect.top, mMainRect.right, mVolRect!.top)
-        : mMainRect;
-
     mMainRenderer = MainRenderer(
-      mainContentRect,
+      mMainRect,
       mMainMaxValue,
       mMainMinValue,
       mTopPadding,
@@ -136,17 +122,6 @@ class ChartPainter extends BaseChartPainter {
       (mMainRect.top + mMainRect.bottom) / 2,
       offsetY,
     );
-    if (mVolRect != null) {
-      mVolRenderer = VolRenderer(
-        mVolRect!,
-        mVolMaxValue,
-        mVolMinValue,
-        mChildPadding,
-        fixedLength,
-        chartStyle,
-        chartColors,
-      );
-    }
     mSecondaryRendererList.clear();
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
       mSecondaryRendererList.add(
@@ -176,8 +151,6 @@ class ChartPainter extends BaseChartPainter {
     );
     canvas.drawRect(mainRect, mBgPaint);
 
-    // Volume được overlay lên main chart nên không cần vẽ nền riêng
-
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
       Rect? mSecondaryRect = mSecondaryRectList[i].mRect;
       Rect secondaryRect = Rect.fromLTRB(
@@ -195,7 +168,6 @@ class ChartPainter extends BaseChartPainter {
   void drawGrid(canvas) {
     if (!hideGrid) {
       mMainRenderer.drawGrid(canvas, mGridRows, mGridColumns);
-      mVolRenderer?.drawGrid(canvas, mGridRows, mGridColumns);
       for (final element in mSecondaryRendererList) {
         element.drawGrid(canvas, mGridRows, mGridColumns);
       }
@@ -227,7 +199,6 @@ class ChartPainter extends BaseChartPainter {
       double curX = getX(i);
       double lastX = i == 0 ? curX : getX(i - 1);
       mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-      mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
     }
     canvas.restore();
 
@@ -257,7 +228,6 @@ class ChartPainter extends BaseChartPainter {
     if (!hideGrid) {
       mMainRenderer.drawVerticalText(canvas, textStyle, mGridRows);
     }
-    mVolRenderer?.drawVerticalText(canvas, textStyle, mGridRows);
     for (final element in mSecondaryRendererList) {
       element.drawVerticalText(canvas, textStyle, mGridRows);
     }
@@ -397,7 +367,6 @@ class ChartPainter extends BaseChartPainter {
       data = getItem(index);
     }
     mMainRenderer.drawText(canvas, data, x);
-    mVolRenderer?.drawText(canvas, data, x);
     for (final element in mSecondaryRendererList) {
       element.drawText(canvas, data, x);
     }

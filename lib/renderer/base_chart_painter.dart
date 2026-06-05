@@ -16,7 +16,6 @@ abstract class BaseChartPainter extends CustomPainter {
 
   List<SecondaryIndicator> secondaryIndicators;
 
-  bool volHidden;
   bool isTapShowInfoDialog;
   double scaleX = 1.0, scaleY = 1.0, scrollX = 0.0, selectX;
   double offsetY = 0.0;
@@ -31,9 +30,6 @@ abstract class BaseChartPainter extends CustomPainter {
 
   late Rect mDateRect;
 
-  /// Rectangle box of the vol chart
-  Rect? mVolRect;
-
   /// Secondary list support
   List<RenderRect> mSecondaryRectList = [];
   late double mDisplayHeight, mWidth;
@@ -44,7 +40,6 @@ abstract class BaseChartPainter extends CustomPainter {
   int mGridRows = 4, mGridColumns = 4;
   int mStartIndex = 0, mStopIndex = 0;
   double mMainMaxValue = double.minPositive, mMainMinValue = double.maxFinite;
-  double mVolMaxValue = double.minPositive, mVolMinValue = double.maxFinite;
   double mTranslateX = double.minPositive;
   int mMainMaxIndex = 0, mMainMinIndex = 0;
   double mMainHighMaxValue = double.minPositive,
@@ -75,7 +70,6 @@ abstract class BaseChartPainter extends CustomPainter {
     this.isOnTap = false,
     this.offsetY = 0.0,
     this.mainIndicators = const [],
-    this.volHidden = false,
     this.isTapShowInfoDialog = false,
     this.secondaryIndicators = const [],
     this.isLine = false,
@@ -188,26 +182,15 @@ abstract class BaseChartPainter extends CustomPainter {
 
   /// init the rectangle box to draw chart
   void initRect(Size size) {
-    double volHeight = baseDimension.mVolumeHeight;
     double secondaryHeight = baseDimension.mSecondaryHeight;
 
     double mainHeight = mDisplayHeight;
-    mainHeight -= volHeight;
     mainHeight -= baseDimension.totalSecondaryHeight;
 
-    // TODO: thứ tự layout có thể thay đổi — hiện tại: main chart (gộp volume) → thời gian → indicator phụ
+    // Layout: main chart → thời gian → indicator phụ (VOL/MACD/RSI…).
+    // Volume không còn overlay trong mMainRect; thay vào đó dùng `VolIndicator`
+    // như một secondary indicator (xem `lib/indicator/secondary/vol_indicator.dart`).
     mMainRect = Rect.fromLTRB(0, mTopPadding, mWidth, mTopPadding + mainHeight);
-
-    // TODO: điều chỉnh tỉ lệ 0.2 nếu muốn volume chiếm nhiều/ít hơn trong main chart
-    if (volHidden != true) {
-      final double overlayHeight = mMainRect.height * 0.2;
-      mVolRect = Rect.fromLTRB(
-        0,
-        mMainRect.bottom - overlayHeight,
-        mWidth,
-        mMainRect.bottom,
-      );
-    }
 
     // Thanh thời gian nằm ngay sau main chart
     mDateRect = Rect.fromLTRB(
@@ -244,7 +227,6 @@ abstract class BaseChartPainter extends CustomPainter {
     for (int i = mStartIndex; i <= mStopIndex; i++) {
       var item = datas![i];
       getMainMaxMinValue(item, i);
-      getVolMaxMinValue(item);
       for (int idx = 0; idx < mSecondaryRectList.length; ++idx) {
         getSecondaryMaxMinValue(idx, item);
       }
@@ -277,18 +259,6 @@ abstract class BaseChartPainter extends CustomPainter {
       mMainMaxValue = max(mMainMaxValue, item.close);
       mMainMinValue = min(mMainMinValue, item.close);
     }
-  }
-
-  // get the maximum and minimum of the Vol value
-  void getVolMaxMinValue(KLineEntity item) {
-    mVolMaxValue = max(
-      mVolMaxValue,
-      max(item.vol, max(item.MA5Volume ?? 0, item.MA10Volume ?? 0)),
-    );
-    mVolMinValue = min(
-      mVolMinValue,
-      min(item.vol, min(item.MA5Volume ?? 0, item.MA10Volume ?? 0)),
-    );
   }
 
   // compute maximum and minimum of secondary value
