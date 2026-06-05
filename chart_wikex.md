@@ -1,7 +1,7 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
-- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, **VolIndicator (tách volume khỏi main)**, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
+- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **gesture gate vol/secondary**, **VolRenderer panel độc lập + date đáy cùng**, **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
 - [OBV Indicator](#obv-indicator)
 - [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
@@ -167,6 +167,87 @@ Pattern để implement thêm một indicator phụ bất kỳ:
 
 ## Thay đổi gần đây
 
+### −2. Gesture gate theo vùng — vol/secondary không di chuyển nến (`k_chart_widget.dart`)
+
+**Vấn đề:** Trước đây drag bất cứ đâu trong chart (kể cả vol/secondary/date)
+đều update `mScrollX`/`mOffsetY` → vol panel kéo theo nến. Khi nhúng chart
+trong page có Order Book/form trade, user kỳ vọng drag dọc trên vol/MACD/RSI
+cuộn page chứ không phải xê dịch nến.
+
+**Fix:** Gate gesture theo điểm chạm start. Chỉ khi `painter.isInMainRect`
+trả về `true` thì chart mới xử lý. Ngược lại forward `dy` sang outer.
+
+```dart
+// State
+bool _gestureInMain = true;
+
+onScaleStart: (details) {
+  // ... existing
+  _gestureInMain = painter.isInMainRect(details.localFocalPoint);
+},
+onScaleUpdate: (details) {
+  if (!_gestureInMain) {
+    final dy = details.focalPointDelta.dy;
+    if (dy != 0) widget.onVerticalOverscroll?.call(dy);
+    return;   // skip toàn bộ logic chart
+  }
+  // ... existing logic
+},
+onScaleEnd: (details) {
+  if (!_dragStartedInTapMode && _gestureInMain) {
+    _onFling(details.velocity.pixelsPerSecond.dx);
+  }
+  _dragStartedInTapMode = false;
+  _gestureInMain = true;
+},
+```
+
+**Behaviour matrix:**
+
+| Touch start | Drag X | Drag Y | Pinch | Fling X |
+|---|---|---|---|---|
+| `mMainRect` | scrollX nến | pan Y (nếu scaleY≠1) | scaleX | có |
+| `mVolRect` / secondary / date | — | forward parent | — | không |
+
+**Tương thích outer scroll:** parent dùng `jumpTo` trong
+`onVerticalOverscroll` callback → bypass physics, list ngoài cuộn được kể
+cả khi parent đang `NeverScrollableScrollPhysics` (do scaleY focus mode).
+
+**Tap & long-press không bị gate:**
+
+- Tap đã có sẵn check `isInMainRect` trước khi toggle crosshair.
+- Long press vẫn cho phép ở vol/secondary để inspect candle tương ứng — vì
+  long press không di chuyển chart, chỉ hiển thị crosshair.
+
+Chi tiết kèm decision tree + edge cases (drag chéo, pinch trên vol…): xem
+`chart_wikex_arch.md` mục 11.2.1.
+
+---
+
+### −1. Vol = panel độc lập + date xuống đáy cùng (`base_chart_painter.dart`)
+
+Layout cuối:
+
+```
+mMainRect          ← candles + main indicators
+mVolRect           ← vol (null khi volHidden)
+mSecondaryRect[0]  ← MACD
+mSecondaryRect[1]  ← RSI
+…
+mDateRect          ← trục thời gian (đáy cùng)
+```
+
+Khớp với sơ đồ đơn giản của `chart_plush.md`: 3 renderer `MainRenderer +
+VolRenderer + SecondaryRenderer`. Date axis ở đáy cùng — các panel chart
+xếp liên tục phía trên, khớp UX trading app (Binance/MEXC/TradingView).
+
+**File chính:**
+- `lib/renderer/vol_renderer.dart` — `VolRenderer extends BaseChartRenderer<VolumeEntity>` (bars + MA5/MA10).
+- `lib/renderer/base_chart_painter.dart` — `initRect` tính `mDateRect` sau cùng.
+- `lib/styles/k_chart_style.dart` — `volBarOpacity` (default 1.0).
+
+---
+
 ### 0. DepthChart: watermark logo + số mốc giá tuỳ chỉnh (`depth_chart.dart`)
 
 **File:** `lib/depth_chart.dart`, `example/lib/main.dart`
@@ -256,43 +337,38 @@ List<SecondaryIndicator> get _secondaryIndicators {
 
 ---
 
-### 3. Volume tách thành Secondary Indicator (`vol_indicator.dart`)
+### 3. Volume = panel độc lập với `VolRenderer` + `mVolRect`
 
-**Trước:** Volume là overlay chiếm 20% dưới của `mMainRect`. `KChartWidget` có flag `volHidden` để tắt, `VolRenderer` được vẽ chung canvas transform với main → bị ảnh hưởng bởi `scaleY`. Layout:
+Khớp với sơ đồ đơn giản của `chart_plush.md`: 3 renderer (`Main` + `Vol` +
+`Secondary`) chạy trong cùng `ChartPainter.drawChart`. Vol có rect riêng
+(`mVolRect`) ngay dưới `mMainRect`, **không** overlay trong main và
+**không** là `SecondaryIndicator`. Toggle bằng cờ `volHidden`.
 
-```
-mMainRect
-├── mainContentRect  (80% trên) ← nến, MA, BOLL...
-└── mVolRect         (20% dưới) ← vol bars
-```
-
-**Sau:** Volume là một `SecondaryIndicator` tương đương MACD/KDJ/RSI/OBV — toggle bằng cách thêm/bỏ `VolIndicator()` trong `secondaryIndicators`. Layout chính trở về đơn giản:
+**Layout:**
 
 ```
-mMainRect          ← nến + main indicators (full height)
-mDateRect          ← trục thời gian
-mSecondaryRect[0]  ← VOL (nếu user bật)
-mSecondaryRect[1]  ← MACD
+mMainRect          ← nến + main indicators
+mVolRect           ← vol panel (null khi volHidden = true)
+mSecondaryRect[0]  ← MACD
+mSecondaryRect[1]  ← RSI
 ...
+mDateRect          ← trục thời gian (đáy cùng)
 ```
 
-**Files đã đổi:**
+**Files:**
 
-| File | Thay đổi |
+| File | Vai trò |
 |---|---|
-| `lib/indicator/secondary/vol_indicator.dart` | **Mới** — `VolIndicator extends SecondaryIndicator<MACDEntity, VolStyle>`. Vẽ bar + MA5/MA10. `calc` no-op (đã có `DataUtil.calcVolumeMA`). |
-| `lib/indicator/indicator_style.dart` | Thêm `VolStyle` (volUpColor/dnColor, ma5Color/ma10Color, volWidth, barOpacity). |
-| `lib/indicator/indicator_template.dart` | Thêm `part 'secondary/vol_indicator.dart'`. |
-| `lib/entity/macd_entity.dart` | Thêm `VolumeEntity` vào `on` clause để MACDEntity truy cập `.vol/.MA5Volume/.MA10Volume`. |
-| `lib/entity/k_entity.dart` | VolumeEntity đã ở trước MACDEntity — chỉ cập nhật comment. |
-| `lib/renderer/base_chart_painter.dart` | Xoá field `mVolRect`, `mVolMaxValue/MinValue`, `volHidden`, hàm `getVolMaxMinValue`, khối tạo `mVolRect` 20% trong `initRect`. |
-| `lib/renderer/chart_painter.dart` | Xoá field `mVolRenderer`, import `vol_renderer.dart`, mọi nhánh `mVolRenderer?.drawX`. `mainContentRect` không còn — main dùng `mMainRect` trực tiếp. |
-| `lib/renderer/vol_renderer.dart` | **Xoá** — chức năng chuyển vào `VolIndicator.drawChart`. |
-| `lib/renderer/index.dart` | Xoá `export 'vol_renderer.dart'`. |
-| `lib/renderer/base_dimension.dart` | Xoá field `_mVolumeHeight` và param `volHidden`. |
-| `lib/k_chart_widget.dart` | Xoá param `volHidden`. Phần `Positioned` của scaleY zone không còn cộng `mVolumeHeight`. |
+| `lib/renderer/vol_renderer.dart` | `VolRenderer extends BaseChartRenderer<VolumeEntity>` — vẽ bar + MA5/MA10, label `VOL/MA5/MA10`, max vertical text. `getY` override giả định min=0. |
+| `lib/renderer/base_chart_painter.dart` | Field `mVolRect`, `mVolMaxValue/MinValue`, cờ `volHidden`, hàm `getVolMaxMinValue`. `initRect` chèn `mVolRect` giữa main và date. |
+| `lib/renderer/chart_painter.dart` | Field `mVolRenderer`. `drawBg/drawGrid/drawChart/drawVerticalText/drawText` đều gọi nhánh `mVolRenderer?`. `VolRenderer.drawChart` chạy ngoài scope scaleY (cùng nhánh với secondary). |
+| `lib/renderer/base_dimension.dart` | `_mVolumeHeight = volHidden ? 0 : mSecondaryHeight`. `mDisplayHeight` cộng thêm. |
+| `lib/k_chart_widget.dart` | Param `volHidden` (default `false`). |
+| `lib/styles/k_chart_style.dart` | Thêm `volBarOpacity` (default 1.0) — override khi muốn cột vol mờ. |
 
-**Hệ quả về scaleY:** trước đây volume scale/pan cùng main; nay vol nằm trong panel secondary riêng → **không** chịu ảnh hưởng `scaleY`, hành vi giống các indicator phụ khác.
+**Hệ quả về scaleY:** `VolRenderer` vẽ **ngoài** `canvas.scale(1, scaleY)` của
+main → panel vol không bị giãn khi user zoom dọc nến. Đây là điểm bổ sung
+so với chart_plush.md gốc (gốc vẽ vol trong cùng scope).
 
 **Cách dùng:**
 
@@ -301,19 +377,14 @@ KChartWidget(
   _data,
   chartStyle,
   chartColors,
-  secondaryIndicators: [
-    VolIndicator(),                          // bật vol panel
-    MACDIndicator(),
-  ],
+  volHidden: false,                        // bật panel vol
+  secondaryIndicators: [MACDIndicator()],
 )
 
-// Tuỳ chỉnh màu / opacity bar
-VolIndicator(
-  indicatorStyle: VolStyle(
-    volUpColor: Color(0xFF14AD8F),
-    volDnColor: Color(0xFFD5405D),
-    barOpacity: 0.85,
-  ),
+// Tuỳ chỉnh độ trong suốt của cột vol
+KChartWidget(
+  ...,
+  chartStyle: const KChartStyle(null, 0.6),  // volBarOpacity = 0.6
 )
 ```
 
@@ -329,7 +400,7 @@ canvas.scale(1.0, scaleY);
 // vẽ main bên trong transform này
 ```
 
-**Secondary indicators** (gồm cả `VolIndicator`) vẽ ngoài transform này → không bị ảnh hưởng bởi scaleY.
+**Volume + Secondary indicators** vẽ ngoài transform này → không bị ảnh hưởng bởi scaleY.
 
 Các label vẽ ngoài transform (nowPrice, maxMin) phải tính lại vị trí screen bằng:
 ```dart
@@ -479,7 +550,8 @@ Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở 
 | Tham số | Kiểu | Giải thích |
 |---------|------|-----------|
 | `mainIndicators` | `List<MainIndicator>` | Indicator hiển thị trên khung nến chính. Hỗ trợ: `MAIndicator`, `BOLLIndicator`, `EMAIndicator`, `SARIndicator`, `ZigZagIndicator`. |
-| `secondaryIndicators` | `List<SecondaryIndicator>` | Indicator phụ, mỗi cái sinh ra 1 khung riêng bên dưới. Hỗ trợ: `VolIndicator`, `MACDIndicator`, `KDJIndicator`, `RSIIndicator`, `WRIndicator`, `CCIIndicator`, `OBVIndicator`. Volume bật bằng cách thêm `VolIndicator()`. |
+| `secondaryIndicators` | `List<SecondaryIndicator>` | Indicator phụ, mỗi cái sinh ra 1 khung riêng bên dưới. Hỗ trợ: `MACDIndicator`, `KDJIndicator`, `RSIIndicator`, `WRIndicator`, `CCIIndicator`, `OBVIndicator`. |
+| `volHidden` | `bool` | `true` = ẩn panel volume. Vol có rect riêng (`mVolRect`) giữa main và date, không phải secondary indicator. |
 
 ### Kiểu hiển thị chart
 
@@ -811,5 +883,6 @@ double screenY = centerY + (rawY - centerY) * scaleY + offsetY;
 | `mMainRect` | Toàn bộ khung nến + vol | `top = mTopPadding`, `bottom = mTopPadding + mainHeight` |
 | `mainContentRect` | Phần nến thuần | `mMainRect.top → mVolRect.top` (80% trên) |
 | `mVolRect` | Vol bars | `mMainRect.bottom - 20% height → mMainRect.bottom` |
-| `mDateRect` | Trục X ngày giờ | Ngay dưới `mMainRect.bottom` |
-| `mSecondaryRectList[i]` | Panel indicator phụ | Xếp chồng bên dưới `mDateRect` |
+| `mVolRect` | Panel volume | Ngay dưới `mMainRect.bottom`, null khi `volHidden` |
+| `mSecondaryRectList[i]` | Panel indicator phụ | Xếp chồng bên dưới `mVolRect` (hoặc `mMainRect` nếu vol ẩn) |
+| `mDateRect` | Trục X ngày giờ | **Đáy cùng** — dưới panel cuối |

@@ -16,6 +16,9 @@ abstract class BaseChartPainter extends CustomPainter {
 
   List<SecondaryIndicator> secondaryIndicators;
 
+  /// Toggle hiển thị panel volume (ẩn = true). Khi ẩn `mVolRect` không được tạo
+  /// và `BaseDimension.mVolumeHeight` = 0.
+  bool volHidden;
   bool isTapShowInfoDialog;
   double scaleX = 1.0, scaleY = 1.0, scrollX = 0.0, selectX;
   double offsetY = 0.0;
@@ -30,6 +33,9 @@ abstract class BaseChartPainter extends CustomPainter {
 
   late Rect mDateRect;
 
+  /// Rectangle box of volume panel — null khi `volHidden = true`.
+  Rect? mVolRect;
+
   /// Secondary list support
   List<RenderRect> mSecondaryRectList = [];
   late double mDisplayHeight, mWidth;
@@ -40,6 +46,7 @@ abstract class BaseChartPainter extends CustomPainter {
   int mGridRows = 4, mGridColumns = 4;
   int mStartIndex = 0, mStopIndex = 0;
   double mMainMaxValue = double.minPositive, mMainMinValue = double.maxFinite;
+  double mVolMaxValue = double.minPositive, mVolMinValue = double.maxFinite;
   double mTranslateX = double.minPositive;
   int mMainMaxIndex = 0, mMainMinIndex = 0;
   double mMainHighMaxValue = double.minPositive,
@@ -70,6 +77,7 @@ abstract class BaseChartPainter extends CustomPainter {
     this.isOnTap = false,
     this.offsetY = 0.0,
     this.mainIndicators = const [],
+    this.volHidden = false,
     this.isTapShowInfoDialog = false,
     this.secondaryIndicators = const [],
     this.isLine = false,
@@ -181,39 +189,54 @@ abstract class BaseChartPainter extends CustomPainter {
   void drawCrossLineText(Canvas canvas, Size size);
 
   /// init the rectangle box to draw chart
+  ///
+  /// Layout dọc (top → bottom):
+  ///   mMainRect             — candles + main indicators
+  ///   mVolRect              — vol panel (nếu volHidden = false)
+  ///   mSecondaryRectList[i] — mỗi secondary indicator 1 panel
+  ///   mDateRect             — trục thời gian (đáy cùng)
   void initRect(Size size) {
+    double volHeight = baseDimension.mVolumeHeight;
     double secondaryHeight = baseDimension.mSecondaryHeight;
 
     double mainHeight = mDisplayHeight;
+    mainHeight -= volHeight;
     mainHeight -= baseDimension.totalSecondaryHeight;
 
-    // Layout: main chart → thời gian → indicator phụ (VOL/MACD/RSI…).
-    // Volume không còn overlay trong mMainRect; thay vào đó dùng `VolIndicator`
-    // như một secondary indicator (xem `lib/indicator/secondary/vol_indicator.dart`).
     mMainRect = Rect.fromLTRB(0, mTopPadding, mWidth, mTopPadding + mainHeight);
 
-    // Thanh thời gian nằm ngay sau main chart
-    mDateRect = Rect.fromLTRB(
-      0,
-      mMainRect.bottom,
-      mWidth,
-      mMainRect.bottom + mBottomPadding,
-    );
+    if (!volHidden) {
+      mVolRect = Rect.fromLTRB(
+        0,
+        mMainRect.bottom + mChildPadding,
+        mWidth,
+        mMainRect.bottom + volHeight,
+      );
+    } else {
+      mVolRect = null;
+    }
 
-    // Các indicator phụ xếp chồng bên dưới thanh thời gian
+    final double secondaryTop = (mVolRect ?? mMainRect).bottom;
+
     mSecondaryRectList.clear();
     for (int i = 0; i < secondaryIndicators.length; ++i) {
       mSecondaryRectList.add(
         RenderRect(
           Rect.fromLTRB(
             0,
-            mDateRect.bottom + i * secondaryHeight + mChildPadding,
+            secondaryTop + i * secondaryHeight + mChildPadding,
             mWidth,
-            mDateRect.bottom + i * secondaryHeight + secondaryHeight,
+            secondaryTop + i * secondaryHeight + secondaryHeight,
           ),
         ),
       );
     }
+
+    // Date rect ở đáy cùng — dưới panel cuối (vol/secondary) hoặc main nếu cả 2 ẩn.
+    final double dateTop = mSecondaryRectList.isNotEmpty
+        ? mSecondaryRectList.last.mRect.bottom
+        : (mVolRect ?? mMainRect).bottom;
+    mDateRect = Rect.fromLTRB(0, dateTop, mWidth, dateTop + mBottomPadding);
   }
 
   /// calculate values
@@ -227,10 +250,19 @@ abstract class BaseChartPainter extends CustomPainter {
     for (int i = mStartIndex; i <= mStopIndex; i++) {
       var item = datas![i];
       getMainMaxMinValue(item, i);
+      if (mVolRect != null) getVolMaxMinValue(item);
       for (int idx = 0; idx < mSecondaryRectList.length; ++idx) {
         getSecondaryMaxMinValue(idx, item);
       }
     }
+  }
+
+  /// max/min cho panel volume. Min chốt 0 để cột vol neo đáy panel.
+  void getVolMaxMinValue(KLineEntity item) {
+    final ma5 = item.MA5Volume ?? 0;
+    final ma10 = item.MA10Volume ?? 0;
+    mVolMaxValue = max(mVolMaxValue, max(item.vol, max(ma5, ma10)));
+    mVolMinValue = 0;
   }
 
   /// compute maximum and minimum value

@@ -118,6 +118,9 @@ class KChartStyle {
   ///vol column width
   final double volWidth = 8.5;
 
+  /// Độ trong suốt của cột volume (0.0–1.0). Mặc định 1.0 = đặc.
+  final double volBarOpacity;
+
   ///vertical-horizontal cross line width
   final double crossWidth = 0.8;
 
@@ -135,5 +138,5 @@ class KChartStyle {
   ///customize the time below
   final List<String>? dateTimeFormat;
 
-  const KChartStyle([this.dateTimeFormat]);
+  const KChartStyle([this.dateTimeFormat, this.volBarOpacity = 1.0]);
 }

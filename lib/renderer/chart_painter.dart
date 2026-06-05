@@ -8,6 +8,7 @@ import 'base_chart_painter.dart';
 import 'base_chart_renderer.dart';
 import 'main_renderer.dart';
 import 'secondary_renderer.dart';
+import 'vol_renderer.dart';
 
 class TrendLine {
   final Offset p1;
@@ -31,6 +32,7 @@ class ChartPainter extends BaseChartPainter {
   final double selectY; //For TrendLine
   static double get maxScrollX => BaseChartPainter.maxScrollX;
   late BaseChartRenderer mMainRenderer;
+  VolRenderer? mVolRenderer;
   Set<BaseChartRenderer> mSecondaryRendererList = {};
   StreamSink<InfoWindowEntity?> sink;
   Color? upColor, dnColor;
@@ -70,6 +72,7 @@ class ChartPainter extends BaseChartPainter {
     super.isTapShowInfoDialog,
     required this.verticalTextAlignment,
     super.mainIndicators,
+    super.volHidden,
     super.secondaryIndicators,
     super.isLine = false,
     super.offsetY = 0.0,
@@ -122,6 +125,19 @@ class ChartPainter extends BaseChartPainter {
       (mMainRect.top + mMainRect.bottom) / 2,
       offsetY,
     );
+    if (mVolRect != null) {
+      mVolRenderer = VolRenderer(
+        mVolRect!,
+        mVolMaxValue,
+        mVolMinValue,
+        mChildPadding,
+        fixedLength,
+        chartStyle,
+        chartColors,
+      );
+    } else {
+      mVolRenderer = null;
+    }
     mSecondaryRendererList.clear();
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
       mSecondaryRendererList.add(
@@ -151,6 +167,16 @@ class ChartPainter extends BaseChartPainter {
     );
     canvas.drawRect(mainRect, mBgPaint);
 
+    if (mVolRect != null) {
+      Rect volRect = Rect.fromLTRB(
+        0,
+        mVolRect!.top - mChildPadding,
+        mVolRect!.width,
+        mVolRect!.bottom,
+      );
+      canvas.drawRect(volRect, mBgPaint);
+    }
+
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
       Rect? mSecondaryRect = mSecondaryRectList[i].mRect;
       Rect secondaryRect = Rect.fromLTRB(
@@ -168,6 +194,7 @@ class ChartPainter extends BaseChartPainter {
   void drawGrid(canvas) {
     if (!hideGrid) {
       mMainRenderer.drawGrid(canvas, mGridRows, mGridColumns);
+      mVolRenderer?.drawGrid(canvas, mGridRows, mGridColumns);
       for (final element in mSecondaryRendererList) {
         element.drawGrid(canvas, mGridRows, mGridColumns);
       }
@@ -202,13 +229,15 @@ class ChartPainter extends BaseChartPainter {
     }
     canvas.restore();
 
-    // Secondary indicators không bị ảnh hưởng bởi scaleY
+    // VolRenderer + SecondaryRenderer cùng nằm ngoài scope scaleY của main
+    // → panel volume + indicator phụ không bị giãn khi user zoom dọc nến.
     for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
       KLineEntity? curPoint = datas?[i];
       if (curPoint == null) continue;
       KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
       double curX = getX(i);
       double lastX = i == 0 ? curX : getX(i - 1);
+      mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       for (final element in mSecondaryRendererList) {
         element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       }
@@ -228,6 +257,7 @@ class ChartPainter extends BaseChartPainter {
     if (!hideGrid) {
       mMainRenderer.drawVerticalText(canvas, textStyle, mGridRows);
     }
+    mVolRenderer?.drawVerticalText(canvas, textStyle, mGridRows);
     for (final element in mSecondaryRendererList) {
       element.drawVerticalText(canvas, textStyle, mGridRows);
     }
@@ -367,6 +397,7 @@ class ChartPainter extends BaseChartPainter {
       data = getItem(index);
     }
     mMainRenderer.drawText(canvas, data, x);
+    mVolRenderer?.drawText(canvas, data, x);
     for (final element in mSecondaryRendererList) {
       element.drawText(canvas, data, x);
     }

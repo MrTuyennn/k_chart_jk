@@ -219,7 +219,8 @@ File: `lib/k_chart_widget.dart`.
 | Param | Default | Ý nghĩa |
 |---|---|---|
 | `mainIndicators` | `[]` | List `MainIndicator` overlay trên main chart (MA, BOLL, EMA, SAR, ZigZag). |
-| `secondaryIndicators` | `[]` | List `SecondaryIndicator` thành panel riêng bên dưới (VOL, MACD, KDJ, RSI, WR, CCI, OBV). Volume bật bằng cách thêm `VolIndicator()` vào list. |
+| `secondaryIndicators` | `[]` | List `SecondaryIndicator` thành panel riêng bên dưới (MACD, KDJ, RSI, WR, CCI, OBV). |
+| `volHidden` | `false` | Ẩn panel volume (volume nằm trong rect riêng giữa main và date — không phải secondary indicator). |
 | `isLine` | `false` | `true` = line chart (chỉ đường close), `false` = candlestick. |
 | `hideGrid` | `false` | Ẩn lưới ngang/dọc. |
 | `showNowPrice` | `true` | Vẽ đường giá hiện tại (nến cuối) ngang qua chart, kèm label bên phải. |
@@ -641,7 +642,26 @@ Implemented trong `_KChartWidgetState.build()` (file `k_chart_widget.dart` ~line
 
 ### 12.3 Scale (`onScaleStart` / `onScaleUpdate` / `onScaleEnd`)
 
-`onScaleUpdate` có 4 nhánh quyết định theo state:
+`onScaleStart` chốt 2 cờ:
+
+- `_isScaleYGesture` = `pointerCount == 1 && localFocalPoint.dx > width - 100`
+  → drag dọc trong vùng 100px bên phải.
+- `_gestureInMain` = `painter.isInMainRect(localFocalPoint)` → finger có nằm
+  trong `mMainRect` hay không. Nếu **false** (vol/secondary/date), toàn bộ
+  scroll/scale của chart bị bypass; chỉ forward `dy` cho outer scroll.
+
+`onScaleUpdate` flow:
+
+```
+if (!_gestureInMain) {
+  // vol/secondary/date — chart đứng yên
+  widget.onVerticalOverscroll?.call(focalPointDelta.dy);
+  return;
+}
+// còn lại: 4 nhánh xử lý chart như cũ
+```
+
+4 nhánh khi `_gestureInMain == true`:
 
 | Điều kiện | Hành vi |
 |---|---|
@@ -649,6 +669,9 @@ Implemented trong `_KChartWidgetState.build()` (file `k_chart_widget.dart` ~line
 | `_isScaleYGesture` && 1 ngón | Drag dọc trong vùng 100px phải → điều chỉnh `mScaleY` ± `delta * 0.005`, clamp `[0.3, 5.0]`. Sau đó re-clamp `mOffsetY`. |
 | `details.scale != 1.0` (≥2 ngón) | Pinch zoom → `mScaleX = lastScale * scale`, clamp `[minScale, maxScale]`. |
 | 1 ngón drag tự do | Cuộn ngang: `mScrollX += dx / mScaleX`, clamp `[0, maxScrollX]`. Pan dọc CHỈ active khi `mScaleY != 1.0`: `mOffsetY = _clampOffsetY(mOffsetY + dy)`. Trigger `onLoadMore(true)` khi `mScrollX >= maxScrollX * 0.8`. |
+
+`onScaleEnd`: fling X chỉ kích hoạt khi `!_dragStartedInTapMode &&
+_gestureInMain` — không fling khi gesture xuất phát từ vol/secondary.
 
 ### 12.4 Clamp `mOffsetY`
 

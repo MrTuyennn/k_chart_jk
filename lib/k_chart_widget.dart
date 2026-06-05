@@ -28,6 +28,9 @@ class KChartWidget extends StatefulWidget {
   final List<KLineEntity>? datas;
   final List<MainIndicator> mainIndicators;
 
+  /// Ẩn panel volume. Khi `true`, `BaseDimension.mVolumeHeight = 0` và
+  /// `BaseChartPainter.mVolRect = null` — `VolRenderer` không được tạo.
+  final bool volHidden;
   final List<SecondaryIndicator> secondaryIndicators;
 
   ///SecondaryState { MACD, KDJ, RSI, WR, CCI }
@@ -88,6 +91,7 @@ class KChartWidget extends StatefulWidget {
     this.mainIndicators = const [],
     this.secondaryIndicators = const [],
     // this.onSecondaryTap,
+    this.volHidden = false,
     this.isLine = false,
     this.isTapShowInfoDialog = false,
     this.hideGrid = false,
@@ -158,6 +162,10 @@ class _KChartWidgetState extends State<KChartWidget>
   bool _isScaleYGesture = false;
   // true khi drag bắt đầu trong lúc crosshair đang hiển thị → drag di chuyển crosshair thay vì scroll
   bool _dragStartedInTapMode = false;
+  // true khi gesture bắt đầu TRONG mMainRect. Khi false (vol/secondary/date),
+  // chart không xử lý scroll/scale — forward delta Y cho outer scroll qua
+  // `onVerticalOverscroll`, parent tự quyết định cuộn theo.
+  bool _gestureInMain = true;
 
   @override
   void dispose() {
@@ -199,6 +207,7 @@ class _KChartWidgetState extends State<KChartWidget>
     final BaseDimension baseDimension = BaseDimension(
       mBaseHeight: widget.mBaseHeight,
       mSecondaryHeight: widget.mSecondaryHeight ?? widget.mBaseHeight * .2,
+      volHidden: widget.volHidden,
       secondaryIndicators: widget.secondaryIndicators,
       mainIndicators: widget.mainIndicators,
     );
@@ -223,6 +232,7 @@ class _KChartWidgetState extends State<KChartWidget>
       isOnTap: isOnTap,
       isTapShowInfoDialog: widget.isTapShowInfoDialog,
       mainIndicators: widget.mainIndicators,
+      volHidden: widget.volHidden,
       secondaryIndicators: widget.secondaryIndicators,
       isLine: widget.isLine,
       hideGrid: widget.hideGrid,
@@ -285,8 +295,20 @@ class _KChartWidgetState extends State<KChartWidget>
         _isScaleYGesture =
             details.pointerCount == 1 &&
             details.localFocalPoint.dx > width - 100;
+        // Gesture bắt đầu trong vol/secondary/date → chart không xử lý
+        // scroll/scale, chỉ forward delta Y cho outer scroll.
+        _gestureInMain = painter.isInMainRect(details.localFocalPoint);
       },
       onScaleUpdate: (details) {
+        // Touch ngoài main (vol/secondary/date): chart đứng yên, forward Y
+        // sang parent để outer ScrollView cuộn theo.
+        if (!_gestureInMain) {
+          final double dy = details.focalPointDelta.dy;
+          if (dy != 0 && widget.onVerticalOverscroll != null) {
+            widget.onVerticalOverscroll!(dy);
+          }
+          return;
+        }
         if (_dragStartedInTapMode &&
             details.pointerCount == 1 &&
             !_isScaleYGesture) {
@@ -337,12 +359,14 @@ class _KChartWidgetState extends State<KChartWidget>
       onScaleEnd: (details) {
         isScale = false;
         _lastScale = mScaleX;
-        // fling chỉ chạy khi drag là scroll thường, không phải kéo crosshair
-        if (!_dragStartedInTapMode) {
+        // fling chỉ chạy khi drag là scroll thường trong main chart
+        // (không phải kéo crosshair, không phải drag ngoài main)
+        if (!_dragStartedInTapMode && _gestureInMain) {
           final velocity = details.velocity.pixelsPerSecond.dx;
           _onFling(velocity);
         }
         _dragStartedInTapMode = false;
+        _gestureInMain = true;
       },
       onLongPressStart: (details) {
         isOnTap = false;
@@ -421,6 +445,7 @@ class _KChartWidgetState extends State<KChartWidget>
             right: 0,
             top: 0,
             bottom:
+                baseDimension.mVolumeHeight +
                 baseDimension.totalSecondaryHeight +
                 widget.chartStyle.bottomPadding,
             child: GestureDetector(

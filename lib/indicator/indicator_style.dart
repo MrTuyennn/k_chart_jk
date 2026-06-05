@@ -132,23 +132,3 @@ class OBVStyle extends IndicatorStyle {
     this.signalColor = const Color(0xFFFFC634),
   });
 }
-
-class VolStyle extends IndicatorStyle {
-  final Color volUpColor;
-  final Color volDnColor;
-  final Color ma5Color;
-  final Color ma10Color;
-  final double volWidth;
-
-  /// Độ trong suốt của cột volume (0.0–1.0). Mặc định 1.0 = đặc, không trong suốt.
-  final double barOpacity;
-
-  const VolStyle({
-    this.volUpColor = const Color(0xFF14AD8F),
-    this.volDnColor = const Color(0xFFD5405D),
-    this.ma5Color = const Color(0xFFFFC634),
-    this.ma10Color = const Color(0xFF35CDAC),
-    this.volWidth = 8.5,
-    this.barOpacity = 1.0,
-  });
-}

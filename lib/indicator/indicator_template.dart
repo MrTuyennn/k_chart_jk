@@ -18,7 +18,6 @@ part 'secondary/kdj_indicator.dart';
 part 'secondary/rsi_indicator.dart';
 part 'secondary/wr_indicator.dart';
 part 'secondary/obv_indicator.dart';
-part 'secondary/vol_indicator.dart';
 
 typedef GetYFunction = double Function(double y);
 

@@ -4,16 +4,19 @@ import 'package:k_chart_wikex/indicator/indicator_template.dart';
 class BaseDimension {
   // chiều cao vùng main chart (nến + main indicators)
   late double _mBaseHeight;
-  // chiều cao mỗi panel secondary indicator (VOL/MACD/RSI/…)
+  // chiều cao panel volume (0 khi volHidden = true)
+  late double _mVolumeHeight;
+  // chiều cao mỗi panel secondary indicator (MACD/RSI/…)
   late double _mSecondaryHeight;
   late double _totalSecondaryHeight;
 
   final double _mLabelHeight = 12;
   double _totalLabelHeight = 12;
 
-  // tổng chiều cao chart: _mBaseHeight + (_mSecondaryHeight × n) + labelHeight
-  // n: số secondary indicator
+  // mDisplayHeight = mBaseHeight + mVolumeHeight + totalSecondaryHeight + totalLabelHeight
   double _mDisplayHeight = 0;
+
+  double get mVolumeHeight => _mVolumeHeight;
 
   double get mSecondaryHeight => _mSecondaryHeight;
   double get totalSecondaryHeight => _totalSecondaryHeight;
@@ -26,15 +29,20 @@ class BaseDimension {
   BaseDimension({
     required double mBaseHeight,
     required double mSecondaryHeight,
+    required bool volHidden,
     required List<SecondaryIndicator> secondaryIndicators,
     required List<MainIndicator> mainIndicators,
   }) {
     _mBaseHeight = mBaseHeight;
+    _mVolumeHeight = volHidden ? 0 : mSecondaryHeight;
     _mSecondaryHeight = mSecondaryHeight;
 
     _totalSecondaryHeight = _mSecondaryHeight * secondaryIndicators.length;
     _totalLabelHeight = _mLabelHeight * mainIndicators.length;
 
-    _mDisplayHeight = _mBaseHeight + _totalSecondaryHeight + _totalLabelHeight;
+    _mDisplayHeight = _mBaseHeight +
+        _mVolumeHeight +
+        _totalSecondaryHeight +
+        _totalLabelHeight;
   }
 }
