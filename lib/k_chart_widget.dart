@@ -109,7 +109,7 @@ class KChartWidget extends StatefulWidget {
     this.mBaseHeight = 360,
     this.mSecondaryHeight,
     this.controller,
-    this.minScale = 0.5,
+    this.minScale = 0.2,
     this.maxScale = 2.2,
     this.isLoadingMore = false,
     this.backgroundLogo,
@@ -213,7 +213,8 @@ class _KChartWidgetState extends State<KChartWidget>
     if (diff <= 0) return; // chỉ xử lý append/prepend, không xử lý shrink
 
     // Append: nến đầu giữ nguyên, nến cuối mới hơn → có nến được thêm ở cuối.
-    final bool appended = oldData.first.time == newData.first.time &&
+    final bool appended =
+        oldData.first.time == newData.first.time &&
         oldData.last.time != newData.last.time;
     if (!appended) return; // prepend hoặc replace toàn bộ → bỏ qua
 
