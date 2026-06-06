@@ -654,8 +654,10 @@ Implemented trong `_KChartWidgetState.build()` (file `k_chart_widget.dart` ~line
 
 ```
 if (!_gestureInMain && pointerCount < 2) {
-  // vol/secondary/date + 1 ngón — chart đứng yên, outer scroll
-  widget.onVerticalOverscroll?.call(focalPointDelta.dy);
+  // vol/secondary/date + 1 ngón — chỉ chặn pan Y
+  mScrollX += dx / mScaleX     // vẫn scroll nến theo dx
+  onVerticalOverscroll(dy)     // forward Y cho outer scroll
+  trigger onLoadMore nếu cần
   return;
 }
 // còn lại (chart hoặc pinch ngoài main): 4 nhánh xử lý chart như cũ
@@ -664,6 +666,9 @@ if (!_gestureInMain && pointerCount < 2) {
 > **Pinch (≥2 ngón) trên vol/secondary** không bị bypass — vẫn chạy nhánh
 > `details.scale != 1.0` → scaleX update. User pinch ở đâu cũng zoom được
 > chart ngang.
+>
+> **Scroll X từ vol/secondary**: 1-ngón drag ngang trên panel phụ vẫn cuộn
+> nến — vol/secondary chỉ chặn duy nhất pan Y, mọi gesture X khác giữ nguyên.
 
 4 nhánh khi `_gestureInMain == true`:
 
@@ -674,8 +679,9 @@ if (!_gestureInMain && pointerCount < 2) {
 | `details.scale != 1.0` (≥2 ngón) | Pinch zoom → `mScaleX = lastScale * scale`, clamp `[minScale, maxScale]`. |
 | 1 ngón drag tự do | Cuộn ngang: `mScrollX += dx / mScaleX`, clamp `[0, maxScrollX]`. Pan dọc CHỈ active khi `mScaleY != 1.0`: `mOffsetY = _clampOffsetY(mOffsetY + dy)`. Trigger `onLoadMore(true)` khi `mScrollX >= maxScrollX * 0.8`. |
 
-`onScaleEnd`: fling X chỉ kích hoạt khi `!_dragStartedInTapMode &&
-_gestureInMain` — không fling khi gesture xuất phát từ vol/secondary.
+`onScaleEnd`: fling X kích hoạt khi `!_dragStartedInTapMode` (không phải kéo
+crosshair), kể cả khi gesture xuất phát từ vol/secondary — vì drag ngang ở
+panel phụ cũng update `mScrollX` nên fling X tự nhiên là phần tiếp theo.
 
 ### 12.4 Clamp `mOffsetY`
 

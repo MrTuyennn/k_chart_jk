@@ -697,31 +697,34 @@ physics, không cần đổi physics khi user chạm vol/secondary.
   vị trí — vì long press chỉ hiển thị crosshair (info), không di chuyển chart.
   Có thể gate bằng `isInMainRect` nếu cần, nhưng UX thông dụng là cho phép
   long press ở vol/secondary để inspect candle tương ứng.
-- **Fling X**: cũng bị skip khi `!_gestureInMain` → tránh trường hợp drag từ
-  vol panel rồi nến tự fling sau khi nhả tay.
-- **Lazy load**: chỉ trigger khi `mScrollX >= maxScrollX * 0.8` mà mScrollX
-  không đổi khi gesture ngoài main → không gọi `onLoadMore` từ drag vol.
+- **Scroll X**: 1-ngón drag ngang ở vol/secondary vẫn cuộn nến — user kỳ vọng
+  drag X bất cứ đâu trong chart đều cuộn timeline.
+- **Fling X**: vẫn chạy sau scroll X từ vol/secondary để có momentum tự nhiên
+  khi user vuốt nhanh.
+- **Lazy load**: vol/secondary drag X vẫn trigger `onLoadMore(true)` khi
+  `mScrollX >= maxScrollX * 0.8`.
+- **Pinch scaleX**: 2-ngón pinch bất cứ đâu (kể cả vol/secondary) đều zoom
+  được chart ngang.
 
 #### Edge cases
 
 - **Drag chéo từ main sang vol**: `onScaleStart` đã chốt `_gestureInMain`
   theo điểm bắt đầu. Nếu start trong main thì cả sequence được xử lý như
-  drag chart, kể cả khi finger lướt sang vol giữa chừng — đúng UX (gesture
-  bắt đầu trong chart thì thuộc chart).
-- **Drag chéo từ vol sang main**: tương tự, start ngoài main thì cả sequence
-  forward outer, finger lướt vào main không "đột ngột" giành lại quyền.
+  drag chart (gồm scroll X + pan Y nếu scaleY≠1), kể cả khi finger lướt
+  sang vol giữa chừng — đúng UX (gesture thuộc về vùng bắt đầu).
+- **Drag chéo từ vol sang main**: start ngoài main → vẫn áp dụng nhánh
+  vol/secondary: scroll X qua dx, forward dy. Finger lướt vào main không
+  giành lại pan Y, tránh giật chart.
 - **Pinch 2 ngón trên vol**: `localFocalPoint` ngoài main → `_gestureInMain =
-  false`. Nhưng `pointerCount >= 2` nên onScaleUpdate **không** bypass —
-  pinch vẫn xử lý scaleX bình thường. User mong đợi pinch luôn zoom được
-  toàn bộ chart bất kể vị trí finger.
+  false`. Nhưng `pointerCount >= 2` nên bypass không kích hoạt — pinch vẫn
+  xử lý scaleX bình thường ở nhánh `details.scale != 1.0`.
 - **Pinch 1 ngón main + 1 ngón vol**: focalPoint nằm giữa 2 ngón. `_gestureInMain`
-  set theo focalPoint nhưng `pointerCount >= 2` nên vẫn xử lý pinch bình thường.
-- **Bắt đầu drag 1 ngón trên vol rồi thả ngón thứ 2 vào**: trong lúc
-  `pointerCount == 1`, mỗi update chỉ forward Y cho outer. Khi `pointerCount`
-  thành 2, nhánh pinch kích hoạt — scaleX bắt đầu update từ thời điểm đó
-  (relative scale).
-- **Pinch trên vol rồi nhả 1 ngón còn 1**: `pointerCount` về 1, bypass kích
-  hoạt lại — 1 ngón còn lại drag chỉ forward Y, không scroll nến. UX hợp lý.
+  set theo focalPoint nhưng `pointerCount >= 2` nên vẫn pinch bình thường.
+- **Drag chéo (dx + dy lớn) ở vol/secondary**: chart cuộn X theo dx, đồng
+  thời outer scroll Y theo dy. Cả 2 chuyển động xảy ra song song — user thấy
+  nến lướt ngang đồng thời list cuộn dọc, phản ánh đúng gesture chéo.
+- **Drag X nhanh ở vol rồi nhả**: `onScaleEnd` không skip fling nữa →
+  nến tiếp tục trượt theo momentum như drag từ main.
 
 ### 11.3 Crosshair / Trend line
 

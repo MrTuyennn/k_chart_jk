@@ -182,6 +182,47 @@ class _KChartWidgetState extends State<KChartWidget>
     widget.controller?.addListener(_onController);
   }
 
+  @override
+  void didUpdateWidget(KChartWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _compensateScrollOnDataChange(oldWidget);
+  }
+
+  /// Khi parent push thêm dữ liệu (live tick append nến mới, hoặc lazy-load
+  /// prepend nến cũ), `mScrollX` tính theo offset từ biên phải vẫn giữ nguyên
+  /// nhưng `getMinTranslateX` tính lại → view sẽ "trôi" khỏi vị trí user
+  /// đang xem. Bù lại đây để user giữ đúng vùng candle đang nhìn:
+  ///
+  ///   - **Append nến mới (live)**: `mScrollX` đại diện khoảng cách tới biên
+  ///     phải. Khi append thêm N nến, biên phải tịnh tiến thêm N×pointWidth.
+  ///     Để giữ user ở đúng candle cũ, cộng N×pointWidth vào `mScrollX`.
+  ///     Ngoại lệ: nếu user đang ở rightmost (mScrollX = 0) → giữ nguyên 0
+  ///     để chart auto-follow nến mới (UX TradingView/Binance).
+  ///
+  ///   - **Prepend nến cũ (lazy-load)**: `getMinTranslateX` tự tính lại đúng
+  ///     theo data mới; vị trí view trong data space tự bảo toàn → không cần
+  ///     bù `mScrollX`.
+  void _compensateScrollOnDataChange(KChartWidget oldWidget) {
+    final oldData = oldWidget.datas;
+    final newData = widget.datas;
+    if (oldData == null || newData == null) return;
+    if (oldData.isEmpty || newData.isEmpty) return;
+    if (oldData.length == newData.length) return;
+
+    final int diff = newData.length - oldData.length;
+    if (diff <= 0) return; // chỉ xử lý append/prepend, không xử lý shrink
+
+    // Append: nến đầu giữ nguyên, nến cuối mới hơn → có nến được thêm ở cuối.
+    final bool appended = oldData.first.time == newData.first.time &&
+        oldData.last.time != newData.last.time;
+    if (!appended) return; // prepend hoặc replace toàn bộ → bỏ qua
+
+    // User đang ở rightmost → auto-follow nến mới, không bù.
+    if (mScrollX <= 0.0) return;
+
+    mScrollX += diff * widget.chartStyle.pointWidth;
+  }
+
   void _onController() {
     // 1: reset 2: zoom
     if (widget.controller!.action == 1) {

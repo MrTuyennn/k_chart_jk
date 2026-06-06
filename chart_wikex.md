@@ -1,7 +1,7 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
-- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **gesture gate vol/secondary**, **VolRenderer panel độc lập + date đáy cùng**, **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
+- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **tự bù scroll khi append nến mới**, **gesture gate vol/secondary**, **VolRenderer panel độc lập + date đáy cùng**, **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
 - [OBV Indicator](#obv-indicator)
 - [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
@@ -167,6 +167,52 @@ Pattern để implement thêm một indicator phụ bất kỳ:
 
 ## Thay đổi gần đây
 
+### −3. Tự bù `mScrollX` khi append nến mới (`k_chart_widget.dart`)
+
+**Bug:** Khi user đang scroll xem history mà live tick append nến mới, view bị
+"trôi" — mỗi nến mới đẩy user thêm 1 candle về phía data cũ. Trong example
+trước đây còn gọi `_controller.reset()` trong `_addNewCandle` → user bị quăng
+hẳn về rightmost. Phá hoàn toàn UX đọc lịch sử.
+
+**Fix:** Thêm `didUpdateWidget` trong `KChartWidget` để detect khi parent
+push thêm data và tự bù `mScrollX`:
+
+```dart
+@override
+void didUpdateWidget(KChartWidget oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  _compensateScrollOnDataChange(oldWidget);
+}
+
+void _compensateScrollOnDataChange(KChartWidget oldWidget) {
+  // Chỉ xử lý append (nến đầu giữ nguyên, nến cuối mới hơn).
+  // Prepend tự bảo toàn view trong data space → không cần bù.
+  final diff = newData.length - oldData.length;
+  if (diff <= 0) return;
+  final appended = oldData.first.time == newData.first.time
+      && oldData.last.time != newData.last.time;
+  if (!appended) return;
+  if (mScrollX <= 0.0) return;  // đang rightmost → auto-follow
+  mScrollX += diff * widget.chartStyle.pointWidth;
+}
+```
+
+**Logic:**
+- `mScrollX` đại diện khoảng cách (px) từ biên phải tới vị trí đang xem.
+- Append `diff` nến mới → biên phải tịnh tiến thêm `diff × pointWidth`.
+- Để giữ user ở đúng vùng candle cũ → cộng `diff × pointWidth` vào `mScrollX`.
+- Ngoại lệ: `mScrollX == 0` (rightmost) → giữ nguyên 0 để auto-follow nến mới
+  (UX TradingView/Binance — chỉ stick rightmost khi user đang ở rightmost).
+
+**Prepend (lazy-load nến cũ)** không cần bù: `getMinTranslateX` tự tính lại
+đúng theo data mới → `mStartIndex` cũ ánh xạ tự nhiên sang `mStartIndex + diff`
+trong data mới → view trong data space được bảo toàn.
+
+**Example app:** xoá `_controller.reset()` khỏi `_addNewCandle` — chart tự
+giữ vị trí mà không cần app can thiệp.
+
+---
+
 ### −2. Gesture gate theo vùng — vol/secondary không di chuyển nến (`k_chart_widget.dart`)
 
 **Vấn đề:** Trước đây drag bất cứ đâu trong chart (kể cả vol/secondary/date)
@@ -186,17 +232,29 @@ onScaleStart: (details) {
   _gestureInMain = painter.isInMainRect(details.localFocalPoint);
 },
 onScaleUpdate: (details) {
-  // 1 ngón ngoài main → forward Y cho outer; pinch (≥2 ngón) vẫn chạy
-  // logic chart bình thường để zoom scaleX kể cả khi finger trên vol.
+  // Vol/secondary + 1 ngón: chỉ chặn pan Y, vẫn scroll X như bình thường.
+  // Pinch (≥2 ngón) đi xuống nhánh dưới → scaleX bình thường.
   if (!_gestureInMain && details.pointerCount < 2) {
+    isOnTap = false;
+    mScrollX = (mScrollX + details.focalPointDelta.dx / mScaleX)
+        .clamp(0.0, ChartPainter.maxScrollX)
+        .toDouble();
     final dy = details.focalPointDelta.dy;
     if (dy != 0) widget.onVerticalOverscroll?.call(dy);
+    if (!widget.isLoadingMore &&
+        widget.onLoadMore != null &&
+        ChartPainter.maxScrollX > 0 &&
+        mScrollX >= ChartPainter.maxScrollX * 0.8) {
+      widget.onLoadMore!(true);
+    }
+    notifyChanged();
     return;
   }
   // ... existing logic
 },
 onScaleEnd: (details) {
-  if (!_dragStartedInTapMode && _gestureInMain) {
+  // Fling X chạy cho cả drag từ vol/secondary (vì cũng update scrollX).
+  if (!_dragStartedInTapMode) {
     _onFling(details.velocity.pixelsPerSecond.dx);
   }
   _dragStartedInTapMode = false;
@@ -206,10 +264,13 @@ onScaleEnd: (details) {
 
 **Behaviour matrix:**
 
-| Touch start | Drag X (1 ngón) | Drag Y (1 ngón) | Pinch (2 ngón) | Fling X |
-|---|---|---|---|---|
-| `mMainRect` | scrollX nến | pan Y (nếu scaleY≠1) | scaleX | có |
-| `mVolRect` / secondary / date | — | forward parent | **scaleX** (vẫn zoom) | không |
+| Touch start | Drag X (1 ngón) | Drag Y (1 ngón) | Pinch (2 ngón) | Fling X | Lazy load |
+|---|---|---|---|---|---|
+| `mMainRect` | scrollX nến | pan Y (nếu scaleY≠1) | scaleX | có | có |
+| `mVolRect` / secondary / date | **scrollX nến** | forward parent | **scaleX** | **có** | **có** |
+
+Vol/secondary chỉ chặn **pan Y** — mọi hành vi khác (scroll/zoom/fling/lazy load)
+đều giữ nguyên để timeline vẫn cuộn được khi user vuốt trên panel phụ.
 
 **Tương thích outer scroll:** parent dùng `jumpTo` trong
 `onVerticalOverscroll` callback → bypass physics, list ngoài cuộn được kể

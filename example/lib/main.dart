@@ -231,8 +231,10 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       _data = newData;
       _totalLoaded++;
     });
-    // Cuộn đến nến mới nhất
-    _controller.reset();
+    // KHÔNG gọi _controller.reset() — sẽ phá mScrollX/mScaleX/mSelectX
+    // của user đang xem lịch sử. Khi mScrollX = 0 (đang ở rightmost),
+    // chart tự động vẫn fit nến mới vào view; khi đang scroll history
+    // thì giữ nguyên vị trí, user không bị giật.
   }
 
   void _recalculate() {
