@@ -186,10 +186,12 @@ onScaleStart: (details) {
   _gestureInMain = painter.isInMainRect(details.localFocalPoint);
 },
 onScaleUpdate: (details) {
-  if (!_gestureInMain) {
+  // 1 ngón ngoài main → forward Y cho outer; pinch (≥2 ngón) vẫn chạy
+  // logic chart bình thường để zoom scaleX kể cả khi finger trên vol.
+  if (!_gestureInMain && details.pointerCount < 2) {
     final dy = details.focalPointDelta.dy;
     if (dy != 0) widget.onVerticalOverscroll?.call(dy);
-    return;   // skip toàn bộ logic chart
+    return;
   }
   // ... existing logic
 },
@@ -204,10 +206,10 @@ onScaleEnd: (details) {
 
 **Behaviour matrix:**
 
-| Touch start | Drag X | Drag Y | Pinch | Fling X |
+| Touch start | Drag X (1 ngón) | Drag Y (1 ngón) | Pinch (2 ngón) | Fling X |
 |---|---|---|---|---|
 | `mMainRect` | scrollX nến | pan Y (nếu scaleY≠1) | scaleX | có |
-| `mVolRect` / secondary / date | — | forward parent | — | không |
+| `mVolRect` / secondary / date | — | forward parent | **scaleX** (vẫn zoom) | không |
 
 **Tương thích outer scroll:** parent dùng `jumpTo` trong
 `onVerticalOverscroll` callback → bypass physics, list ngoài cuộn được kể

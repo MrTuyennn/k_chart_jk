@@ -300,13 +300,26 @@ class _KChartWidgetState extends State<KChartWidget>
         _gestureInMain = painter.isInMainRect(details.localFocalPoint);
       },
       onScaleUpdate: (details) {
-        // Touch ngoài main (vol/secondary/date): chart đứng yên, forward Y
-        // sang parent để outer ScrollView cuộn theo.
-        if (!_gestureInMain) {
+        // Touch ngoài main + 1 ngón:
+        //   - dx → vẫn scroll nến X như bình thường.
+        //   - dy → forward outer scroll (KHÔNG pan chart Y).
+        // Pinch (≥2 ngón) vẫn để chart xử lý scaleX bình thường ở nhánh dưới.
+        if (!_gestureInMain && details.pointerCount < 2) {
+          isOnTap = false;
+          mScrollX = (mScrollX + details.focalPointDelta.dx / mScaleX)
+              .clamp(0.0, ChartPainter.maxScrollX)
+              .toDouble();
           final double dy = details.focalPointDelta.dy;
           if (dy != 0 && widget.onVerticalOverscroll != null) {
             widget.onVerticalOverscroll!(dy);
           }
+          if (!widget.isLoadingMore &&
+              widget.onLoadMore != null &&
+              ChartPainter.maxScrollX > 0 &&
+              mScrollX >= ChartPainter.maxScrollX * 0.8) {
+            widget.onLoadMore!(true);
+          }
+          notifyChanged();
           return;
         }
         if (_dragStartedInTapMode &&
@@ -359,9 +372,10 @@ class _KChartWidgetState extends State<KChartWidget>
       onScaleEnd: (details) {
         isScale = false;
         _lastScale = mScaleX;
-        // fling chỉ chạy khi drag là scroll thường trong main chart
-        // (không phải kéo crosshair, không phải drag ngoài main)
-        if (!_dragStartedInTapMode && _gestureInMain) {
+        // fling X kích hoạt cho mọi drag scroll thường (không phải kéo crosshair),
+        // kể cả khi gesture bắt đầu ngoài main vì 1-finger drag ở vol/secondary
+        // cũng update mScrollX.
+        if (!_dragStartedInTapMode) {
           final velocity = details.velocity.pixelsPerSecond.dx;
           _onFling(velocity);
         }

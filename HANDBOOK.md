@@ -653,13 +653,17 @@ Implemented trong `_KChartWidgetState.build()` (file `k_chart_widget.dart` ~line
 `onScaleUpdate` flow:
 
 ```
-if (!_gestureInMain) {
-  // vol/secondary/date — chart đứng yên
+if (!_gestureInMain && pointerCount < 2) {
+  // vol/secondary/date + 1 ngón — chart đứng yên, outer scroll
   widget.onVerticalOverscroll?.call(focalPointDelta.dy);
   return;
 }
-// còn lại: 4 nhánh xử lý chart như cũ
+// còn lại (chart hoặc pinch ngoài main): 4 nhánh xử lý chart như cũ
 ```
+
+> **Pinch (≥2 ngón) trên vol/secondary** không bị bypass — vẫn chạy nhánh
+> `details.scale != 1.0` → scaleX update. User pinch ở đâu cũng zoom được
+> chart ngang.
 
 4 nhánh khi `_gestureInMain == true`:
 

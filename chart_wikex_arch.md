@@ -561,20 +561,35 @@ onScaleStart: (details) {
 },
 
 onScaleUpdate: (details) {
-  // Touch ngoài main: chart đứng yên, forward Y cho outer scroll.
-  if (!_gestureInMain) {
-    final double dy = details.focalPointDelta.dy;
+  // Touch ngoài main + 1 ngón: chỉ chặn pan Y, vẫn cho scroll X.
+  //   - dx → scrollX nến (giống main)
+  //   - dy → forward outer scroll (KHÔNG pan chart Y)
+  // Pinch (≥2 ngón) đi xuống nhánh dưới → scaleX bình thường.
+  if (!_gestureInMain && details.pointerCount < 2) {
+    isOnTap = false;
+    mScrollX = (mScrollX + details.focalPointDelta.dx / mScaleX)
+        .clamp(0.0, ChartPainter.maxScrollX)
+        .toDouble();
+    final dy = details.focalPointDelta.dy;
     if (dy != 0 && widget.onVerticalOverscroll != null) {
       widget.onVerticalOverscroll!(dy);
     }
+    if (!widget.isLoadingMore &&
+        widget.onLoadMore != null &&
+        ChartPainter.maxScrollX > 0 &&
+        mScrollX >= ChartPainter.maxScrollX * 0.8) {
+      widget.onLoadMore!(true);
+    }
+    notifyChanged();
     return;
   }
   // ... existing logic (scaleY zone, pinch, scroll X, pan Y, …)
 },
 
 onScaleEnd: (details) {
-  // fling chỉ chạy khi drag là scroll thường TRONG main chart
-  if (!_dragStartedInTapMode && _gestureInMain) {
+  // fling X cho mọi drag scroll thường, kể cả từ vol/secondary
+  // (vì 1-ngón drag ở đó cũng update mScrollX).
+  if (!_dragStartedInTapMode) {
     _onFling(details.velocity.pixelsPerSecond.dx);
   }
   _dragStartedInTapMode = false;
@@ -598,13 +613,22 @@ Finger chạm xuống
 │   │       └─ fling X theo velocity (nếu không phải crosshair drag)
 │   │
 │   └─ NO (vol / secondary / date) → _gestureInMain = false
-│       └─ onScaleUpdate:
-│           ├─ chart KHÔNG đổi mScrollX/mOffsetY/mScaleX/mScaleY
-│           ├─ forward focalPointDelta.dy qua onVerticalOverscroll
-│           └─ parent jumpTo (bypass physics) → list ngoài cuộn
+│       └─ onScaleUpdate phân nhánh theo pointerCount:
+│           ├─ pointerCount ≥ 2 (pinch) →
+│           │   ★ vẫn xử lý scaleX bình thường (như drag trong main)
+│           │   → user pinch trên vol/secondary vẫn zoom chart ngang
+│           │
+│           └─ pointerCount == 1 (drag 1 ngón) →
+│               ├─ dx → scrollX nến (như drag trong main)
+│               ├─ dy → forward onVerticalOverscroll (KHÔNG pan chart Y)
+│               ├─ chart KHÔNG đổi mScaleX/mScaleY/mOffsetY
+│               └─ vẫn trigger onLoadMore khi scroll X đạt 80%
 │       onScaleEnd
-│           └─ skip fling; reset _gestureInMain = true
+│           └─ fling X bình thường (vẫn chạy cho drag từ vol/secondary)
 ```
+
+**Tóm gọn:** vol/secondary chỉ chặn duy nhất **pan Y**. Mọi thao tác khác
+(scroll X, fling X, pinch scaleX, lazy load) vẫn hoạt động.
 
 #### Vùng chính xác
 
@@ -617,20 +641,21 @@ bool isInMainRect(Offset point) => mMainRect.contains(point);
 Layout (xem mục 3):
 
 ```
-┌───────────────────────────────────┐
-│  mMainRect          ★ chart move  │ ← gesture bắt đầu ở đây
-├───────────────────────────────────┤
-│  mVolRect           ☆ outer scroll │
-├───────────────────────────────────┤
-│  mSecondaryRect[0]  ☆ outer scroll │
-├───────────────────────────────────┤
-│  mSecondaryRect[1]  ☆ outer scroll │
-├───────────────────────────────────┤
-│  mDateRect          ☆ outer scroll │
-└───────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  mMainRect          ★ full chart gestures               │ ← scroll/pan/pinch
+├─────────────────────────────────────────────────────────┤
+│  mVolRect           ◐ scroll X + pinch | outer scroll Y │
+├─────────────────────────────────────────────────────────┤
+│  mSecondaryRect[0]  ◐ scroll X + pinch | outer scroll Y │
+├─────────────────────────────────────────────────────────┤
+│  mSecondaryRect[1]  ◐ scroll X + pinch | outer scroll Y │
+├─────────────────────────────────────────────────────────┤
+│  mDateRect          ◐ scroll X + pinch | outer scroll Y │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Mọi điểm Y ngoài `mMainRect` → coi như "không phải vùng chart" → parent xử lý.
+Ngoài `mMainRect`: tách rạch giữa **X (chart)** và **Y (outer scroll)**.
+Pan Y của chart bị chặn riêng để không xung đột với outer scroll.
 
 #### Tương tác với physics của outer scroll
 
@@ -685,12 +710,18 @@ physics, không cần đổi physics khi user chạm vol/secondary.
   bắt đầu trong chart thì thuộc chart).
 - **Drag chéo từ vol sang main**: tương tự, start ngoài main thì cả sequence
   forward outer, finger lướt vào main không "đột ngột" giành lại quyền.
-- **Pinch 2 ngón trên vol**: cả 2 ngón đều ngoài main → `localFocalPoint`
-  ở trung điểm sẽ ngoài main → `_gestureInMain = false` → pinch không zoom
-  nến. Đây là behaviour mong muốn (user đang tương tác với vol panel).
-- **Pinch 1 ngón main + 1 ngón vol**: focalPoint nằm giữa 2 ngón → có thể
-  vẫn trong main hoặc ngoài tuỳ vị trí. Hiếm gặp; chấp nhận behaviour theo
-  vị trí focal.
+- **Pinch 2 ngón trên vol**: `localFocalPoint` ngoài main → `_gestureInMain =
+  false`. Nhưng `pointerCount >= 2` nên onScaleUpdate **không** bypass —
+  pinch vẫn xử lý scaleX bình thường. User mong đợi pinch luôn zoom được
+  toàn bộ chart bất kể vị trí finger.
+- **Pinch 1 ngón main + 1 ngón vol**: focalPoint nằm giữa 2 ngón. `_gestureInMain`
+  set theo focalPoint nhưng `pointerCount >= 2` nên vẫn xử lý pinch bình thường.
+- **Bắt đầu drag 1 ngón trên vol rồi thả ngón thứ 2 vào**: trong lúc
+  `pointerCount == 1`, mỗi update chỉ forward Y cho outer. Khi `pointerCount`
+  thành 2, nhánh pinch kích hoạt — scaleX bắt đầu update từ thời điểm đó
+  (relative scale).
+- **Pinch trên vol rồi nhả 1 ngón còn 1**: `pointerCount` về 1, bypass kích
+  hoạt lại — 1 ngón còn lại drag chỉ forward Y, không scroll nến. UX hợp lý.
 
 ### 11.3 Crosshair / Trend line
 
