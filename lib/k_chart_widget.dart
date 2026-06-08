@@ -60,6 +60,7 @@ class KChartWidget extends StatefulWidget {
   final KChartStyle chartStyle;
   final VerticalTextAlignment verticalTextAlignment;
   final bool isTrendLine;
+  /// Padding phải sau nến cuối (px tại chart ≥375px). Chart hẹp hơn tự co — xem [BaseChartPainter.effectiveRightPaddingPx].
   final double xFrontPadding;
   final WidgetDetailBuilder detailBuilder;
   final double minScale;
@@ -124,8 +125,10 @@ class KChartWidget extends StatefulWidget {
 
 class _KChartWidgetState extends State<KChartWidget>
     with TickerProviderStateMixin {
+  // broadcast: StreamBuilder trong _buildInfoDialog có thể rebuild mà không lỗi
+  // "Stream has already been listened to" (single-subscription stream).
   final StreamController<InfoWindowEntity?> mInfoWindowStream =
-      StreamController<InfoWindowEntity?>();
+      StreamController<InfoWindowEntity?>.broadcast();
   double mScaleX = 1.0, mScrollX = 0.0, mSelectX = 0.0;
   // mOffsetY: độ dịch chuyển Y của chart (pan dọc), reset về 0 khi double tap
   double mScaleY = 1.0, mOffsetY = 0.0;
@@ -158,7 +161,7 @@ class _KChartWidgetState extends State<KChartWidget>
 
   double _lastScale = 1.0;
   bool isScale = false, isDrag = false, isLongPress = false, isOnTap = false;
-  // true khi gesture bắt đầu trong vùng 100px phải → drag dọc = scaleY
+  // true khi gesture bắt đầu trong vùng phải (width = effectiveRightPaddingPx) → drag dọc = scaleY
   bool _isScaleYGesture = false;
   // true khi drag bắt đầu trong lúc crosshair đang hiển thị → drag di chuyển crosshair thay vì scroll
   bool _dragStartedInTapMode = false;
@@ -331,12 +334,16 @@ class _KChartWidgetState extends State<KChartWidget>
         _stopAnimation();
         _lastScale = mScaleX;
         _scaleYDragStart = details.localFocalPoint.dy;
-        // xác định scaleY gesture: 1 ngón tay trong vùng 100px bên phải
+        // xác định scaleY gesture: 1 ngón tay trong vùng phải (cùng tỷ lệ với xFrontPadding)
         final renderBox = context.findRenderObject() as RenderBox?;
         final width = renderBox?.size.width ?? 0.0;
+        final zoneWidth = BaseChartPainter.effectiveRightPaddingPx(
+          widget.xFrontPadding,
+          width,
+        );
         _isScaleYGesture =
             details.pointerCount == 1 &&
-            details.localFocalPoint.dx > width - 100;
+            details.localFocalPoint.dx > width - zoneWidth;
         // Gesture bắt đầu trong vol/secondary/date → chart không xử lý
         // scroll/scale, chỉ forward delta Y cho outer scroll.
         _gestureInMain = painter.isInMainRect(details.localFocalPoint);
@@ -495,6 +502,9 @@ class _KChartWidgetState extends State<KChartWidget>
             size: Size(double.infinity, baseDimension.mDisplayHeight),
             painter: painter,
           ),
+          // Vùng scaleY + double-tap reset: width đồng bộ với xFrontPadding (co theo chart hẹp).
+          // LayoutBuilder chỉ bọc Positioned (không bọc GestureDetector ngoài) để tránh
+          // rebuild cả StreamBuilder → lỗi stream single-subscription.
           // TODO: bottom offset giới hạn vùng scaleY chỉ trong main chart
           // nếu muốn gesture phủ toàn bộ thì đổi lại bottom: 0
           Positioned(
@@ -504,14 +514,26 @@ class _KChartWidgetState extends State<KChartWidget>
                 baseDimension.mVolumeHeight +
                 baseDimension.totalSecondaryHeight +
                 widget.chartStyle.bottomPadding,
-            child: GestureDetector(
-              onDoubleTap: () {
-                // double tap vùng phải → reset scaleY và offsetY về mặc định
-                mScaleY = 1.0;
-                mOffsetY = 0.0;
-                notifyChanged();
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final scaleYZoneWidth =
+                    BaseChartPainter.effectiveRightPaddingPx(
+                  widget.xFrontPadding,
+                  constraints.maxWidth,
+                );
+                return GestureDetector(
+                  onDoubleTap: () {
+                    // double tap vùng phải → reset scaleY và offsetY về mặc định
+                    mScaleY = 1.0;
+                    mOffsetY = 0.0;
+                    notifyChanged();
+                  },
+                  child: Container(
+                    color: Colors.transparent,
+                    width: scaleYZoneWidth,
+                  ),
+                );
               },
-              child: Container(color: Colors.transparent, width: 100),
             ),
           ),
           if (widget.showInfoDialog) _buildInfoDialog(),

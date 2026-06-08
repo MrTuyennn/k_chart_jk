@@ -134,7 +134,7 @@ KChartWidget  (state + gesture)
    │       ├─ drawText(getItem(mStopIndex))    (main + vol + secondaries)
    │       ├─ drawMaxAndMin() / drawNowPrice()     (qua _applyScaleY)
    │       └─ drawCrossLineText() (nếu long-press/tap)
-   └─ Positioned (right:0, w:100)
+   └─ Positioned (right:0) + LayoutBuilder → w = effectiveRightPaddingPx
        ─ vùng gesture scaleY + double-tap reset scaleY/offsetY
 ```
 
@@ -198,7 +198,7 @@ Các tham số chính của `KChartWidget`:
 - `hideGrid`: ẩn lưới.
 - `showNowPrice`: vẽ đường + label giá hiện tại.
 - `livePrice`: override giá now-price (realtime socket).
-- `xFrontPadding`: padding bên phải chart sau nến cuối (default 100px).
+- `xFrontPadding`: padding bên phải sau nến cuối (default 100px tại chart ≥375px). Chart hẹp hơn → `effectiveRightPaddingPx` giảm tỷ lệ; đồng bộ vùng gesture scaleY.
 - `mBaseHeight` / `mSecondaryHeight`: chiều cao mỗi panel.
 - `backgroundLogo` / `backgroundLogoOpacity`: watermark widget giữa main.
 - `onLoadMore` / `isLoadingMore`: lazy load data cũ.
@@ -263,6 +263,30 @@ mDisplayHeight = mBaseHeight + totalSecondaryHeight + totalLabelHeight
 - Tìm `mStartIndex = indexOfTranslateX(xToTranslateX(0))`,
   `mStopIndex  = indexOfTranslateX(xToTranslateX(mWidth))`
   bằng tìm kiếm nhị phân.
+
+### 4.0 Padding phải & `getMinTranslateX`
+
+Khoảng trống sau nến cuối khi scroll tới biên phải:
+
+```dart
+static const double referenceChartWidth = 375.0;
+
+static double effectiveRightPaddingPx(double xFrontPadding, double chartWidth) {
+  if (chartWidth <= 0) return xFrontPadding;
+  final ratio = chartWidth / referenceChartWidth;
+  return xFrontPadding * (ratio < 1.0 ? ratio : 1.0);
+}
+
+double getMinTranslateX() {
+  final paddingData = effectiveRightPaddingPx(xFrontPadding, mWidth) / scaleX;
+  var x = -mDataLen + mWidth / scaleX - mPointWidth / 2 - paddingData;
+  return x >= 0 ? 0.0 : x;
+}
+```
+
+- `effectiveRightPaddingPx / scaleX`: chuyển padding **screen px** → **data space** để gap màn hình ổn định khi pinch `scaleX`.
+- `referenceChartWidth`: tại 375px logical, padding = `xFrontPadding` đầy đủ; chart hẹp hơn co tỷ lệ.
+- `KChartWidget`: vùng scaleY + `_isScaleYGesture` dùng cùng helper; `mInfoWindowStream` = `broadcast()`.
 - Duyệt `i = mStartIndex..mStopIndex`:
   - `getMainMaxMinValue(item, i)` → `mMainMaxValue`, `mMainMinValue`,
     `mMainMaxIndex`, `mMainMinIndex`, `mMainHighMaxValue`, `mMainLowMinValue`.
@@ -521,8 +545,8 @@ chứa color overrides + line width.
 
 ### 11.2 Trục Y (zoom dọc + pan dọc) — chỉ áp cho main
 
-- **ScaleY gesture**: 1 ngón drag dọc trong vùng `Positioned` 100px bên phải
-  → `mScaleY -= delta * 0.005`, clamp `[0.3, 5.0]`.
+- **ScaleY gesture**: 1 ngón drag dọc trong vùng `Positioned` bên phải (width =
+  `effectiveRightPaddingPx`) → `mScaleY -= delta * 0.005`, clamp `[0.3, 5.0]`.
 - **Pan Y**: chỉ active khi `mScaleY != 1.0`. `mOffsetY += dy`, clamp
   `|offsetY| ≤ baseHeight × scaleY / 2` (50% rule).
 - **Overscroll handoff**: phần `dy` vượt clamp emit qua

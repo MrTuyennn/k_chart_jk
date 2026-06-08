@@ -40,7 +40,7 @@ Tài liệu A → Z cho package candlestick chart `k_chart_wikex`. Mô tả từ
 │  │  │  │     └── BaseChartPainter                  │  │  │
 │  │  │  │           └── MainRenderer / VolRenderer  │  │  │
 │  │  │  │               / SecondaryRenderer         │  │  │
-│  │  │  ├── Positioned (vùng phải 100px scaleY)     │  │  │
+│  │  │  ├── Positioned (vùng phải scaleY, width ∝ chart) │  │  │
 │  │  │  └── InfoDialog (long-press detail)          │  │  │
 │  │  └──────────────────────────────────────────────┘  │  │
 │  └────────────────────────────────────────────────────┘  │
@@ -229,7 +229,7 @@ File: `lib/k_chart_widget.dart`.
 | `materialInfoDialog` | `true` | Style dialog Material vs Cupertino. |
 | `timeFormat` | `TimeFormat.yearMonthDay` | Format thời gian dưới X axis. Xem `TimeFormat` constants. |
 | `livePrice` | `null` | Giá realtime override cho line "now price". Nếu null dùng `data.last.close`. |
-| `xFrontPadding` | `100` | Padding bên phải (px) để chừa chỗ cho label giá / now-price. |
+| `xFrontPadding` | `100` | Padding phải sau nến cuối (px tại chart ≥375px). Chart hẹp hơn tự co qua `effectiveRightPaddingPx`; đồng bộ width vùng scaleY. |
 | `verticalTextAlignment` | `right` | `left` / `right` — vị trí label giá dọc. |
 | `fixedLength` | `2` | Số chữ số thập phân format giá. |
 
@@ -275,11 +275,11 @@ Trong `_KChartWidgetState`:
 |---|---|
 | `mScaleX` | Zoom ngang (timeline). Clamp `[minScale, maxScale]`. |
 | `mScrollX` | Offset cuộn ngang (đơn vị data, đã chia mScaleX). Clamp `[0, maxScrollX]`. |
-| `mScaleY` | Zoom dọc (price scale). Clamp `[0.3, 5.0]`. Drag dọc vùng 100px bên phải để chỉnh. |
+| `mScaleY` | Zoom dọc (price scale). Clamp `[0.3, 5.0]`. Drag dọc vùng phải (`effectiveRightPaddingPx`) để chỉnh. |
 | `mOffsetY` | Pan dọc. Chỉ active khi `mScaleY != 1.0`. Clamp `±mBaseHeight * mScaleY / 2` (giữ ≥50% chart trong view). |
 | `mSelectX/Y` | Vị trí crosshair khi long-press / tap. |
 | `isOnTap / isLongPress / isScale` | Trạng thái gesture hiện tại. |
-| `_isScaleYGesture` | `true` khi drag bắt đầu trong vùng 100px phải (1 ngón) → drag dọc = scaleY. |
+| `_isScaleYGesture` | `true` khi drag bắt đầu trong vùng phải width = `effectiveRightPaddingPx` (1 ngón) → drag dọc = scaleY. |
 | `_dragStartedInTapMode` | `true` khi drag bắt đầu lúc crosshair đang hiện → drag = di chuyển crosshair, không scroll. |
 
 ### 5.7 `TimeFormat` constants
@@ -613,7 +613,7 @@ Không cần để dùng package, nhưng giúp hiểu performance & extend.
 | Class | Trách nhiệm |
 |---|---|
 | `BaseDimension` | Tính tổng chiều cao: `mBaseHeight + (mSecondaryHeight × n)`. `mVolumeHeight = 0` cứng (volume overlay vào main, không panel riêng). |
-| `BaseChartPainter` | Tính `mStartIndex` / `mStopIndex` (nến trong view), `mDataLen`, `maxScrollX`, `mScaleX`, scaling helpers. |
+| `BaseChartPainter` | Tính `mStartIndex` / `mStopIndex` (nến trong view), `mDataLen`, `maxScrollX`, `getMinTranslateX()` (padding phải qua `effectiveRightPaddingPx`), scaling helpers. |
 | `ChartPainter` | Subclass của `BaseChartPainter`. Orchestrate paint: bg → grid → main → vol → secondary → crosshair → labels. Apply canvas transform `scaleY + offsetY` quanh `centerY` của `mMainRect`. |
 | `BaseChartRenderer<T>` | Helper render mỗi panel với min/max value, draw text, getY. |
 | `MainRenderer` | Vẽ nến / line, MA/BOLL/EMA/SAR/ZigZag overlay. |
@@ -644,8 +644,8 @@ Implemented trong `_KChartWidgetState.build()` (file `k_chart_widget.dart` ~line
 
 `onScaleStart` chốt 2 cờ:
 
-- `_isScaleYGesture` = `pointerCount == 1 && localFocalPoint.dx > width - 100`
-  → drag dọc trong vùng 100px bên phải.
+- `_isScaleYGesture` = `pointerCount == 1 && localFocalPoint.dx > width - effectiveRightPaddingPx(...)`
+  → drag dọc trong vùng phải (width đồng bộ `xFrontPadding`, co theo chart hẹp).
 - `_gestureInMain` = `painter.isInMainRect(localFocalPoint)` → finger có nằm
   trong `mMainRect` hay không. Nếu **false** (vol/secondary/date), toàn bộ
   scroll/scale của chart bị bypass; chỉ forward `dy` cho outer scroll.
@@ -675,7 +675,7 @@ if (!_gestureInMain && pointerCount < 2) {
 | Điều kiện | Hành vi |
 |---|---|
 | `_dragStartedInTapMode` && 1 ngón && không phải scaleY zone | Di chuyển crosshair theo ngón. |
-| `_isScaleYGesture` && 1 ngón | Drag dọc trong vùng 100px phải → điều chỉnh `mScaleY` ± `delta * 0.005`, clamp `[0.3, 5.0]`. Sau đó re-clamp `mOffsetY`. |
+| `_isScaleYGesture` && 1 ngón | Drag dọc trong vùng phải (`effectiveRightPaddingPx`) → điều chỉnh `mScaleY` ± `delta * 0.005`, clamp `[0.3, 5.0]`. Sau đó re-clamp `mOffsetY`. |
 | `details.scale != 1.0` (≥2 ngón) | Pinch zoom → `mScaleX = lastScale * scale`, clamp `[minScale, maxScale]`. |
 | 1 ngón drag tự do | Cuộn ngang: `mScrollX += dx / mScaleX`, clamp `[0, maxScrollX]`. Pan dọc CHỈ active khi `mScaleY != 1.0`: `mOffsetY = _clampOffsetY(mOffsetY + dy)`. Trigger `onLoadMore(true)` khi `mScrollX >= maxScrollX * 0.8`. |
 
@@ -694,12 +694,14 @@ double _clampOffsetY(double v) {
 
 → giữ tối thiểu 50% chart content trong view ở mọi scaleY.
 
-### 12.5 Double-tap (vùng phải 100px)
+### 12.5 Double-tap (vùng phải scaleY)
 
-`Positioned(right: 0, bottom: mVolumeHeight + secondary + bottomPadding)` chứa 1 `GestureDetector` riêng:
+`Positioned(right: 0, bottom: mVolumeHeight + secondary + bottomPadding)` chứa `LayoutBuilder` → `GestureDetector` riêng:
 
+- Width vùng = `BaseChartPainter.effectiveRightPaddingPx(xFrontPadding, chartWidth)` (không cố định 100px).
 - Double-tap → reset `mScaleY = 1.0`, `mOffsetY = 0.0`.
 - Vùng này chỉ phủ chiều cao của main rect (không vượt xuống panel secondary).
+- `mInfoWindowStream` dùng `StreamController.broadcast()` để `StreamBuilder` rebuild an toàn.
 
 ### 12.6 Fling
 
@@ -892,7 +894,7 @@ class _PageState extends State<Page> {
 ```
 
 **Flow:**
-1. User scaleY (drag dọc vùng 100px phải chart) → `_scaleYActive = true` → outer scroll bị khoá.
+1. User scaleY (drag dọc vùng phải `effectiveRightPaddingPx`) → `_scaleYActive = true` → outer scroll bị khoá.
 2. User pan chart xuống → `mOffsetY` tăng đến `+mBaseHeight * mScaleY / 2`.
 3. User vẫn drag xuống → `overscroll > 0` fire → outer `jumpTo(pos - positive)` → pos giảm → cuộn lên đầu trang.
 4. User đảo chiều drag lên → chart absorb trước (`mOffsetY` giảm), outer dừng. Khi `mOffsetY` chạm `-max` → outer scroll xuống tiếp.
@@ -914,10 +916,16 @@ class _PageState extends State<Page> {
 - `time` phải là **milliseconds** Unix epoch, không phải seconds. Nếu API trả seconds, nhân 1000.
 
 ### "Crosshair label dính vào cạnh"
-- Tăng `xFrontPadding` (mặc định 100px).
+- Tăng `xFrontPadding` (mặc định 100px tại chart ≥375px).
+
+### "Chart hẹp vẫn chừa khoảng trống lớn bên phải"
+- Padding phải đã scale theo width (`effectiveRightPaddingPx`). Nếu vẫn rộng, giảm `xFrontPadding` hoặc chỉnh `referenceChartWidth` trong `base_chart_painter.dart`.
+
+### "Stream has already been listened to"
+- `mInfoWindowStream` phải là `StreamController.broadcast()`. Không bọc toàn bộ `GestureDetector` trong `LayoutBuilder` — chỉ `LayoutBuilder` trong `Positioned` scaleY.
 
 ### "Pan dọc không hoạt động"
-- Pan dọc CHỈ active sau khi user đã scaleY (`mScaleY != 1.0`). Drag dọc vùng 100px bên phải để zoom dọc trước. Hoặc double-tap vùng đó để reset.
+- Pan dọc CHỈ active sau khi user đã scaleY (`mScaleY != 1.0`). Drag dọc vùng phải (`effectiveRightPaddingPx`) để zoom dọc trước. Hoặc double-tap vùng đó để reset.
 
 ### "Outer scroll ăn gesture chart"
 - Khi nhúng `KChartWidget` trong `SingleChildScrollView` / `ListView`, vertical drag dễ bị scroll cha bắt. Giải pháp: track pointer events ở widget cha và toggle outer physics → `NeverScrollableScrollPhysics` khi finger trên chart (xem cách làm trong `example/lib/main.dart`).

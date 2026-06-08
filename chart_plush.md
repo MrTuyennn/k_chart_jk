@@ -110,7 +110,7 @@ Các tham số cấu hình chính:
 - `secondaryState`: `MACD`, `KDJ`, `RSI`, `WR`, `CCI`, `NONE`.
 - `volHidden`: ẩn hiện vùng volume.
 - `hideGrid`: ẩn lưới.
-- `xFrontPadding`: đệm biên trái của đồ thị.
+- `xFrontPadding`: đệm bên phải sau nến cuối (px tại chart ≥375px). Chart hẹp hơn tự co qua `BaseChartPainter.effectiveRightPaddingPx`; đồng bộ vùng gesture scaleY.
 
 ## 3. Cách chia vùng và tính toán layout
 

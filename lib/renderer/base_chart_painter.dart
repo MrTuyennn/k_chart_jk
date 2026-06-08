@@ -57,6 +57,7 @@ abstract class BaseChartPainter extends CustomPainter {
   late double mPointWidth;
   // format time
   List<String> mFormats = [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
+  /// Giá trị padding phải tối đa (px tại [referenceChartWidth]). Thực tế qua [_effectiveRightPaddingPx].
   double xFrontPadding;
 
   /// base dimension
@@ -352,9 +353,30 @@ abstract class BaseChartPainter extends CustomPainter {
   void setTranslateXFromScrollX(double scrollX) =>
       mTranslateX = scrollX + getMinTranslateX();
 
+  /// Chiều rộng tham chiếu (logical px): tại đây [xFrontPadding] = giá trị đầy đủ.
+  /// Chart hẹp hơn → padding phải giảm tỷ lệ (fix khoảng trống ~100px cố định khi resize).
+  static const double referenceChartWidth = 375.0;
+
+  /// Padding phải thực tế (screen px).
+  /// Ví dụ `xFrontPadding=100`: width 375→100px, 250→~67px, 187→~50px; width ≥375 giữ 100px.
+  static double effectiveRightPaddingPx(
+    double xFrontPadding,
+    double chartWidth,
+  ) {
+    if (chartWidth <= 0) return xFrontPadding;
+    final ratio = chartWidth / referenceChartWidth;
+    return xFrontPadding * (ratio < 1.0 ? ratio : 1.0);
+  }
+
+  double get _effectiveRightPaddingPx =>
+      effectiveRightPaddingPx(xFrontPadding, mWidth);
+
   /// get the minimum value of translation
   double getMinTranslateX() {
-    var x = -mDataLen + mWidth / scaleX - mPointWidth / 2 - xFrontPadding;
+    // paddingData: px → data space (/ scaleX) để gap màn hình ≈ _effectiveRightPaddingPx khi pinch zoom.
+    final paddingData = _effectiveRightPaddingPx / scaleX;
+    var x =
+        -mDataLen + mWidth / scaleX - mPointWidth / 2 - paddingData;
     return x >= 0 ? 0.0 : x;
   }
 

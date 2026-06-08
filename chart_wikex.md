@@ -1,7 +1,7 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
-- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **tự bù scroll khi append nến mới**, **gesture gate vol/secondary**, **VolRenderer panel độc lập + date đáy cùng**, **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
+- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **padding phải tỷ lệ theo width**, **tự bù scroll khi append nến mới**, **gesture gate vol/secondary**, **VolRenderer panel độc lập + date đáy cùng**, **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
 - [OBV Indicator](#obv-indicator)
 - [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
@@ -166,6 +166,53 @@ Pattern để implement thêm một indicator phụ bất kỳ:
 ---
 
 ## Thay đổi gần đây
+
+### −4. Padding phải tỷ lệ theo chiều rộng chart (`base_chart_painter.dart`, `k_chart_widget.dart`)
+
+**Bug:** `xFrontPadding` mặc định `100` được trừ trực tiếp trong `getMinTranslateX()`
+theo **data space**, không co theo `mWidth`. Chart hẹp (split view, màn nhỏ) vẫn
+chừa ~100px bên phải như chart rộng → lãng phí vùng nến. Vùng gesture scaleY
+cũng cố định `width: 100` / `width - 100`, không đồng bộ.
+
+**Fix:**
+
+1. Thêm `BaseChartPainter.effectiveRightPaddingPx(xFrontPadding, chartWidth)`:
+   - `referenceChartWidth = 375` — tại width này padding = `xFrontPadding` đầy đủ.
+   - Chart hẹp hơn → padding giảm tỷ lệ (`× chartWidth / 375`, cap tối đa = `xFrontPadding`).
+2. `getMinTranslateX()` dùng `effectiveRightPaddingPx / scaleX` (px → data space) để
+   khoảng trống màn hình ổn định khi pinch zoom `scaleX`.
+3. Vùng scaleY (`Positioned` phải) + `_isScaleYGesture` dùng cùng helper — width zone
+   đồng bộ với padding scroll.
+4. `StreamController.broadcast()` cho `mInfoWindowStream` — tránh lỗi rebuild
+   `StreamBuilder` ("Stream has already been listened to"). **Không** bọc toàn bộ
+   `GestureDetector` trong `LayoutBuilder` (chỉ `LayoutBuilder` bên trong `Positioned`).
+
+```dart
+// base_chart_painter.dart
+static const double referenceChartWidth = 375.0;
+
+static double effectiveRightPaddingPx(double xFrontPadding, double chartWidth) {
+  if (chartWidth <= 0) return xFrontPadding;
+  final ratio = chartWidth / referenceChartWidth;
+  return xFrontPadding * (ratio < 1.0 ? ratio : 1.0);
+}
+
+double getMinTranslateX() {
+  final paddingData = effectiveRightPaddingPx(xFrontPadding, mWidth) / scaleX;
+  var x = -mDataLen + mWidth / scaleX - mPointWidth / 2 - paddingData;
+  return x >= 0 ? 0.0 : x;
+}
+```
+
+| `mWidth` (scaleX=1, xFrontPadding=100) | Padding màn hình |
+|----------------------------------------|------------------|
+| ≥ 375px | 100px |
+| 250px | ~67px |
+| 187px | ~50px |
+
+**Tuning:** tăng `xFrontPadding` nếu label giá bị sát nến; giảm nếu muốn tối đa vùng candle trên màn rộng.
+
+---
 
 ### −3. Tự bù `mScrollX` khi append nến mới (`k_chart_widget.dart`)
 
@@ -479,7 +526,7 @@ double _applyScaleY(double rawY) {
 
 **Vấn đề:** 1-finger drag tự do trước đây cộng dồn cả `mScrollX` và `mOffsetY` — pan Y luôn active kể cả khi `mScaleY = 1.0` (chart fit viewport, không có gì để pan). Ngoài ra chart có thể pan ra ngoài viewport quá xa.
 
-**Fix:** Pan Y chỉ active sau khi user đã scaleY (drag dọc vùng `Positioned` 100px bên phải) → `mScaleY != 1.0`. Đồng thời clamp `mOffsetY` để giữ tối thiểu 50% chart content trong view.
+**Fix:** Pan Y chỉ active sau khi user đã scaleY (drag dọc vùng `Positioned` bên phải, width = `effectiveRightPaddingPx`) → `mScaleY != 1.0`. Đồng thời clamp `mOffsetY` để giữ tối thiểu 50% chart content trong view.
 
 ```dart
 } else {
@@ -513,7 +560,7 @@ Re-clamp `mOffsetY` mỗi khi `mScaleY` thay đổi (bound phụ thuộc scaleY)
 
 **UX:**
 - Mặc định (`mScaleY = 1`): drag bình thường chỉ cuộn timeline (X), không trôi dọc.
-- Drag dọc vùng phải 100px → scaleY (zoom dọc). Sau đó drag bất kỳ đâu → pan Y, giới hạn 50%.
+- Drag dọc vùng phải (`effectiveRightPaddingPx`) → scaleY (zoom dọc). Sau đó drag bất kỳ đâu → pan Y, giới hạn 50%.
 - Double-tap vùng phải → reset scaleY=1, offsetY=0 → tắt pan Y.
 
 ---
@@ -646,7 +693,7 @@ Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở 
 |---------|------|----------|-----------|
 | `mBaseHeight` | `double` | `360` | Chiều cao khung nến chính (px). |
 | `mSecondaryHeight` | `double?` | `mBaseHeight * 0.2` | Chiều cao mỗi khung indicator phụ. Nếu null tự tính = 20% chiều cao chính. |
-| `xFrontPadding` | `double` | `100` | Khoảng trống bên phải chart sau cây nến cuối (px). |
+| `xFrontPadding` | `double` | `100` | Khoảng trống bên phải sau nến cuối (px) tại chart rộng ≥375px. Chart hẹp hơn → tự giảm tỷ lệ qua `effectiveRightPaddingPx`. Cùng giá trị quyết định width vùng gesture scaleY. |
 
 ### Cuộn & zoom
 
