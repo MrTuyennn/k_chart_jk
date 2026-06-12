@@ -27,14 +27,14 @@ class MyApp extends StatelessWidget {
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
 
-List<KLineEntity> _generateMockData(int count) {
+List<KLineEntity> _generateMockData(int count, Duration candleInterval) {
   final random = Random(42);
   double price = 65000;
   final now = DateTime.now();
   final list = <KLineEntity>[];
 
   for (int i = count - 1; i >= 0; i--) {
-    final time = now.subtract(Duration(hours: i));
+    final time = now.subtract(candleInterval * i);
     final change = (random.nextDouble() - 0.48) * 800;
     final open = price;
     final close = (price + change).clamp(10000.0, 200000.0);
@@ -90,6 +90,17 @@ enum _MainType { ma, boll, ema, none }
 
 enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, none }
 
+enum _ChartTimeframe {
+  m15('15m', Duration(minutes: 15)),
+  h1('1H', Duration(hours: 1)),
+  h4('4H', Duration(hours: 4)),
+  d1('1D', Duration(days: 1));
+
+  const _ChartTimeframe(this.label, this.interval);
+  final String label;
+  final Duration interval;
+}
+
 class _OrderBookItem {
   final DepthEntity? entity;
   final Color? sideColor;
@@ -112,6 +123,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   final ScrollController _outerScrollController = ScrollController();
 
   _MainType _mainType = _MainType.ma;
+  _ChartTimeframe _timeframe = _ChartTimeframe.h1;
+  KChartScaleState _savedChartScale = const KChartScaleState();
   Set<_SecondaryType> _secondaryTypes = {_SecondaryType.macd};
   bool _isLine = false;
   bool _volHidden = false;
@@ -153,8 +166,18 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   @override
   void initState() {
     super.initState();
-    _data = _generateMockData(200);
+    _data = _generateMockData(200, _timeframe.interval);
     _recalculate();
+  }
+
+  void _setTimeframe(_ChartTimeframe tf) {
+    if (_timeframe == tf) return;
+    setState(() {
+      _timeframe = tf;
+      _data = _generateMockData(200, tf.interval);
+      _totalLoaded = 200;
+      _recalculate();
+    });
   }
 
   @override
@@ -217,7 +240,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     // Mở nến mới với open = close của nến trước
     final last = _data.last;
     final newCandle = KLineEntity.fromCustom(
-      time: last.time! + _ticksPerCandle * _tickInterval.inMilliseconds,
+      time: last.time! + _timeframe.interval.inMilliseconds,
       open: prevClose,
       close: prevClose,
       high: prevClose,
@@ -336,7 +359,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     double price = oldest.open;
     final list = <KLineEntity>[];
     for (int i = count; i >= 1; i--) {
-      final time = (oldest.time ?? 0) - i * 3600 * 1000;
+      final time = (oldest.time ?? 0) - i * _timeframe.interval.inMilliseconds;
       final change = (random.nextDouble() - 0.48) * 800;
       final open = price;
       final close = (price - change).clamp(10000.0, 200000.0);
@@ -732,13 +755,36 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             ],
           ),
         ),
+        // Timeframe + scale đã lưu
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+          child: Row(
+            children: [
+              for (final tf in _ChartTimeframe.values) ...[
+                _chip(tf.label, _timeframe == tf, () => _setTimeframe(tf)),
+                const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+          child: Text(
+            'Pinch zoom rồi đổi timeframe — scaleX giữ nguyên '
+            '(${_savedChartScale.scaleX.toStringAsFixed(2)}×)',
+            style: TextStyle(
+              fontSize: 10,
+              color: _isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+        ),
         // Số nến + trạng thái
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Row(
             children: [
               Text(
-                '${_data.length} nến'
+                '${_data.length} nến · ${_timeframe.label}'
                 '${_totalLoaded >= _maxTotal ? ' · Đã tải hết' : ' · Kéo trái để tải thêm'}',
                 style: TextStyle(
                   fontSize: 11,
@@ -790,12 +836,20 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       _data,
       const KChartStyle(),
       _colors,
+      key: ValueKey(_timeframe),
       isTrendLine: false,
       isLine: _isLine,
       volHidden: _volHidden,
       mainIndicators: _mainIndicators,
       secondaryIndicators: _secondaryIndicators,
       controller: _controller,
+      minScale: 0.2,
+      maxScale: 2.2,
+      chartScale: _savedChartScale,
+      onChartScaleChanged: (scale) {
+        debugPrint('[scale_state] $scale');
+        setState(() => _savedChartScale = scale);
+      },
       showNowPrice: true,
       showInfoDialog: true,
       mBaseHeight: 280,

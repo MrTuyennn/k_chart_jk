@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:k_chart_wikex/entity/index.dart';
 import 'package:k_chart_wikex/indicator/indicator_template.dart';
 import 'package:k_chart_wikex/renderer/index.dart';
+import 'package:k_chart_wikex/k_chart_scale_state.dart';
 import 'package:k_chart_wikex/renderer/k_chart_controller.dart';
 import 'package:k_chart_wikex/utils/index.dart';
 import 'renderer/base_dimension.dart';
@@ -23,6 +24,9 @@ class TimeFormat {
 }
 
 typedef WidgetDetailBuilder = Widget Function(KLineEntity entity);
+
+/// Gọi khi user kết thúc zoom; [KChartScaleState.scaleX] nằm trong [KChartWidget.minScale]–[KChartWidget.maxScale].
+typedef OnChartScaleChanged = void Function(KChartScaleState scale);
 
 class KChartWidget extends StatefulWidget {
   final List<KLineEntity>? datas;
@@ -63,6 +67,7 @@ class KChartWidget extends StatefulWidget {
   /// Padding phải sau nến cuối (px tại chart ≥375px). Chart hẹp hơn tự co — xem [BaseChartPainter.effectiveRightPaddingPx].
   final double xFrontPadding;
   final WidgetDetailBuilder detailBuilder;
+  /// Giới hạn zoom ngang (pinch) và clamp [KChartScaleState.scaleX] khi lưu/khôi phục.
   final double minScale;
   final double maxScale;
   final double? livePrice;
@@ -80,6 +85,12 @@ class KChartWidget extends StatefulWidget {
   /// delta > 0: drag xuống quá biên dưới; delta < 0: drag lên quá biên trên.
   /// Parent có thể dùng để forward sang outer ScrollController (handoff).
   final ValueChanged<double>? onVerticalOverscroll;
+
+  /// Scale đã lưu — truyền lại khi đổi timeframe; [scaleX] clamp theo [minScale]/[maxScale].
+  final KChartScaleState? chartScale;
+
+  /// Kết thúc pinch / scaleY / zoom controller / double-tap reset scaleY.
+  final OnChartScaleChanged? onChartScaleChanged;
 
   const KChartWidget(
     this.datas,
@@ -116,6 +127,8 @@ class KChartWidget extends StatefulWidget {
     this.backgroundLogo,
     this.backgroundLogoOpacity = 1,
     this.onVerticalOverscroll,
+    this.chartScale,
+    this.onChartScaleChanged,
     super.key,
   });
 
@@ -160,6 +173,11 @@ class _KChartWidgetState extends State<KChartWidget>
   }
 
   double _lastScale = 1.0;
+  double _gestureScaleXAtStart = 1.0;
+  double _gestureScaleYAtStart = 1.0;
+  bool _suppressScaleCallback = false;
+  static const double _minScaleY = 0.3;
+  static const double _maxScaleY = 5.0;
   bool isScale = false, isDrag = false, isLongPress = false, isOnTap = false;
   // true khi gesture bắt đầu trong vùng phải (width = effectiveRightPaddingPx) → drag dọc = scaleY
   bool _isScaleYGesture = false;
@@ -183,12 +201,62 @@ class _KChartWidgetState extends State<KChartWidget>
   void initState() {
     super.initState();
     widget.controller?.addListener(_onController);
+    _restoreChartScaleFromWidget(reclampScrollAfterLayout: true);
   }
 
   @override
   void didUpdateWidget(KChartWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     _compensateScrollOnDataChange(oldWidget);
+    if (widget.minScale != oldWidget.minScale ||
+        widget.maxScale != oldWidget.maxScale) {
+      mScaleX = mScaleX.clamp(widget.minScale, widget.maxScale);
+      _lastScale = mScaleX;
+    }
+    if (widget.chartScale != null &&
+        widget.chartScale != oldWidget.chartScale) {
+      _restoreChartScaleFromWidget(reclampScrollAfterLayout: true);
+    }
+  }
+
+  KChartScaleState get _currentChartScale => KChartScaleState(
+        scaleX: mScaleX,
+        scaleY: mScaleY,
+        scrollX: mScrollX,
+      ).clampedTo(minScale: widget.minScale, maxScale: widget.maxScale);
+
+  void _restoreChartScaleFromWidget({bool reclampScrollAfterLayout = false}) {
+    final external = widget.chartScale;
+    final saved = external?.clampedTo(
+      minScale: widget.minScale,
+      maxScale: widget.maxScale,
+    );
+    if (saved == null) return;
+    _suppressScaleCallback = true;
+    mScaleX = saved.scaleX;
+    mScaleY = saved.scaleY.clamp(_minScaleY, _maxScaleY);
+    mScrollX = saved.scrollX
+        .clamp(0.0, ChartPainter.maxScrollX > 0 ? ChartPainter.maxScrollX : 0.0)
+        .toDouble();
+    mOffsetY = _clampOffsetY(mOffsetY);
+    _lastScale = mScaleX;
+    _suppressScaleCallback = false;
+    if (reclampScrollAfterLayout) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || widget.chartScale != external) return;
+        final clamped =
+            saved.scrollX.clamp(0.0, ChartPainter.maxScrollX).toDouble();
+        if (mScrollX != clamped) {
+          mScrollX = clamped;
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  void _emitChartScaleChanged() {
+    if (_suppressScaleCallback || widget.onChartScaleChanged == null) return;
+    widget.onChartScaleChanged!(_currentChartScale);
   }
 
   /// Khi parent push thêm dữ liệu (live tick append nến mới, hoặc lazy-load
@@ -233,12 +301,15 @@ class _KChartWidgetState extends State<KChartWidget>
       mScaleX = 1.0;
       mScrollX = 0.0;
       mSelectX = 0.0;
+      _lastScale = mScaleX;
+      _emitChartScaleChanged();
     } else if (widget.controller!.action == 2) {
-      // Zoom logic
       mScaleX = (mScaleX + widget.controller!.zoom).clamp(
         widget.minScale,
         widget.maxScale,
       );
+      _lastScale = mScaleX;
+      _emitChartScaleChanged();
     }
     notifyChanged();
   }
@@ -333,6 +404,8 @@ class _KChartWidgetState extends State<KChartWidget>
         if (!isOnTap) isOnTap = false;
         _stopAnimation();
         _lastScale = mScaleX;
+        _gestureScaleXAtStart = mScaleX;
+        _gestureScaleYAtStart = mScaleY;
         _scaleYDragStart = details.localFocalPoint.dy;
         // xác định scaleY gesture: 1 ngón tay trong vùng phải (cùng tỷ lệ với xFrontPadding)
         final renderBox = context.findRenderObject() as RenderBox?;
@@ -379,7 +452,8 @@ class _KChartWidgetState extends State<KChartWidget>
         } else if (_isScaleYGesture && details.pointerCount == 1) {
           // vùng phải + drag dọc → điều chỉnh scaleY (zoom dọc)
           final double delta = details.localFocalPoint.dy - _scaleYDragStart;
-          mScaleY = (mScaleY - delta * 0.005).clamp(0.3, 5.0);
+          mScaleY =
+              (mScaleY - delta * 0.005).clamp(_minScaleY, _maxScaleY);
           _scaleYDragStart = details.localFocalPoint.dy;
           // Bound của offsetY phụ thuộc vào mScaleY → clamp lại sau khi đổi scaleY
           mOffsetY = _clampOffsetY(mOffsetY);
@@ -421,6 +495,10 @@ class _KChartWidgetState extends State<KChartWidget>
       onScaleEnd: (details) {
         isScale = false;
         _lastScale = mScaleX;
+        if (mScaleX != _gestureScaleXAtStart ||
+            mScaleY != _gestureScaleYAtStart) {
+          _emitChartScaleChanged();
+        }
         // fling X kích hoạt cho mọi drag scroll thường (không phải kéo crosshair),
         // kể cả khi gesture bắt đầu ngoài main vì 1-finger drag ở vol/secondary
         // cũng update mScrollX.
@@ -526,6 +604,7 @@ class _KChartWidgetState extends State<KChartWidget>
                     // double tap vùng phải → reset scaleY và offsetY về mặc định
                     mScaleY = 1.0;
                     mOffsetY = 0.0;
+                    _emitChartScaleChanged();
                     notifyChanged();
                   },
                   child: Container(
