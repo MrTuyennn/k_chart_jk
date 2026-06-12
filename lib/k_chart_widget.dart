@@ -437,8 +437,8 @@ class _KChartWidgetState extends State<KChartWidget>
           }
           if (!widget.isLoadingMore &&
               widget.onLoadMore != null &&
-              ChartPainter.maxScrollX > 0 &&
-              mScrollX >= ChartPainter.maxScrollX * 0.8) {
+              (ChartPainter.maxScrollX <= 0 ||
+                  mScrollX >= ChartPainter.maxScrollX * 0.8)) {
             widget.onLoadMore!(true);
           }
           notifyChanged();
@@ -485,8 +485,8 @@ class _KChartWidgetState extends State<KChartWidget>
           }
           if (!widget.isLoadingMore &&
               widget.onLoadMore != null &&
-              ChartPainter.maxScrollX > 0 &&
-              mScrollX >= ChartPainter.maxScrollX * 0.8) {
+              (ChartPainter.maxScrollX <= 0 ||
+                  mScrollX >= ChartPainter.maxScrollX * 0.8)) {
             widget.onLoadMore!(true);
           }
         }
@@ -508,6 +508,19 @@ class _KChartWidgetState extends State<KChartWidget>
         }
         _dragStartedInTapMode = false;
         _gestureInMain = true;
+        // Sau khi pinch zoom out đến mức tất cả data hiển thị (maxScrollX == 0),
+        // cần trigger loadMore vì user không scroll thêm được.
+        // maxScrollX chỉ được cập nhật sau paint() nên dùng post-frame callback.
+        if (mScaleX != _gestureScaleXAtStart) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            if (!widget.isLoadingMore &&
+                widget.onLoadMore != null &&
+                ChartPainter.maxScrollX <= 0) {
+              widget.onLoadMore!(true);
+            }
+          });
+        }
       },
       onLongPressStart: (details) {
         isOnTap = false;
@@ -661,8 +674,8 @@ class _KChartWidgetState extends State<KChartWidget>
         _stopAnimation();
       } else if (!widget.isLoadingMore &&
           widget.onLoadMore != null &&
-          ChartPainter.maxScrollX > 0 &&
-          mScrollX >= ChartPainter.maxScrollX * 0.8) {
+          (ChartPainter.maxScrollX <= 0 ||
+              mScrollX >= ChartPainter.maxScrollX * 0.8)) {
         widget.onLoadMore!(true);
       }
       notifyChanged();
