@@ -258,12 +258,12 @@ abstract class BaseChartPainter extends CustomPainter {
     }
   }
 
-  /// max/min cho panel volume. Min chốt 0 để cột vol neo đáy panel.
+  /// max/min cho panel volume.
   void getVolMaxMinValue(KLineEntity item) {
     final ma5 = item.MA5Volume ?? 0;
     final ma10 = item.MA10Volume ?? 0;
     mVolMaxValue = max(mVolMaxValue, max(item.vol, max(ma5, ma10)));
-    mVolMinValue = 0;
+    mVolMinValue = min(mVolMinValue, item.vol);
   }
 
   /// compute maximum and minimum value

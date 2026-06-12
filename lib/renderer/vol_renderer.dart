@@ -134,6 +134,20 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         chartRect.top - topPadding,
       ),
     );
+    final minTp = TextPainter(
+      text: TextSpan(
+        text: NumberUtil.formatCompact(minValue),
+        style: textStyle,
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    minTp.paint(
+      canvas,
+      Offset(
+        chartRect.width - minTp.width - chartStyle.space,
+        chartRect.bottom - minTp.height,
+      ),
+    );
   }
 
   @override
