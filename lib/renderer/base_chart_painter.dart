@@ -16,6 +16,8 @@ abstract class BaseChartPainter extends CustomPainter {
 
   List<SecondaryIndicator> secondaryIndicators;
 
+  /// Toggle hiển thị panel volume (ẩn = true). Khi ẩn `mVolRect` không được tạo
+  /// và `BaseDimension.mVolumeHeight` = 0.
   bool volHidden;
   bool isTapShowInfoDialog;
   double scaleX = 1.0, scaleY = 1.0, scrollX = 0.0, selectX;
@@ -31,7 +33,7 @@ abstract class BaseChartPainter extends CustomPainter {
 
   late Rect mDateRect;
 
-  /// Rectangle box of the vol chart
+  /// Rectangle box of volume panel — null khi `volHidden = true`.
   Rect? mVolRect;
 
   /// Secondary list support
@@ -55,6 +57,7 @@ abstract class BaseChartPainter extends CustomPainter {
   late double mPointWidth;
   // format time
   List<String> mFormats = [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
+  /// Giá trị padding phải tối đa (px tại [referenceChartWidth]). Thực tế qua [_effectiveRightPaddingPx].
   double xFrontPadding;
 
   /// base dimension
@@ -187,6 +190,12 @@ abstract class BaseChartPainter extends CustomPainter {
   void drawCrossLineText(Canvas canvas, Size size);
 
   /// init the rectangle box to draw chart
+  ///
+  /// Layout dọc (top → bottom):
+  ///   mMainRect             — candles + main indicators
+  ///   mVolRect              — vol panel (nếu volHidden = false)
+  ///   mSecondaryRectList[i] — mỗi secondary indicator 1 panel
+  ///   mDateRect             — trục thời gian (đáy cùng)
   void initRect(Size size) {
     double volHeight = baseDimension.mVolumeHeight;
     double secondaryHeight = baseDimension.mSecondaryHeight;
@@ -195,42 +204,40 @@ abstract class BaseChartPainter extends CustomPainter {
     mainHeight -= volHeight;
     mainHeight -= baseDimension.totalSecondaryHeight;
 
-    // TODO: thứ tự layout có thể thay đổi — hiện tại: main chart (gộp volume) → thời gian → indicator phụ
     mMainRect = Rect.fromLTRB(0, mTopPadding, mWidth, mTopPadding + mainHeight);
 
-    // TODO: điều chỉnh tỉ lệ 0.2 nếu muốn volume chiếm nhiều/ít hơn trong main chart
-    if (volHidden != true) {
-      final double overlayHeight = mMainRect.height * 0.2;
+    if (!volHidden) {
       mVolRect = Rect.fromLTRB(
         0,
-        mMainRect.bottom - overlayHeight,
+        mMainRect.bottom + mChildPadding,
         mWidth,
-        mMainRect.bottom,
+        mMainRect.bottom + volHeight,
       );
+    } else {
+      mVolRect = null;
     }
 
-    // Thanh thời gian nằm ngay sau main chart
-    mDateRect = Rect.fromLTRB(
-      0,
-      mMainRect.bottom,
-      mWidth,
-      mMainRect.bottom + mBottomPadding,
-    );
+    final double secondaryTop = (mVolRect ?? mMainRect).bottom;
 
-    // Các indicator phụ xếp chồng bên dưới thanh thời gian
     mSecondaryRectList.clear();
     for (int i = 0; i < secondaryIndicators.length; ++i) {
       mSecondaryRectList.add(
         RenderRect(
           Rect.fromLTRB(
             0,
-            mDateRect.bottom + i * secondaryHeight + mChildPadding,
+            secondaryTop + i * secondaryHeight + mChildPadding,
             mWidth,
-            mDateRect.bottom + i * secondaryHeight + secondaryHeight,
+            secondaryTop + i * secondaryHeight + secondaryHeight,
           ),
         ),
       );
     }
+
+    // Date rect ở đáy cùng — dưới panel cuối (vol/secondary) hoặc main nếu cả 2 ẩn.
+    final double dateTop = mSecondaryRectList.isNotEmpty
+        ? mSecondaryRectList.last.mRect.bottom
+        : (mVolRect ?? mMainRect).bottom;
+    mDateRect = Rect.fromLTRB(0, dateTop, mWidth, dateTop + mBottomPadding);
   }
 
   /// calculate values
@@ -244,11 +251,19 @@ abstract class BaseChartPainter extends CustomPainter {
     for (int i = mStartIndex; i <= mStopIndex; i++) {
       var item = datas![i];
       getMainMaxMinValue(item, i);
-      getVolMaxMinValue(item);
+      if (mVolRect != null) getVolMaxMinValue(item);
       for (int idx = 0; idx < mSecondaryRectList.length; ++idx) {
         getSecondaryMaxMinValue(idx, item);
       }
     }
+  }
+
+  /// max/min cho panel volume.
+  void getVolMaxMinValue(KLineEntity item) {
+    final ma5 = item.MA5Volume ?? 0;
+    final ma10 = item.MA10Volume ?? 0;
+    mVolMaxValue = max(mVolMaxValue, max(item.vol, max(ma5, ma10)));
+    mVolMinValue = min(mVolMinValue, item.vol);
   }
 
   /// compute maximum and minimum value
@@ -277,18 +292,6 @@ abstract class BaseChartPainter extends CustomPainter {
       mMainMaxValue = max(mMainMaxValue, item.close);
       mMainMinValue = min(mMainMinValue, item.close);
     }
-  }
-
-  // get the maximum and minimum of the Vol value
-  void getVolMaxMinValue(KLineEntity item) {
-    mVolMaxValue = max(
-      mVolMaxValue,
-      max(item.vol, max(item.MA5Volume ?? 0, item.MA10Volume ?? 0)),
-    );
-    mVolMinValue = min(
-      mVolMinValue,
-      min(item.vol, min(item.MA5Volume ?? 0, item.MA10Volume ?? 0)),
-    );
   }
 
   // compute maximum and minimum of secondary value
@@ -350,9 +353,30 @@ abstract class BaseChartPainter extends CustomPainter {
   void setTranslateXFromScrollX(double scrollX) =>
       mTranslateX = scrollX + getMinTranslateX();
 
+  /// Chiều rộng tham chiếu (logical px): tại đây [xFrontPadding] = giá trị đầy đủ.
+  /// Chart hẹp hơn → padding phải giảm tỷ lệ (fix khoảng trống ~100px cố định khi resize).
+  static const double referenceChartWidth = 375.0;
+
+  /// Padding phải thực tế (screen px).
+  /// Ví dụ `xFrontPadding=100`: width 375→100px, 250→~67px, 187→~50px; width ≥375 giữ 100px.
+  static double effectiveRightPaddingPx(
+    double xFrontPadding,
+    double chartWidth,
+  ) {
+    if (chartWidth <= 0) return xFrontPadding;
+    final ratio = chartWidth / referenceChartWidth;
+    return xFrontPadding * (ratio < 1.0 ? ratio : 1.0);
+  }
+
+  double get _effectiveRightPaddingPx =>
+      effectiveRightPaddingPx(xFrontPadding, mWidth);
+
   /// get the minimum value of translation
   double getMinTranslateX() {
-    var x = -mDataLen + mWidth / scaleX - mPointWidth / 2 - xFrontPadding;
+    // paddingData: px → data space (/ scaleX) để gap màn hình ≈ _effectiveRightPaddingPx khi pinch zoom.
+    final paddingData = _effectiveRightPaddingPx / scaleX;
+    var x =
+        -mDataLen + mWidth / scaleX - mPointWidth / 2 - paddingData;
     return x >= 0 ? 0.0 : x;
   }
 

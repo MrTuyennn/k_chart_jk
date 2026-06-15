@@ -1,7 +1,8 @@
 # k_chart_wikex — Tài liệu tham khảo
 
 ## Mục lục
-- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, volume overlay, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**
+- [Thay đổi gần đây](#thay-đổi-gần-đây) — gồm: **padding phải tỷ lệ theo width**, **tự bù scroll khi append nến mới**, **gesture gate vol/secondary**, **VolRenderer panel độc lập + date đáy cùng**, **DepthChart logo + bottomLabelCount**, label theo scroll, multi-select secondary, scaleY transform, **pan Y clamp 50%**, **overscroll handoff**, **KChartScaleState + onChartScaleChanged**, **loadmore khi maxScrollX = 0**, **min vol label**
+- [KChartScaleState](#kchartscalestate)
 - [OBV Indicator](#obv-indicator)
 - [Mixin type system — generic indicator](#mixin-type-system--generic-indicator)
 - [Thêm secondary indicator mới](#thêm-secondary-indicator-mới)
@@ -167,6 +168,197 @@ Pattern để implement thêm một indicator phụ bất kỳ:
 
 ## Thay đổi gần đây
 
+### −4. Padding phải tỷ lệ theo chiều rộng chart (`base_chart_painter.dart`, `k_chart_widget.dart`)
+
+**Bug:** `xFrontPadding` mặc định `100` được trừ trực tiếp trong `getMinTranslateX()`
+theo **data space**, không co theo `mWidth`. Chart hẹp (split view, màn nhỏ) vẫn
+chừa ~100px bên phải như chart rộng → lãng phí vùng nến. Vùng gesture scaleY
+cũng cố định `width: 100` / `width - 100`, không đồng bộ.
+
+**Fix:**
+
+1. Thêm `BaseChartPainter.effectiveRightPaddingPx(xFrontPadding, chartWidth)`:
+   - `referenceChartWidth = 375` — tại width này padding = `xFrontPadding` đầy đủ.
+   - Chart hẹp hơn → padding giảm tỷ lệ (`× chartWidth / 375`, cap tối đa = `xFrontPadding`).
+2. `getMinTranslateX()` dùng `effectiveRightPaddingPx / scaleX` (px → data space) để
+   khoảng trống màn hình ổn định khi pinch zoom `scaleX`.
+3. Vùng scaleY (`Positioned` phải) + `_isScaleYGesture` dùng cùng helper — width zone
+   đồng bộ với padding scroll.
+4. `StreamController.broadcast()` cho `mInfoWindowStream` — tránh lỗi rebuild
+   `StreamBuilder` ("Stream has already been listened to"). **Không** bọc toàn bộ
+   `GestureDetector` trong `LayoutBuilder` (chỉ `LayoutBuilder` bên trong `Positioned`).
+
+```dart
+// base_chart_painter.dart
+static const double referenceChartWidth = 375.0;
+
+static double effectiveRightPaddingPx(double xFrontPadding, double chartWidth) {
+  if (chartWidth <= 0) return xFrontPadding;
+  final ratio = chartWidth / referenceChartWidth;
+  return xFrontPadding * (ratio < 1.0 ? ratio : 1.0);
+}
+
+double getMinTranslateX() {
+  final paddingData = effectiveRightPaddingPx(xFrontPadding, mWidth) / scaleX;
+  var x = -mDataLen + mWidth / scaleX - mPointWidth / 2 - paddingData;
+  return x >= 0 ? 0.0 : x;
+}
+```
+
+| `mWidth` (scaleX=1, xFrontPadding=100) | Padding màn hình |
+|----------------------------------------|------------------|
+| ≥ 375px | 100px |
+| 250px | ~67px |
+| 187px | ~50px |
+
+**Tuning:** tăng `xFrontPadding` nếu label giá bị sát nến; giảm nếu muốn tối đa vùng candle trên màn rộng.
+
+---
+
+### −3. Tự bù `mScrollX` khi append nến mới (`k_chart_widget.dart`)
+
+**Bug:** Khi user đang scroll xem history mà live tick append nến mới, view bị
+"trôi" — mỗi nến mới đẩy user thêm 1 candle về phía data cũ. Trong example
+trước đây còn gọi `_controller.reset()` trong `_addNewCandle` → user bị quăng
+hẳn về rightmost. Phá hoàn toàn UX đọc lịch sử.
+
+**Fix:** Thêm `didUpdateWidget` trong `KChartWidget` để detect khi parent
+push thêm data và tự bù `mScrollX`:
+
+```dart
+@override
+void didUpdateWidget(KChartWidget oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  _compensateScrollOnDataChange(oldWidget);
+}
+
+void _compensateScrollOnDataChange(KChartWidget oldWidget) {
+  // Chỉ xử lý append (nến đầu giữ nguyên, nến cuối mới hơn).
+  // Prepend tự bảo toàn view trong data space → không cần bù.
+  final diff = newData.length - oldData.length;
+  if (diff <= 0) return;
+  final appended = oldData.first.time == newData.first.time
+      && oldData.last.time != newData.last.time;
+  if (!appended) return;
+  if (mScrollX <= 0.0) return;  // đang rightmost → auto-follow
+  mScrollX += diff * widget.chartStyle.pointWidth;
+}
+```
+
+**Logic:**
+- `mScrollX` đại diện khoảng cách (px) từ biên phải tới vị trí đang xem.
+- Append `diff` nến mới → biên phải tịnh tiến thêm `diff × pointWidth`.
+- Để giữ user ở đúng vùng candle cũ → cộng `diff × pointWidth` vào `mScrollX`.
+- Ngoại lệ: `mScrollX == 0` (rightmost) → giữ nguyên 0 để auto-follow nến mới
+  (UX TradingView/Binance — chỉ stick rightmost khi user đang ở rightmost).
+
+**Prepend (lazy-load nến cũ)** không cần bù: `getMinTranslateX` tự tính lại
+đúng theo data mới → `mStartIndex` cũ ánh xạ tự nhiên sang `mStartIndex + diff`
+trong data mới → view trong data space được bảo toàn.
+
+**Example app:** xoá `_controller.reset()` khỏi `_addNewCandle` — chart tự
+giữ vị trí mà không cần app can thiệp.
+
+---
+
+### −2. Gesture gate theo vùng — vol/secondary không di chuyển nến (`k_chart_widget.dart`)
+
+**Vấn đề:** Trước đây drag bất cứ đâu trong chart (kể cả vol/secondary/date)
+đều update `mScrollX`/`mOffsetY` → vol panel kéo theo nến. Khi nhúng chart
+trong page có Order Book/form trade, user kỳ vọng drag dọc trên vol/MACD/RSI
+cuộn page chứ không phải xê dịch nến.
+
+**Fix:** Gate gesture theo điểm chạm start. Chỉ khi `painter.isInMainRect`
+trả về `true` thì chart mới xử lý. Ngược lại forward `dy` sang outer.
+
+```dart
+// State
+bool _gestureInMain = true;
+
+onScaleStart: (details) {
+  // ... existing
+  _gestureInMain = painter.isInMainRect(details.localFocalPoint);
+},
+onScaleUpdate: (details) {
+  // Vol/secondary + 1 ngón: chỉ chặn pan Y, vẫn scroll X như bình thường.
+  // Pinch (≥2 ngón) đi xuống nhánh dưới → scaleX bình thường.
+  if (!_gestureInMain && details.pointerCount < 2) {
+    isOnTap = false;
+    mScrollX = (mScrollX + details.focalPointDelta.dx / mScaleX)
+        .clamp(0.0, ChartPainter.maxScrollX)
+        .toDouble();
+    final dy = details.focalPointDelta.dy;
+    if (dy != 0) widget.onVerticalOverscroll?.call(dy);
+    if (!widget.isLoadingMore &&
+        widget.onLoadMore != null &&
+        ChartPainter.maxScrollX > 0 &&
+        mScrollX >= ChartPainter.maxScrollX * 0.8) {
+      widget.onLoadMore!(true);
+    }
+    notifyChanged();
+    return;
+  }
+  // ... existing logic
+},
+onScaleEnd: (details) {
+  // Fling X chạy cho cả drag từ vol/secondary (vì cũng update scrollX).
+  if (!_dragStartedInTapMode) {
+    _onFling(details.velocity.pixelsPerSecond.dx);
+  }
+  _dragStartedInTapMode = false;
+  _gestureInMain = true;
+},
+```
+
+**Behaviour matrix:**
+
+| Touch start | Drag X (1 ngón) | Drag Y (1 ngón) | Pinch (2 ngón) | Fling X | Lazy load |
+|---|---|---|---|---|---|
+| `mMainRect` | scrollX nến | pan Y (nếu scaleY≠1) | scaleX | có | có |
+| `mVolRect` / secondary / date | **scrollX nến** | forward parent | **scaleX** | **có** | **có** |
+
+Vol/secondary chỉ chặn **pan Y** — mọi hành vi khác (scroll/zoom/fling/lazy load)
+đều giữ nguyên để timeline vẫn cuộn được khi user vuốt trên panel phụ.
+
+**Tương thích outer scroll:** parent dùng `jumpTo` trong
+`onVerticalOverscroll` callback → bypass physics, list ngoài cuộn được kể
+cả khi parent đang `NeverScrollableScrollPhysics` (do scaleY focus mode).
+
+**Tap & long-press không bị gate:**
+
+- Tap đã có sẵn check `isInMainRect` trước khi toggle crosshair.
+- Long press vẫn cho phép ở vol/secondary để inspect candle tương ứng — vì
+  long press không di chuyển chart, chỉ hiển thị crosshair.
+
+Chi tiết kèm decision tree + edge cases (drag chéo, pinch trên vol…): xem
+`chart_wikex_arch.md` mục 11.2.1.
+
+---
+
+### −1. Vol = panel độc lập + date xuống đáy cùng (`base_chart_painter.dart`)
+
+Layout cuối:
+
+```
+mMainRect          ← candles + main indicators
+mVolRect           ← vol (null khi volHidden)
+mSecondaryRect[0]  ← MACD
+mSecondaryRect[1]  ← RSI
+…
+mDateRect          ← trục thời gian (đáy cùng)
+```
+
+Khớp với sơ đồ đơn giản của `chart_plush.md`: 3 renderer `MainRenderer +
+VolRenderer + SecondaryRenderer`. Date axis ở đáy cùng — các panel chart
+xếp liên tục phía trên, khớp UX trading app (Binance/MEXC/TradingView).
+
+**File chính:**
+- `lib/renderer/vol_renderer.dart` — `VolRenderer extends BaseChartRenderer<VolumeEntity>` (bars + MA5/MA10).
+- `lib/renderer/base_chart_painter.dart` — `initRect` tính `mDateRect` sau cùng.
+- `lib/styles/k_chart_style.dart` — `volBarOpacity` (default 1.0).
+
+---
+
 ### 0. DepthChart: watermark logo + số mốc giá tuỳ chỉnh (`depth_chart.dart`)
 
 **File:** `lib/depth_chart.dart`, `example/lib/main.dart`
@@ -256,44 +448,72 @@ List<SecondaryIndicator> get _secondaryIndicators {
 
 ---
 
-### 3. Layout volume overlay (`chart_painter.dart` + `base_chart_painter.dart`)
+### 3. Volume = panel độc lập với `VolRenderer` + `mVolRect`
 
-Volume **không phải panel riêng bên dưới** mà là overlay chiếm **20% dưới của `mMainRect`**:
+Khớp với sơ đồ đơn giản của `chart_plush.md`: 3 renderer (`Main` + `Vol` +
+`Secondary`) chạy trong cùng `ChartPainter.drawChart`. Vol có rect riêng
+(`mVolRect`) ngay dưới `mMainRect`, **không** overlay trong main và
+**không** là `SecondaryIndicator`. Toggle bằng cờ `volHidden`.
+
+**Layout:**
 
 ```
-mMainRect
-├── mainContentRect  (80% trên) ← nến, MA, BOLL...
-└── mVolRect         (20% dưới) ← vol bars
+mMainRect          ← nến + main indicators
+mVolRect           ← vol panel (null khi volHidden = true)
+mSecondaryRect[0]  ← MACD
+mSecondaryRect[1]  ← RSI
+...
+mDateRect          ← trục thời gian (đáy cùng)
 ```
+
+**Files:**
+
+| File | Vai trò |
+|---|---|
+| `lib/renderer/vol_renderer.dart` | `VolRenderer extends BaseChartRenderer<VolumeEntity>` — vẽ bar + MA5/MA10, label `VOL/MA5/MA10`, max vertical text. `getY` override giả định min=0. |
+| `lib/renderer/base_chart_painter.dart` | Field `mVolRect`, `mVolMaxValue/MinValue`, cờ `volHidden`, hàm `getVolMaxMinValue`. `initRect` chèn `mVolRect` giữa main và date. |
+| `lib/renderer/chart_painter.dart` | Field `mVolRenderer`. `drawBg/drawGrid/drawChart/drawVerticalText/drawText` đều gọi nhánh `mVolRenderer?`. `VolRenderer.drawChart` chạy ngoài scope scaleY (cùng nhánh với secondary). |
+| `lib/renderer/base_dimension.dart` | `_mVolumeHeight = volHidden ? 0 : mSecondaryHeight`. `mDisplayHeight` cộng thêm. |
+| `lib/k_chart_widget.dart` | Param `volHidden` (default `false`). |
+| `lib/styles/k_chart_style.dart` | Thêm `volBarOpacity` (default 1.0) — override khi muốn cột vol mờ. |
+
+**Hệ quả về scaleY:** `VolRenderer` vẽ **ngoài** `canvas.scale(1, scaleY)` của
+main → panel vol không bị giãn khi user zoom dọc nến. Đây là điểm bổ sung
+so với chart_plush.md gốc (gốc vẽ vol trong cùng scope).
+
+**Cách dùng:**
 
 ```dart
-// base_chart_painter.initRect()
-final double overlayHeight = mMainRect.height * 0.2;
-mVolRect = Rect.fromLTRB(0, mMainRect.bottom - overlayHeight, mWidth, mMainRect.bottom);
+KChartWidget(
+  _data,
+  chartStyle,
+  chartColors,
+  volHidden: false,                        // bật panel vol
+  secondaryIndicators: [MACDIndicator()],
+)
 
-// chart_painter.initChartRenderer()
-final Rect mainContentRect = mVolRect != null
-    ? Rect.fromLTRB(mMainRect.left, mMainRect.top, mMainRect.right, mVolRect!.top)
-    : mMainRect;
+// Tuỳ chỉnh độ trong suốt của cột vol
+KChartWidget(
+  ...,
+  chartStyle: const KChartStyle(null, 0.6),  // volBarOpacity = 0.6
+)
 ```
-
-Cả `mMainRenderer` và `mVolRenderer` đều được vẽ trong cùng canvas transform (`scaleY`), clip vào `mMainRect`.
 
 ---
 
 ### 4. ScaleY + offsetY transform (`chart_painter.drawChart`)
 
-Main chart và volume đều được scale/pan bằng canvas transform, **không** scale giá trị:
+Main chart được scale/pan bằng canvas transform, **không** scale giá trị:
 
 ```dart
 canvas.translate(0, centerY * (1 - scaleY) + offsetY);
 canvas.scale(1.0, scaleY);
-// vẽ main + vol bên trong transform này
+// vẽ main bên trong transform này
 ```
 
-**Secondary indicators** vẽ ngoài transform này → không bị ảnh hưởng bởi scaleY.
+**Volume + Secondary indicators** vẽ ngoài transform này → không bị ảnh hưởng bởi scaleY.
 
-Các label vẽ ngoài transform (nowPrice, maxMin, volText) phải tính lại vị trí screen bằng:
+Các label vẽ ngoài transform (nowPrice, maxMin) phải tính lại vị trí screen bằng:
 ```dart
 double _applyScaleY(double rawY) {
   final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
@@ -307,7 +527,7 @@ double _applyScaleY(double rawY) {
 
 **Vấn đề:** 1-finger drag tự do trước đây cộng dồn cả `mScrollX` và `mOffsetY` — pan Y luôn active kể cả khi `mScaleY = 1.0` (chart fit viewport, không có gì để pan). Ngoài ra chart có thể pan ra ngoài viewport quá xa.
 
-**Fix:** Pan Y chỉ active sau khi user đã scaleY (drag dọc vùng `Positioned` 100px bên phải) → `mScaleY != 1.0`. Đồng thời clamp `mOffsetY` để giữ tối thiểu 50% chart content trong view.
+**Fix:** Pan Y chỉ active sau khi user đã scaleY (drag dọc vùng `Positioned` bên phải, width = `effectiveRightPaddingPx`) → `mScaleY != 1.0`. Đồng thời clamp `mOffsetY` để giữ tối thiểu 50% chart content trong view.
 
 ```dart
 } else {
@@ -341,8 +561,131 @@ Re-clamp `mOffsetY` mỗi khi `mScaleY` thay đổi (bound phụ thuộc scaleY)
 
 **UX:**
 - Mặc định (`mScaleY = 1`): drag bình thường chỉ cuộn timeline (X), không trôi dọc.
-- Drag dọc vùng phải 100px → scaleY (zoom dọc). Sau đó drag bất kỳ đâu → pan Y, giới hạn 50%.
+- Drag dọc vùng phải (`effectiveRightPaddingPx`) → scaleY (zoom dọc). Sau đó drag bất kỳ đâu → pan Y, giới hạn 50%.
 - Double-tap vùng phải → reset scaleY=1, offsetY=0 → tắt pan Y.
+
+---
+
+### 7. `KChartScaleState` + `onChartScaleChanged` — lưu/khôi phục zoom state
+
+**File:** `lib/k_chart_scale_state.dart`, `lib/k_chart_widget.dart`
+
+Thêm class `KChartScaleState` để lưu và khôi phục trạng thái zoom/scroll — giúp app giữ view người dùng khi đổi timeframe.
+
+| Field | Kiểu | Mặc định | Mô tả |
+|---|---|---|---|
+| `scaleX` | `double` | `1.0` | Zoom ngang (pinch). Clamp theo `minScale`/`maxScale` của widget. |
+| `scaleY` | `double` | `1.0` | Zoom dọc main chart. |
+| `scrollX` | `double` | `0.0` | Offset scroll ngang. `0` = nến mới nhất. |
+
+**Params mới trong `KChartWidget`:**
+
+| Param | Kiểu | Mô tả |
+|---|---|---|
+| `chartScale` | `KChartScaleState?` | Scale đã lưu — truyền lại khi đổi timeframe. `scaleX` tự clamp theo `minScale`/`maxScale`. Khi `chartScale` thay đổi (object mới), widget tự restore. |
+| `onChartScaleChanged` | `OnChartScaleChanged?` | Gọi sau mỗi lần kết thúc pinch, scaleY drag, zoom controller, hoặc double-tap reset scaleY. Nhận snapshot `KChartScaleState` hiện tại. |
+
+**Typedef:**
+```dart
+typedef OnChartScaleChanged = void Function(KChartScaleState scale);
+```
+
+**Cách dùng:**
+
+```dart
+KChartScaleState? _savedScale;
+
+KChartWidget(
+  _data, chartStyle, chartColors,
+  chartScale: _savedScale,
+  onChartScaleChanged: (s) => setState(() => _savedScale = s),
+  ...
+)
+
+// Khi đổi timeframe: truyền _savedScale vào instance mới → widget tự restore.
+// scaleX được clamp theo minScale/maxScale nên không cần validate thủ công.
+```
+
+**`clampedTo` helper:**
+```dart
+final clamped = savedScale.clampedTo(
+  minScale: widget.minScale,
+  maxScale: widget.maxScale,
+);
+```
+
+**Khi nào `onChartScaleChanged` được gọi:**
+- Sau `onScaleEnd` nếu `scaleX` hoặc `scaleY` thay đổi so với trước gesture.
+- Sau `KChartController.zoomIn()` / `zoomOut()` / `reset()`.
+- Sau double-tap vùng phải (reset scaleY = 1, offsetY = 0).
+- **Không** emit khi widget tự restore từ `chartScale` (suppress nội bộ).
+
+---
+
+### 8. Loadmore khi `maxScrollX == 0` (`k_chart_widget.dart`)
+
+**Bug:** `onLoadMore(true)` không được gọi khi user pinch zoom out đến mức tất cả dữ liệu vừa màn hình (`maxScrollX == 0`). Guard cũ `ChartPainter.maxScrollX > 0` chặn trigger trong trường hợp này → user không load được data cũ hơn khi đang xem ít nến.
+
+**Fix:**
+
+```dart
+// Trước:
+ChartPainter.maxScrollX > 0 && mScrollX >= ChartPainter.maxScrollX * 0.8
+
+// Sau:
+ChartPainter.maxScrollX <= 0 || mScrollX >= ChartPainter.maxScrollX * 0.8
+```
+
+Áp dụng ở cả 3 nơi trong `onScaleUpdate` + animation ticker.
+
+Thêm post-frame callback trong `onScaleEnd` để catch trường hợp pinch zoom out làm `maxScrollX` về 0 (maxScrollX chỉ cập nhật sau `paint()` nên cần đợi frame):
+
+```dart
+onScaleEnd: (details) {
+  // ...
+  if (mScaleX != _gestureScaleXAtStart) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!widget.isLoadingMore &&
+          widget.onLoadMore != null &&
+          ChartPainter.maxScrollX <= 0) {
+        widget.onLoadMore!(true);
+      }
+    });
+  }
+},
+```
+
+---
+
+### 9. Min vol label (`vol_renderer.dart` + `base_chart_painter.dart`)
+
+**Trước:** `mVolMinValue` hardcode = `0`. Panel vol luôn bắt đầu từ 0, không hiển thị giá trị min.
+
+**Sau:**
+
+```dart
+// base_chart_painter.dart
+void getVolMaxMinValue(KLineEntity item) {
+  ...
+  mVolMinValue = min(mVolMinValue, item.vol);  // từ data thực tế
+}
+```
+
+`VolRenderer.drawVerticalText` thêm label min ở góc dưới-phải panel (cùng style với label max ở góc trên-phải):
+
+```dart
+final minTp = TextPainter(
+  text: TextSpan(text: NumberUtil.formatCompact(minValue), style: textStyle),
+  textDirection: TextDirection.ltr,
+)..layout();
+minTp.paint(canvas, Offset(
+  chartRect.width - minTp.width - chartStyle.space,
+  chartRect.bottom - minTp.height,
+));
+```
+
+**Hệ quả:** `VolRenderer.getY` vẫn dùng `(max - v) * (height / max) + top` (neo 0 ở đáy panel) — `mVolMinValue` chỉ dùng để render label, không ảnh hưởng scale cột vol.
 
 ---
 
@@ -441,8 +784,8 @@ Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở 
 | Tham số | Kiểu | Giải thích |
 |---------|------|-----------|
 | `mainIndicators` | `List<MainIndicator>` | Indicator hiển thị trên khung nến chính. Hỗ trợ: `MAIndicator`, `BOLLIndicator`, `EMAIndicator`, `SARIndicator`, `ZigZagIndicator`. |
-| `secondaryIndicators` | `List<SecondaryIndicator>` | Indicator phụ, mỗi cái sinh ra 1 khung riêng bên dưới. Hỗ trợ: `MACDIndicator`, `KDJIndicator`, `RSIIndicator`, `WRIndicator`, `CCIIndicator`. |
-| `volHidden` | `bool` | `true` = ẩn khung volume. Chỉ nên ẩn khi dùng MA/BOLL/SAR. |
+| `secondaryIndicators` | `List<SecondaryIndicator>` | Indicator phụ, mỗi cái sinh ra 1 khung riêng bên dưới. Hỗ trợ: `MACDIndicator`, `KDJIndicator`, `RSIIndicator`, `WRIndicator`, `CCIIndicator`, `OBVIndicator`. |
+| `volHidden` | `bool` | `true` = ẩn panel volume. Vol có rect riêng (`mVolRect`) giữa main và date, không phải secondary indicator. |
 
 ### Kiểu hiển thị chart
 
@@ -474,7 +817,7 @@ Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở 
 |---------|------|----------|-----------|
 | `mBaseHeight` | `double` | `360` | Chiều cao khung nến chính (px). |
 | `mSecondaryHeight` | `double?` | `mBaseHeight * 0.2` | Chiều cao mỗi khung indicator phụ. Nếu null tự tính = 20% chiều cao chính. |
-| `xFrontPadding` | `double` | `100` | Khoảng trống bên phải chart sau cây nến cuối (px). |
+| `xFrontPadding` | `double` | `100` | Khoảng trống bên phải sau nến cuối (px) tại chart rộng ≥375px. Chart hẹp hơn → tự giảm tỷ lệ qua `effectiveRightPaddingPx`. Cùng giá trị quyết định width vùng gesture scaleY. |
 
 ### Cuộn & zoom
 
@@ -490,9 +833,16 @@ Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở 
 
 | Tham số | Kiểu | Mặc định | Giải thích |
 |---------|------|----------|-----------|
-| `onLoadMore` | `Function(bool)?` | `null` | Gọi khi scroll đạt 80% về biên. `true` = biên trái (load data cũ hơn). `false` = biên phải. |
+| `onLoadMore` | `Function(bool)?` | `null` | Gọi khi scroll đạt 80% về biên, **hoặc khi `maxScrollX == 0`** (tất cả data vừa màn hình). `true` = biên trái (load data cũ hơn). `false` = biên phải. |
 | `isLoadingMore` | `bool` | `false` | App truyền vào để báo đang fetch — widget dùng để chặn double-trigger. |
 | `isOnDrag` | `Function(bool)?` | `null` | Gọi khi trạng thái kéo thay đổi. `true` = đang kéo, `false` = đã dừng. |
+| `onChartScaleChanged` | `OnChartScaleChanged?` | `null` | Gọi sau mỗi lần kết thúc pinch/scaleY/zoom controller/double-tap reset scaleY. Nhận `KChartScaleState` snapshot. |
+
+### Zoom state
+
+| Tham số | Kiểu | Mặc định | Giải thích |
+|---------|------|----------|-----------|
+| `chartScale` | `KChartScaleState?` | `null` | Scale đã lưu — truyền lại khi đổi timeframe để restore `scaleX`/`scaleY`/`scrollX`. `scaleX` tự clamp theo `minScale`/`maxScale`. |
 
 ### Giao diện & điều khiển
 
@@ -649,6 +999,33 @@ const KChartColors(
 
 ---
 
+## KChartScaleState
+
+Class lưu/khôi phục zoom state — export qua `package:k_chart_wikex/k_chart_scale_state.dart` và re-export trong `wikex.dart`.
+
+```dart
+class KChartScaleState {
+  final double scaleX;   // zoom ngang
+  final double scaleY;   // zoom dọc main
+  final double scrollX;  // offset scroll (0 = nến mới nhất)
+
+  const KChartScaleState({
+    this.scaleX = 1.0,
+    this.scaleY = 1.0,
+    this.scrollX = 0.0,
+  });
+
+  KChartScaleState clampedTo({required double minScale, required double maxScale});
+  KChartScaleState copyWith({double? scaleX, double? scaleY, double? scrollX});
+}
+```
+
+**Invariant:** `scaleX` trong `KChartScaleState` **chưa** được clamp — widget tự clamp khi restore. Dùng `clampedTo` nếu cần trước khi lưu vào database.
+
+**Equality:** `==` so sánh cả 3 field → widget chỉ restore khi object mới khác object cũ (tránh loop).
+
+---
+
 ## Lazy Load Data
 
 ### Cơ chế scroll
@@ -774,5 +1151,6 @@ double screenY = centerY + (rawY - centerY) * scaleY + offsetY;
 | `mMainRect` | Toàn bộ khung nến + vol | `top = mTopPadding`, `bottom = mTopPadding + mainHeight` |
 | `mainContentRect` | Phần nến thuần | `mMainRect.top → mVolRect.top` (80% trên) |
 | `mVolRect` | Vol bars | `mMainRect.bottom - 20% height → mMainRect.bottom` |
-| `mDateRect` | Trục X ngày giờ | Ngay dưới `mMainRect.bottom` |
-| `mSecondaryRectList[i]` | Panel indicator phụ | Xếp chồng bên dưới `mDateRect` |
+| `mVolRect` | Panel volume | Ngay dưới `mMainRect.bottom`, null khi `volHidden` |
+| `mSecondaryRectList[i]` | Panel indicator phụ | Xếp chồng bên dưới `mVolRect` (hoặc `mMainRect` nếu vol ẩn) |
+| `mDateRect` | Trục X ngày giờ | **Đáy cùng** — dưới panel cuối |

@@ -1,14 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:k_chart_wikex/entity/index.dart';
+import 'package:k_chart_wikex/utils/index.dart';
 import 'package:k_chart_wikex/renderer/index.dart';
 
+/// VolRenderer
+///
+/// Vẽ panel volume độc lập (không overlay trong main chart). Layout đi qua
+/// `mVolRect` được `BaseChartPainter.initRect` tạo riêng ngay sau `mMainRect`,
+/// trước các secondary panel và `mDateRect` (ở đáy cùng). Bật/tắt panel bằng
+/// cờ `volHidden` ở `KChartWidget`.
+///
+/// Render:
+///   - Cột vol xanh/đỏ theo `close > open`, opacity tuỳ `chartStyle.volBarOpacity`.
+///   - 2 đường MA5/MA10 (lấy từ `MA5Volume`/`MA10Volume` đã tính trong
+///     `DataUtil.calcVolumeMA`).
+///   - Label `VOL : … MA5 : … MA10 : …` ở đầu panel.
+///   - Nhãn max ở góc phải (min ≈ 0 nên bỏ qua để không đè đường lưới đáy).
 class VolRenderer extends BaseChartRenderer<VolumeEntity> {
-  late double mVolWidth;
   final KChartStyle chartStyle;
   final KChartColors chartColors;
+  late final double _volWidth;
 
   VolRenderer(
-    Rect mainRect,
+    Rect volRect,
     double maxValue,
     double minValue,
     double topPadding,
@@ -16,14 +30,14 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
     this.chartStyle,
     this.chartColors,
   ) : super(
-        chartRect: mainRect,
-        maxValue: maxValue,
-        minValue: minValue,
-        topPadding: topPadding,
-        fixedLength: fixedLength,
-        gridColor: chartColors.gridColor,
-      ) {
-    mVolWidth = chartStyle.volWidth;
+          chartRect: volRect,
+          maxValue: maxValue,
+          minValue: minValue,
+          topPadding: topPadding,
+          fixedLength: fixedLength,
+          gridColor: chartColors.gridColor,
+        ) {
+    _volWidth = chartStyle.volWidth;
   }
 
   @override
@@ -35,24 +49,22 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
     Size size,
     Canvas canvas,
   ) {
-    double r = mVolWidth / 2;
-    double top = getVolY(curPoint.vol);
-    double bottom = chartRect.bottom;
     if (curPoint.vol != 0) {
-      // withOpacity để cột volume không che khuất nến phía dưới
+      final r = _volWidth / 2;
+      final top = getY(curPoint.vol);
+      final bottom = chartRect.bottom;
+      final base = curPoint.close > curPoint.open
+          ? chartColors.volUpColor
+          : chartColors.volDnColor;
       canvas.drawRect(
         Rect.fromLTRB(curX - r, top, curX + r, bottom),
         chartPaint
-          ..color =
-              (curPoint.close > curPoint.open
-                      ? chartColors.volUpColor
-                      : chartColors.volDnColor)
-                  .withValues(alpha: 0.5),
+          ..color = base.withValues(alpha: chartStyle.volBarOpacity),
       );
     }
-
-    // TODO: bật lại khi cần hiển thị đường MA5 và MA10 trên volume
-    if (lastPoint.MA5Volume != 0) {
+    if (lastPoint.MA5Volume != null &&
+        lastPoint.MA5Volume != 0 &&
+        curPoint.MA5Volume != null) {
       drawLine(
         lastPoint.MA5Volume,
         curPoint.MA5Volume,
@@ -62,8 +74,9 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         chartColors.ma5Color,
       );
     }
-
-    if (lastPoint.MA10Volume != 0) {
+    if (lastPoint.MA10Volume != null &&
+        lastPoint.MA10Volume != 0 &&
+        curPoint.MA10Volume != null) {
       drawLine(
         lastPoint.MA10Volume,
         curPoint.MA10Volume,
@@ -75,50 +88,66 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
     }
   }
 
-  double getVolY(double value) =>
-      (maxValue - value) * (chartRect.height / maxValue) + chartRect.top;
+  /// `getY` luôn chốt min = 0 (giả định volume không âm) để cột vol neo đáy panel.
+  @override
+  double getY(double y) =>
+      (maxValue - y) * (chartRect.height / maxValue) + chartRect.top;
 
   @override
   void drawText(Canvas canvas, VolumeEntity data, double x) {
-    // TODO: bật lại khi cần hiển thị text VOL, MA5, MA10 phía trên volume
-    // TextSpan span = TextSpan(
-    //   children: [
-    //     TextSpan(
-    //       text: "VOL:${NumberUtil.formatCompact(data.vol)}   ",
-    //       style: getTextStyle(chartColors.volColor),
-    //     ),
-    //     if (data.MA5Volume.notNullOrZero)
-    //       TextSpan(
-    //         text: "MA5:${NumberUtil.formatCompact(data.MA5Volume!)}   ",
-    //         style: getTextStyle(chartColors.ma5Color),
-    //       ),
-    //     if (data.MA10Volume.notNullOrZero)
-    //       TextSpan(
-    //         text: "MA10:${NumberUtil.formatCompact(data.MA10Volume!)}   ",
-    //         style: getTextStyle(chartColors.ma10Color),
-    //       ),
-    //   ],
-    // );
-    // TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
-    // tp.layout();
-    // tp.paint(canvas, Offset(x, chartRect.top - topPadding));
+    final span = TextSpan(
+      children: [
+        TextSpan(
+          text: 'VOL:${NumberUtil.formatCompact(data.vol)}  ',
+          style: getTextStyle(chartColors.defaultTextColor),
+        ),
+        if (NumberUtil.checkNotNullOrZero(data.MA5Volume))
+          TextSpan(
+            text: 'MA5:${NumberUtil.formatCompact(data.MA5Volume!)}  ',
+            style: getTextStyle(chartColors.ma5Color),
+          ),
+        if (NumberUtil.checkNotNullOrZero(data.MA10Volume))
+          TextSpan(
+            text: 'MA10:${NumberUtil.formatCompact(data.MA10Volume!)}',
+            style: getTextStyle(chartColors.ma10Color),
+          ),
+      ],
+    );
+    final tp = TextPainter(text: span, textDirection: TextDirection.ltr)
+      ..layout();
+    tp.paint(canvas, Offset(x, chartRect.top - topPadding));
   }
 
   @override
   void drawVerticalText(Canvas canvas, TextStyle textStyle, int gridRows) {
-    // TextSpan span = TextSpan(
-    //   text: NumberUtil.formatCompact(maxValue),
-    //   style: textStyle,
-    // );
-    // TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
-    // tp.layout();
-    // tp.paint(
-    //   canvas,
-    //   Offset(
-    //     chartRect.width - tp.width - chartStyle.space,
-    //     chartRect.top - topPadding,
-    //   ),
-    // );
+    final maxTp = TextPainter(
+      text: TextSpan(
+        text: NumberUtil.formatCompact(maxValue),
+        style: textStyle,
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    maxTp.paint(
+      canvas,
+      Offset(
+        chartRect.width - maxTp.width - chartStyle.space,
+        chartRect.top - topPadding,
+      ),
+    );
+    final minTp = TextPainter(
+      text: TextSpan(
+        text: NumberUtil.formatCompact(minValue),
+        style: textStyle,
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    minTp.paint(
+      canvas,
+      Offset(
+        chartRect.width - minTp.width - chartStyle.space,
+        chartRect.bottom - minTp.height,
+      ),
+    );
   }
 
   @override
@@ -128,9 +157,8 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
       Offset(chartRect.width, chartRect.bottom),
       gridPaint,
     );
-    double columnSpace = chartRect.width / gridColumns;
-    for (int i = 0; i <= columnSpace; i++) {
-      //vol垂直线
+    final columnSpace = chartRect.width / gridColumns;
+    for (int i = 0; i <= gridColumns; i++) {
       canvas.drawLine(
         Offset(columnSpace * i, chartRect.top - topPadding),
         Offset(columnSpace * i, chartRect.bottom),

@@ -32,7 +32,7 @@ class ChartPainter extends BaseChartPainter {
   final double selectY; //For TrendLine
   static double get maxScrollX => BaseChartPainter.maxScrollX;
   late BaseChartRenderer mMainRenderer;
-  BaseChartRenderer? mVolRenderer;
+  VolRenderer? mVolRenderer;
   Set<BaseChartRenderer> mSecondaryRendererList = {};
   StreamSink<InfoWindowEntity?> sink;
   Color? upColor, dnColor;
@@ -108,19 +108,8 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void initChartRenderer() {
-    // if (datas != null && datas!.isNotEmpty) {
-    //   var t = datas![0];
-    //   fixedLength = NumberUtil.getMaxDecimalLength(t.open, t.close, t.high, t.low);
-    // }
-    // mainContentRect = phần nến chính (không bao gồm vùng volume 20% dưới).
-    // mVolRect chiếm 20% dưới mMainRect (xem base_chart_painter.initRect).
-    // Nếu muốn volume đè hoàn toàn lên main chart: dùng mMainRect thay vì mainContentRect.
-    final Rect mainContentRect = mVolRect != null
-        ? Rect.fromLTRB(mMainRect.left, mMainRect.top, mMainRect.right, mVolRect!.top)
-        : mMainRect;
-
     mMainRenderer = MainRenderer(
-      mainContentRect,
+      mMainRect,
       mMainMaxValue,
       mMainMinValue,
       mTopPadding,
@@ -146,6 +135,8 @@ class ChartPainter extends BaseChartPainter {
         chartStyle,
         chartColors,
       );
+    } else {
+      mVolRenderer = null;
     }
     mSecondaryRendererList.clear();
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
@@ -176,7 +167,15 @@ class ChartPainter extends BaseChartPainter {
     );
     canvas.drawRect(mainRect, mBgPaint);
 
-    // Volume được overlay lên main chart nên không cần vẽ nền riêng
+    if (mVolRect != null) {
+      Rect volRect = Rect.fromLTRB(
+        0,
+        mVolRect!.top - mChildPadding,
+        mVolRect!.width,
+        mVolRect!.bottom,
+      );
+      canvas.drawRect(volRect, mBgPaint);
+    }
 
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
       Rect? mSecondaryRect = mSecondaryRectList[i].mRect;
@@ -227,17 +226,18 @@ class ChartPainter extends BaseChartPainter {
       double curX = getX(i);
       double lastX = i == 0 ? curX : getX(i - 1);
       mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
-      mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
     }
     canvas.restore();
 
-    // Secondary indicators không bị ảnh hưởng bởi scaleY
+    // VolRenderer + SecondaryRenderer cùng nằm ngoài scope scaleY của main
+    // → panel volume + indicator phụ không bị giãn khi user zoom dọc nến.
     for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
       KLineEntity? curPoint = datas?[i];
       if (curPoint == null) continue;
       KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
       double curX = getX(i);
       double lastX = i == 0 ? curX : getX(i - 1);
+      mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       for (final element in mSecondaryRendererList) {
         element.drawChart(lastPoint, curPoint, lastX, curX, size, canvas);
       }

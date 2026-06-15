@@ -1,4 +1,5 @@
 export 'k_chart_widget.dart'; //布局
+export 'k_chart_scale_state.dart';
 export 'styles/k_chart_style.dart';
 export 'styles/depth_chart_style.dart';
 export 'depth_chart.dart';

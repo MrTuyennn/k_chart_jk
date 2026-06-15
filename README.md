@@ -7,7 +7,7 @@ A Flutter candlestick chart package with support for multiple technical indicato
 - Candlestick and line chart rendering
 - **Free pan:** drag 1 ngón tay di chuyển chart theo cả X (scroll nến) lẫn Y (dịch vùng giá)
 - **Zoom X:** pinch 2 ngón tay, giới hạn bởi `minScale` / `maxScale`
-- **Zoom Y:** drag dọc trong vùng 100px bên phải chart
+- **Zoom Y:** drag dọc trong vùng phải chart (width tỷ lệ `xFrontPadding`, co khi chart hẹp)
 - **Double tap** vùng phải: reset zoom Y và pan Y về mặc định
 - **Tap-to-toggle crosshair:** tap hiện crosshair, tap lại ẩn; kéo khi crosshair đang hiện sẽ di chuyển crosshair thay vì scroll
 - **Price labels đồng bộ scaleY + offsetY:** labels trục Y luôn hiển thị đúng giá theo vị trí visual của nến
@@ -124,6 +124,9 @@ KChartWidget(
 | `RSIIndicator()`  | Relative Strength Index | 6, 12, 24      |
 | `WRIndicator()`   | Williams %R             | 14             |
 | `CCIIndicator()`  | Commodity Channel Index | 14             |
+| `OBVIndicator()`  | On-Balance Volume       | 5              |
+
+Volume hiển thị trong panel riêng giữa main chart và date axis. Toggle bằng `volHidden`.
 
 Combine multiple indicators by passing a list:
 
@@ -204,7 +207,7 @@ KChartWidget(
 | 1 ngón kéo dọc | Pan vùng giá lên/xuống (Y) |
 | 1 ngón kéo tự do | Scroll X + pan Y đồng thời |
 | Pinch 2 ngón | Zoom scaleX (thu phóng số nến hiển thị) |
-| Kéo dọc trong 100px phải | Zoom scaleY (thu phóng vùng giá) |
+| Kéo dọc vùng phải chart | Zoom scaleY (thu phóng vùng giá; width ∝ chart) |
 | Double tap vùng phải | Reset scaleY và offsetY về mặc định |
 | Tap vào nến | Hiện crosshair + info dialog |
 | Tap lại | Ẩn crosshair |
