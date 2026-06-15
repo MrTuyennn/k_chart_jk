@@ -17,6 +17,9 @@ Doc này mô tả lại nguồn hiện tại theo cùng cấu trúc với `chart
 - Label dùng `getItem(mStopIndex)` (nến phải nhất hiển thị) thay
   `datas.last`.
 - Pan Y clamp 50% + overscroll handoff với outer scroll.
+- `KChartScaleState` — lưu/khôi phục zoom state qua `chartScale` + `onChartScaleChanged`.
+- `mVolMinValue` tính từ data thực tế + label min vol ở góc dưới-phải panel.
+- `onLoadMore(true)` trigger cả khi `maxScrollX == 0` (data vừa màn hình).
 
 ---
 
@@ -203,6 +206,8 @@ Các tham số chính của `KChartWidget`:
 - `backgroundLogo` / `backgroundLogoOpacity`: watermark widget giữa main.
 - `onLoadMore` / `isLoadingMore`: lazy load data cũ.
 - `onVerticalOverscroll`: forward overscroll Y ra parent (scroll handoff).
+- `chartScale`: `KChartScaleState?` — restore zoom state khi đổi timeframe. `scaleX` clamp theo `minScale`/`maxScale`.
+- `onChartScaleChanged`: `OnChartScaleChanged?` — emit snapshot sau pinch/scaleY/zoom controller/double-tap reset.
 
 > **Khác chart_plush.md gốc:** không còn `mainState`/`secondaryState` enum —
 > indicator chính / phụ truyền bằng `List<MainIndicator>` / `List<SecondaryIndicator>`
@@ -314,8 +319,10 @@ Tính qua `BaseChartPainter.getVolMaxMinValue` (chỉ gọi khi `mVolRect != nul
 final ma5 = item.MA5Volume ?? 0;
 final ma10 = item.MA10Volume ?? 0;
 mVolMaxValue = max(mVolMaxValue, max(item.vol, max(ma5, ma10)));
-mVolMinValue = 0;   // cột vol luôn neo đáy panel
+mVolMinValue = min(mVolMinValue, item.vol);  // từ data thực tế (không còn hardcode 0)
 ```
+
+`mVolMinValue` dùng để render **label min** ở góc dưới-phải panel vol (`VolRenderer.drawVerticalText`). Scale cột vol vẫn neo đáy panel — `VolRenderer.getY` dùng `(max - v) * (height / max) + top`, không phụ thuộc `mVolMinValue`.
 
 ### 4.3 Secondary range
 
@@ -537,11 +544,56 @@ chứa color overrides + line width.
 ### 11.1 Trục X (scroll + zoom)
 
 - **Horizontal drag (1 ngón)**: `mScrollX += dx / scaleX`, clamp
-  `[0, maxScrollX]`. Trigger `onLoadMore(true)` khi `mScrollX >= 0.8 * maxScrollX`.
+  `[0, maxScrollX]`. Trigger `onLoadMore(true)` khi `mScrollX >= 0.8 * maxScrollX`
+  **hoặc khi `maxScrollX <= 0`** (tất cả data vừa màn hình — không scroll được).
 - **Pinch (2 ngón)**: `mScaleX = lastScale * details.scale`, clamp
-  `[minScale, maxScale]`.
+  `[minScale, maxScale]`. Sau khi kết thúc pinch, nếu `maxScrollX` giảm về 0
+  (zoom out quá), post-frame callback sẽ trigger `onLoadMore(true)`.
 - **Fling**: animate `mScrollX` theo velocity sau khi thả tay (ngoại trừ khi
   drag bắt đầu trong tap mode để di chuyển crosshair).
+- **Restore từ `chartScale`**: khi widget nhận `chartScale != null` (hoặc
+  `chartScale` object thay đổi), tự restore `mScaleX`/`mScaleY`/`mScrollX`.
+  `mScrollX` được clamp lại sau layout (post-frame) vì `maxScrollX` chưa biết
+  trước khi paint lần đầu.
+
+### 11.1.1 `KChartScaleState` — snapshot zoom state
+
+```dart
+class KChartScaleState {
+  final double scaleX;   // zoom ngang, chưa clamp — widget tự clamp khi restore
+  final double scaleY;   // zoom dọc main (0.3–5.0)
+  final double scrollX;  // offset scroll (0 = nến mới nhất)
+}
+```
+
+**Khi `onChartScaleChanged` được emit:**
+
+| Sự kiện | Ghi chú |
+|---|---|
+| `onScaleEnd` (pinch / scaleY drag kết thúc) | Chỉ emit khi `scaleX` hoặc `scaleY` thực sự thay đổi |
+| `KChartController.zoomIn()` / `zoomOut()` / `reset()` | Sau khi cập nhật `mScaleX` |
+| Double-tap vùng phải | Sau khi reset `scaleY = 1`, `offsetY = 0` |
+| Restore từ `chartScale` | **Không emit** (suppress nội bộ) |
+
+**Pattern lưu/khôi phục khi đổi timeframe:**
+
+```dart
+KChartScaleState? _savedScale;
+
+// Build:
+KChartWidget(
+  _data, chartStyle, chartColors,
+  chartScale: _savedScale,
+  onChartScaleChanged: (s) => _savedScale = s,  // lưu (không cần setState)
+  ...
+)
+
+// Đổi timeframe:
+setState(() {
+  _data = newData;
+  // _savedScale giữ nguyên → widget tự restore view của user
+});
+```
 
 ### 11.2 Trục Y (zoom dọc + pan dọc) — chỉ áp cho main
 

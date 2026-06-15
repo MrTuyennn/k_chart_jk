@@ -617,10 +617,10 @@ Không cần để dùng package, nhưng giúp hiểu performance & extend.
 | `ChartPainter` | Subclass của `BaseChartPainter`. Orchestrate paint: bg → grid → main → vol → secondary → crosshair → labels. Apply canvas transform `scaleY + offsetY` quanh `centerY` của `mMainRect`. |
 | `BaseChartRenderer<T>` | Helper render mỗi panel với min/max value, draw text, getY. |
 | `MainRenderer` | Vẽ nến / line, MA/BOLL/EMA/SAR/ZigZag overlay. |
-| `VolRenderer` | Vẽ cột volume. Đã merge vào main rect (overlay). |
+| `VolRenderer` | Vẽ cột volume. `drawVerticalText` hiển thị label max (top-right) và min vol thực tế (bottom-right). `mVolMinValue` được tính từ `item.vol` nhỏ nhất trong vùng hiển thị (không còn hardcode `0`). |
 | `SecondaryRenderer` | Vẽ panel indicator phụ. Mỗi `SecondaryIndicator` 1 panel riêng, height = `mSecondaryHeight`. |
 
-**Static field quan trọng:** `ChartPainter.maxScrollX` — set trong paint, dùng ở gesture để clamp `mScrollX`. Khi `mScrollX >= maxScrollX * 0.8`, trigger `onLoadMore(true)`.
+**Static field quan trọng:** `ChartPainter.maxScrollX` — set trong paint, dùng ở gesture để clamp `mScrollX`. Trigger `onLoadMore(true)` khi `maxScrollX <= 0` (tất cả data vừa khung hình) HOẶC `mScrollX >= maxScrollX * 0.8` (gần biên trái). Sau pinch zoom out, check thêm trong post-frame callback của `onScaleEnd`.
 
 ---
 
@@ -677,7 +677,7 @@ if (!_gestureInMain && pointerCount < 2) {
 | `_dragStartedInTapMode` && 1 ngón && không phải scaleY zone | Di chuyển crosshair theo ngón. |
 | `_isScaleYGesture` && 1 ngón | Drag dọc trong vùng phải (`effectiveRightPaddingPx`) → điều chỉnh `mScaleY` ± `delta * 0.005`, clamp `[0.3, 5.0]`. Sau đó re-clamp `mOffsetY`. |
 | `details.scale != 1.0` (≥2 ngón) | Pinch zoom → `mScaleX = lastScale * scale`, clamp `[minScale, maxScale]`. |
-| 1 ngón drag tự do | Cuộn ngang: `mScrollX += dx / mScaleX`, clamp `[0, maxScrollX]`. Pan dọc CHỈ active khi `mScaleY != 1.0`: `mOffsetY = _clampOffsetY(mOffsetY + dy)`. Trigger `onLoadMore(true)` khi `mScrollX >= maxScrollX * 0.8`. |
+| 1 ngón drag tự do | Cuộn ngang: `mScrollX += dx / mScaleX`, clamp `[0, maxScrollX]`. Pan dọc CHỈ active khi `mScaleY != 1.0`: `mOffsetY = _clampOffsetY(mOffsetY + dy)`. Trigger `onLoadMore(true)` khi `maxScrollX <= 0` (tất cả data vừa khung hình) HOẶC `mScrollX >= maxScrollX * 0.8`. |
 
 `onScaleEnd`: fling X kích hoạt khi `!_dragStartedInTapMode` (không phải kéo
 crosshair), kể cả khi gesture xuất phát từ vol/secondary — vì drag ngang ở
@@ -935,6 +935,9 @@ class _PageState extends State<Page> {
 
 ### "Mixin order error"
 - Khi tự kế thừa `KEntity`, giữ đúng thứ tự mixin trong file `k_entity.dart`. `OBVEntity` PHẢI trước `MACDEntity`.
+
+### "onLoadMore không được gọi khi zoom out nhỏ"
+- Khi scale đủ nhỏ, tất cả data vừa khung hình → `maxScrollX = 0`. `onLoadMore(true)` vẫn được trigger vì điều kiện đã được mở rộng: `maxScrollX <= 0 || mScrollX >= maxScrollX * 0.8`. Nếu user chỉ pinch zoom mà không drag, trigger đến qua post-frame callback trong `onScaleEnd`.
 
 ### "Volume panel không tách ra dưới chart"
 - Đó là design hiện tại: `BaseDimension._mVolumeHeight = 0`, volume vẽ overlay trên main rect. Comment trong file ghi rõ cách bật lại panel riêng nếu cần.

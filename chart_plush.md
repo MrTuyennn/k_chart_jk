@@ -142,6 +142,7 @@ Chiều cao mỗi vùng được tính linh hoạt dựa trên tổng chiều ca
 ### 4.2 Tính `vol` range
 
 - So sánh `vol`, `MA5Volume`, `MA10Volume`.
+- `mVolMinValue` tính từ `min(mVolMinValue, item.vol)` (data thực tế, không hardcode 0). Dùng để render label min ở góc dưới-phải panel vol; scale cột vol vẫn neo đáy panel.
 
 ### 4.3 Tính `secondary` range
 
@@ -303,3 +304,22 @@ Mô hình này ưu tiên:
 - hỗ trợ zoom/scroll và chọn điểm data trực tiếp.
 
 Với tài liệu này, source khác có thể tham khảo cách chia vùng, tính toán giá trị và vẽ theo từng bước.
+
+---
+
+## Bổ sung từ `k_chart_wikex` (source thực tế)
+
+Các điểm source `k_chart_wikex` bổ sung/thay đổi so với kiến trúc gốc mô tả ở doc này:
+
+| Tính năng | Mô tả ngắn |
+|---|---|
+| `scaleY` + `offsetY` transform | Zoom dọc + pan dọc chỉ áp cho `mMainRect`; vol/secondary nằm ngoài |
+| `KChartScaleState` | Class lưu/khôi phục `scaleX/scaleY/scrollX`; callback `onChartScaleChanged` |
+| `onLoadMore` khi `maxScrollX = 0` | Trigger load thêm ngay cả khi data vừa màn hình (không scroll được) |
+| Min vol label | `mVolMinValue` từ data thực, label min ở góc dưới-phải panel vol |
+| Multi-select secondary | `secondaryIndicators: List<SecondaryIndicator>` thay enum đơn |
+| Gesture gate | Vol/secondary chặn pan Y, forward outer scroll; scroll X + pinch vẫn hoạt động |
+| Pan Y clamp 50% + overscroll handoff | `|offsetY| ≤ baseHeight × scaleY / 2`; delta vượt biên emit qua `onVerticalOverscroll` |
+| `backgroundLogo` watermark | Widget overlay giữa `mMainRect`, `IgnorePointer` |
+
+Chi tiết từng mục xem `chart_wikex.md` (thay đổi gần đây) và `chart_wikex_arch.md`.
