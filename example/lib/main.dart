@@ -843,8 +843,6 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       mainIndicators: _mainIndicators,
       secondaryIndicators: _secondaryIndicators,
       controller: _controller,
-      minScale: 0.2,
-      maxScale: 2.2,
       chartScale: _savedChartScale,
       onChartScaleChanged: (scale) {
         debugPrint('[scale_state] $scale');

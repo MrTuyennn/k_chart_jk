@@ -12,7 +12,7 @@ class KChartScaleState {
   final double scrollX;
 
   const KChartScaleState({
-    this.scaleX = 1.0,
+    this.scaleX = 0.8, // setting tỉ lệ
     this.scaleY = 1.0,
     this.scrollX = 0.0,
   });
@@ -25,11 +25,7 @@ class KChartScaleState {
     return copyWith(scaleX: scaleX.clamp(minScale, maxScale));
   }
 
-  KChartScaleState copyWith({
-    double? scaleX,
-    double? scaleY,
-    double? scrollX,
-  }) {
+  KChartScaleState copyWith({double? scaleX, double? scaleY, double? scrollX}) {
     return KChartScaleState(
       scaleX: scaleX ?? this.scaleX,
       scaleY: scaleY ?? this.scaleY,

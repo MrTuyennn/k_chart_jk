@@ -770,6 +770,63 @@ Khi user đảo chiều drag: chart absorb trước (mOffsetY rời biên trở 
 
 ---
 
+### 10. Default scaleX = 0.8 (`k_chart_widget.dart`, `example/main.dart`)
+
+**Vấn đề:** Default scale trước đây là `1.0` nhưng việc đổi initial value không có tác dụng vì 2 nguyên nhân:
+1. `build()` reset `mScaleX = 1.0` mỗi khi `datas` rỗng (xảy ra trước khi data load xong).
+2. `_savedChartScale = const KChartScaleState()` khởi tạo với `scaleX: 1.0`, được truyền vào `chartScale:` → `_restoreChartScaleFromWidget` đọc ra `scaleX = 1.0` và ghi đè mọi thứ.
+
+**Fix:**
+
+```dart
+// k_chart_widget.dart
+static const double _defaultScaleX = 0.8;
+double mScaleX = _defaultScaleX, mScrollX = 0.0, mSelectX = 0.0;
+double _lastScale = _defaultScaleX;
+
+// build() — khi data rỗng dùng _defaultScaleX thay vì hardcode 1.0
+if (widget.datas != null && widget.datas!.isEmpty) {
+  mScrollX = mSelectX = 0.0;
+  mScaleX = _defaultScaleX;
+}
+
+// example/main.dart
+KChartScaleState _savedChartScale = const KChartScaleState(scaleX: 0.8);
+```
+
+---
+
+### 11. Grid dọc + fix bug loop + gridColumns = 8 (`main_renderer.dart`, `secondary_renderer.dart`, `k_chart_style.dart`)
+
+**Bug:** Vòng lặp vertical column trong `main_renderer` và `secondary_renderer` dùng `i <= columnSpace` (giá trị pixel, ví dụ ~67) thay vì `i <= gridColumns` (số cột = 4) → vẽ hàng chục đường thừa.
+
+**Thay đổi:**
+
+1. Fix loop: `i <= columnSpace` → `i <= gridColumns` ở cả `main_renderer` và `secondary_renderer`.
+2. `gridColumns` 4 → 8 để ô grid cao hơn rộng (chart landscape ~400×300px: cell = 50×75px).
+
+```dart
+// k_chart_style.dart
+final int gridRows = 4;
+final int gridColumns = 8;  // tăng từ 4 → ô grid cao hơn rộng
+
+// main_renderer.dart & secondary_renderer.dart — fix bug
+final double columnSpace = chartRect.width / gridColumns;
+for (int i = 0; i <= gridColumns; i++) {  // đúng: lặp theo số cột
+  canvas.drawLine(...);
+}
+```
+
+**Tỷ lệ ô grid (ví dụ chart 400×300px):**
+
+| `gridColumns` | Cell width | Cell height (gridRows=4) | Nhận xét |
+|---|---|---|---|
+| 4 | 100px | 75px | Rộng hơn cao |
+| 6 | 67px | 75px | Xấp xỉ vuông |
+| 8 | 50px | 75px | Cao hơn rộng ✓ |
+
+---
+
 ## KChartWidget — Tham số
 
 ### Dữ liệu
