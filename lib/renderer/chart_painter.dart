@@ -583,8 +583,13 @@ class ChartPainter extends BaseChartPainter {
         .clamp(mMainRect.top, mMainRect.bottom);
   }
 
-  /// Whether the point is in MainRect
-  bool isInMainRect(Offset point) {
-    return mMainRect.contains(point);
+  @override
+  bool shouldRepaint(BaseChartPainter oldDelegate) {
+    if (oldDelegate is ChartPainter && oldDelegate.livePrice != livePrice) {
+      return true;
+    }
+    return super.shouldRepaint(oldDelegate);
   }
+
+  bool isInMainRect(Offset point) => mMainRect.contains(point);
 }

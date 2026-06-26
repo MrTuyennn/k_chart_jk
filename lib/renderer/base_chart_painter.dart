@@ -391,6 +391,7 @@ abstract class BaseChartPainter extends CustomPainter {
         oldDelegate.selectX != selectX ||
         oldDelegate.isOnTap != isOnTap ||
         oldDelegate.offsetY != offsetY ||
+        oldDelegate.scaleY != scaleY ||
         oldDelegate.volHidden != volHidden ||
         oldDelegate.mainIndicators != mainIndicators ||
         oldDelegate.secondaryIndicators != secondaryIndicators;
