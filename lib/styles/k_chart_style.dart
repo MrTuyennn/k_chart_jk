@@ -133,7 +133,7 @@ class KChartStyle {
   final double borderWidth = 0.5;
 
   final int gridRows = 4;
-  final int gridColumns = 8;
+  final int gridColumns = 6;
 
   ///customize the time below
   final List<String>? dateTimeFormat;

@@ -272,21 +272,20 @@ class ChartPainter extends BaseChartPainter {
     double stopX = getX(mStopIndex) + mPointWidth / 2;
     double x = 0.0;
     double y = 0.0;
+
     for (var i = 0; i <= mGridColumns; ++i) {
       double translateX = xToTranslateX(columnSpace * i);
+      if (translateX < startX || translateX > stopX) continue;
 
-      if (translateX >= startX && translateX <= stopX) {
-        int index = indexOfTranslateX(translateX);
+      int index = indexOfTranslateX(translateX);
+      if (datas?[index] == null) continue;
 
-        if (datas?[index] == null) continue;
-        TextPainter tp = getTextPainter(getDate(datas![index].time), null);
-        y = mDateRect.top + (mBottomPadding - tp.height) / 2;
-        x = columnSpace * i - tp.width / 2;
-        // Prevent date text out of canvas
-        if (x < 0) x = 0;
-        if (x > size.width - tp.width) x = size.width - tp.width;
-        tp.paint(canvas, Offset(x, y));
-      }
+      TextPainter tp = getTextPainter(getDate(datas![index].time), null);
+      y = mDateRect.top + (mBottomPadding - tp.height) / 2;
+      x = columnSpace * i - tp.width / 2;
+      if (x < 0) x = 0;
+      if (x > size.width - tp.width) x = size.width - tp.width;
+      tp.paint(canvas, Offset(x, y));
     }
 
     //    double translateX = xToTranslateX(0);

@@ -851,7 +851,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       showNowPrice: true,
       showInfoDialog: true,
       mBaseHeight: 280,
-      timeFormat: TimeFormat.yearMonthDayWithHour,
+      timeFormat: TimeFormat.yearMonthDay,
       onLoadMore: _onLoadMore,
       isLoadingMore: _isFetching,
       detailBuilder: _buildInfoCard,

@@ -1,111 +1,68 @@
-# k_chart_wikex — Kiến trúc & sơ đồ
+# k_chart_wikex — Tài liệu tổng hợp
 
-Doc này mô tả lại nguồn hiện tại theo cùng cấu trúc với `chart_plush.md`
-(mục lục giữ nguyên, nội dung cập nhật theo source).
-
-**Khớp với sơ đồ đơn giản của `chart_plush.md`:** 3 renderer riêng
-(`MainRenderer` + `VolRenderer` + `SecondaryRenderer`) chạy trong cùng
-`ChartPainter.drawChart`. Vol có panel `mVolRect` dedicated giữa
-`mMainRect` và `mDateRect`, toggle bằng `volHidden`.
-
-**Bổ sung so với chart_plush.md gốc:**
-- `scaleY` + `offsetY` transform (chỉ áp cho main).
-- `backgroundLogo` watermark.
-- `DepthChart` thêm `backgroundLogo` + `bottomLabelCount` cấu hình được.
-- `secondaryIndicators` là `List<SecondaryIndicator>` (multi-select)
-  thay vì enum đơn `secondaryState`.
-- Label dùng `getItem(mStopIndex)` (nến phải nhất hiển thị) thay
-  `datas.last`.
-- Pan Y clamp 50% + overscroll handoff với outer scroll.
-- `KChartScaleState` — lưu/khôi phục zoom state qua `chartScale` + `onChartScaleChanged`.
-- `mVolMinValue` tính từ data thực tế + label min vol ở góc dưới-phải panel.
-- `onLoadMore(true)` trigger cả khi `maxScrollX == 0` (data vừa màn hình).
+> Tổng hợp từ: `HANDBOOK.md`, `chart_wikex.md`, `chart_plush.md`, `CHANGELOG.md`, `chart_wikex_arch.md`.
 
 ---
 
-## 1. Tổng quan kiến trúc
+## Mục lục
+
+1. [Changelog](#1-changelog)
+2. [Tổng quan kiến trúc](#2-tổng-quan-kiến-trúc)
+3. [Cài đặt & Quick Start](#3-cài-đặt--quick-start)
+4. [Entry point & exports](#4-entry-point--exports)
+5. [Entity — data models](#5-entity--data-models)
+6. [KChartWidget — API đầy đủ](#6-kchartwidget--api-đầy-đủ)
+7. [KChartController](#7-kchartcontroller)
+8. [KChartStyle & KChartColors](#8-kchartstyle--kchartcolors)
+9. [Indicators — main & secondary](#9-indicators--main--secondary)
+10. [DataUtil & helpers](#10-datautil--helpers)
+11. [DepthChart — orderbook depth](#11-depthchart--orderbook-depth)
+12. [Renderer internals](#12-renderer-internals)
+13. [Gesture model](#13-gesture-model)
+14. [Recipes — công thức thường dùng](#14-recipes--công-thức-thường-dùng)
+15. [Troubleshooting & pitfalls](#15-troubleshooting--pitfalls)
+
+---
+
+## 1. Changelog
+
+### Unreleased
+
+* **feat:** `KChartScaleState` — class lưu/khôi phục trạng thái zoom (`scaleX`, `scaleY`, `scrollX`). Truyền qua `KChartWidget.chartScale` để restore khi đổi timeframe; `scaleX` tự clamp theo `minScale`/`maxScale`. Callback `onChartScaleChanged` (`OnChartScaleChanged`) emit sau khi kết thúc pinch, scaleY drag, zoom controller, hoặc double-tap reset scaleY.
+* **fix:** `onLoadMore(true)` không được gọi khi scale nhỏ đến mức tất cả data vừa khung hình (`maxScrollX == 0`). Đã bỏ guard `ChartPainter.maxScrollX > 0` và thêm post-frame callback trong `onScaleEnd` để trigger load thêm sau khi pinch zoom out.
+* **feat:** Panel volume hiển thị thêm label giá trị nhỏ nhất (min vol trong vùng hiển thị) ở góc dưới-phải, giống cách MACD hiển thị min. `mVolMinValue` không còn hardcode `0` mà được tính từ data thực tế.
+* **refactor:** `KChartStyle.gridColumns` đổi từ `8` → `6` (giảm từ 7 đường time nội xuống 5 đường).
+* **refactor:** `initFormats()` giờ override `mGridColumns` theo timeframe: intraday (phút/giờ) = `3` (4 mốc), daily/monthly = `4` (5 mốc). Override này thắng giá trị `gridColumns` trong `KChartStyle`.
+* **refactor:** `drawDate()` căn chỉnh label thời gian **trùng khớp với grid line dọc** — mỗi đường grid dọc ứng đúng 1 time label ở dưới. Label vẽ tại `columnSpace * i` cho `i = 0..mGridColumns`, cùng vị trí với `drawGrid`.
+
+### 0.0.1
+
+* Initial release of k_chart_wikex — a Flutter candlestick chart package.
+* Candlestick and line chart rendering with smooth gesture support (pan, zoom, fling).
+* Main indicators: MA, EMA, BOLL, SAR, ZigZag.
+* Secondary indicators: MACD, KDJ, RSI, WR, CCI.
+* Volume bar chart with MA5/MA10 overlay.
+* Long-press info dialog with customizable `detailBuilder`.
+* Dark/light theme support via `KChartColors`.
+* `KChartController` for programmatic zoom in/out and reset.
+* Depth chart widget (`DepthChart`) for order book visualization.
+* Multi-language support via `ChartTranslations`.
+
+---
+
+## 2. Tổng quan kiến trúc
 
 Mã nguồn chart được thiết kế theo mô hình:
 
-- `KChartWidget`: widget chứa, xử lý tương tác (gesture, scroll, scale, long-press,
-  pointer tracking cho parent), và tạo `ChartPainter`.
+- `KChartWidget`: widget chứa, xử lý tương tác (gesture, scroll, scale, long-press, pointer tracking cho parent), và tạo `ChartPainter`.
 - `ChartPainter`: lớp vẽ chính, kế thừa `BaseChartPainter`.
-- `BaseChartPainter`: xử lý layout (chia rect), phạm vi dữ liệu (visible window),
-  và điều phối paint.
-- `MainRenderer`: vẽ đồ thị chính (nến hoặc line), chạy từng `MainIndicator`
-  (MA/BOLL/EMA/SAR/ZigZag) trong cùng vùng `mMainRect`.
-- `VolRenderer`: vẽ panel volume (bars + MA5/MA10) trong `mVolRect`. Toggle
-  bằng `volHidden` ở `KChartWidget`.
-- `SecondaryRenderer`: vẽ một panel indicator phụ (MACD/KDJ/RSI/WR/CCI/OBV).
-  Mỗi entry trong `secondaryIndicators` có 1 instance riêng.
-- `DepthChartPainter`: vẽ orderbook depth (Buy/Sell pressure) — standalone,
-  không gắn với `KChartWidget`.
+- `BaseChartPainter`: xử lý layout (chia rect), phạm vi dữ liệu (visible window), và điều phối paint.
+- `MainRenderer`: vẽ đồ thị chính (nến hoặc line), chạy từng `MainIndicator` (MA/BOLL/EMA/SAR/ZigZag) trong cùng vùng `mMainRect`.
+- `VolRenderer`: vẽ panel volume (bars + MA5/MA10) trong `mVolRect`. Toggle bằng `volHidden` ở `KChartWidget`.
+- `SecondaryRenderer`: vẽ một panel indicator phụ (MACD/KDJ/RSI/WR/CCI/OBV). Mỗi entry trong `secondaryIndicators` có 1 instance riêng.
+- `DepthChartPainter`: vẽ orderbook depth (Buy/Sell pressure) — standalone, không gắn với `KChartWidget`.
 
-> **Ghi chú quan trọng:** toàn bộ chart chính của `KChartWidget` được vẽ
-> trong một `CustomPaint` duy nhất. `KChartWidget` tạo ra `ChartPainter`,
-> và `ChartPainter` quản lý canvas chung, dùng các renderer nội bộ để vẽ
-> từng phần trong cùng một hộp vẽ.
->
-> - `KChartWidget` = widget chứa và điều khiển tương tác.
-> - `ChartPainter` = painter duy nhất gắn vào `CustomPaint`.
-> - `MainRenderer`, `VolRenderer`, `SecondaryRenderer` = lớp hỗ trợ vẽ nội bộ.
->
-> Box vẽ có 3 vùng con (`main`, `volume`, `secondary list`) khớp với sơ đồ
-> đơn giản của `chart_plush.md`. Vol không phải overlay trong main — có rect
-> riêng (`mVolRect`) giữa `mMainRect` và `mDateRect`.
-
-### Cách hiểu chi tiết
-
-1. `KChartWidget` nhận dữ liệu và trạng thái cấu hình từ bên ngoài.
-2. Trong `build()`, `KChartWidget` tạo `ChartPainter` với:
-   - `datas`, `scaleX`, `scaleY`, `scrollX`, `offsetY`, `selectX`.
-   - `mainIndicators`, `secondaryIndicators` (list, không phải enum), `isLine`.
-   - `volHidden` (toggle panel vol).
-   - `chartStyle`, `chartColors`, `xFrontPadding`, `verticalTextAlignment`.
-   - `livePrice`, `showNowPrice`, `hideGrid`, `fixedLength`.
-   - `skipBg` (true khi `backgroundLogo != null`).
-3. `CustomPaint` sử dụng `ChartPainter` làm painter duy nhất.
-   `Stack` ngoài bọc thêm: `ColoredBox(bgColor)` + `backgroundLogo`
-   (IgnorePointer, centered) + `CustomPaint` + `Positioned` scaleY zone.
-4. Flutter gọi `ChartPainter.paint(canvas, size)` để vẽ toàn bộ chart.
-5. `BaseChartPainter.paint()` làm:
-   - cắt vùng vẽ bằng `canvas.clipRect(0, 0, w, h)`.
-   - tính `mDisplayHeight` và `mWidth`.
-   - gọi `initRect(size)` để chia `mMainRect`, `mVolRect` (nếu không ẩn),
-     `mSecondaryRectList[]`, rồi `mDateRect` ở đáy cùng.
-   - gọi `calculateValue()` để:
-     - tính `maxScrollX` và `mTranslateX`.
-     - xác định `mStartIndex`, `mStopIndex` cho dữ liệu hiển thị.
-     - tính `mMainMaxValue/MinValue`, `mVolMaxValue/MinValue`, và mỗi
-       `mSecondaryRectList[i].mMaxValue/mMinValue` chỉ trên vùng visible.
-   - gọi `initChartRenderer()` để tạo:
-     - `mMainRenderer` (1 instance).
-     - `mVolRenderer` (1 instance, null nếu `volHidden`).
-     - `mSecondaryRendererList[]` (1 instance/SecondaryIndicator).
-   - vẽ nền (`drawBg` — skip nếu `skipBg`) và lưới (`drawGrid`).
-   - nếu có dữ liệu, gọi `drawChart()`.
-6. Trong `ChartPainter.drawChart()`:
-   - `canvas.translate(mTranslateX * scaleX, 0)` + `canvas.scale(scaleX, 1.0)`
-     → áp dụng cuộn ngang + zoom ngang cho toàn frame.
-   - mở canvas scope thứ hai cho `scaleY`:
-     - `canvas.clipRect(mMainRect band)`.
-     - `canvas.translate(0, centerY*(1-scaleY) + offsetY)`.
-     - `canvas.scale(1.0, scaleY)`.
-   - lặp `i = mStartIndex..mStopIndex` và gọi `mMainRenderer.drawChart()`.
-   - đóng scaleY scope.
-   - lặp lại `i = mStartIndex..mStopIndex` và gọi
-     `mVolRenderer?.drawChart()` + mỗi `SecondaryRenderer.drawChart()` —
-     **ngoài** scaleY transform để vol + secondary không bị giãn theo zoom dọc.
-   - sau vòng lặp: nếu cần vẽ crosshair hoặc trend line thì vẽ thêm.
-7. Sau `drawChart()`, `BaseChartPainter.paint()` tiếp tục:
-   - `drawVerticalText(canvas)` — text trục dọc bên phải.
-   - `drawDate(canvas, size)` — ngày giờ ở `mDateRect`.
-   - `drawText(canvas, getItem(mStopIndex), chartStyle.space)` — label
-     MA/MACD/VOL theo nến phải nhất đang hiển thị (không phải `datas!.last`).
-   - `drawMaxAndMin(canvas)` và `drawNowPrice(canvas)` — đã đi qua
-     `_applyScaleY(rawY)` để khớp với canvas đã scaleY.
-   - `drawCrossLineText(canvas, size)` nếu đang chọn dữ liệu
-     (`isLongPress` hoặc `isTapShowInfoDialog && isOnTap`).
+> **Ghi chú quan trọng:** toàn bộ chart chính của `KChartWidget` được vẽ trong một `CustomPaint` duy nhất. `KChartWidget` tạo ra `ChartPainter`, và `ChartPainter` quản lý canvas chung, dùng các renderer nội bộ để vẽ từng phần trong cùng một hộp vẽ.
 
 ### Sơ đồ đơn giản
 
@@ -141,25 +98,113 @@ KChartWidget  (state + gesture)
        ─ vùng gesture scaleY + double-tap reset scaleY/offsetY
 ```
 
+### Flow dữ liệu
+
+1. Chuẩn bị `List<KLineEntity>` (mỗi entity = 1 nến OHLCV + time).
+2. Gọi `DataUtil.calculateAll(data, mainIndicators, secondaryIndicators)` để tính chỉ báo.
+3. Truyền list vào `KChartWidget` cùng style/colors/indicators.
+4. `ChartPainter` đọc data đã tính, dùng renderer để vẽ từng nến + indicator.
+5. `KChartController` ở ngoài có thể gọi `zoomIn` / `zoomOut` / `reset`.
+
 ### Quy tắc quan trọng để port sang source khác
 
 - **Widget quản lý trạng thái + gesture, painter vẽ toàn bộ.**
 - **Một `CustomPaint`** cho main chart; secondary indicators KHÔNG phải widget riêng.
-- **Tính min/max chỉ trên vùng dữ liệu visible** (`mStartIndex..mStopIndex`),
-  không trên toàn dataset.
+- **Tính min/max chỉ trên vùng dữ liệu visible** (`mStartIndex..mStopIndex`).
 - **`scrollX` và `scaleX` thành phép biến đổi canvas**, không vẽ tay từng phần.
 - **`scaleY` áp riêng cho main**, secondary nằm ngoài transform để không bị giãn.
-- **Mỗi renderer chỉ chịu trách nhiệm vẽ trong vùng của nó** (`chartRect`).
 - **Mọi label vẽ ngoài canvas transform** phải đi qua `_applyScaleY(rawY)`.
 
 ---
 
-## 2. Luồng dữ liệu và tham số chính
+## 3. Cài đặt & Quick Start
 
-### 2.1 Dữ liệu đầu vào
+### Dependency
 
-Dữ liệu chính là `List<KLineEntity>` truyền vào `KChartWidget`. `KEntity` là
-class mix nhiều mixin để chứa field cho mọi indicator:
+```yaml
+dependencies:
+  k_chart_wikex:
+    git:
+      url: <repo-url>
+```
+
+### Quick start tối thiểu
+
+```dart
+import 'package:k_chart_wikex/k_chart_plus.dart';
+
+final data = [
+  KLineEntity.fromCustom(
+    time: 1700000000000,
+    open: 65000, close: 65500, high: 65800, low: 64900,
+    vol: 12.3,
+  ),
+  // ...
+];
+
+DataUtil.calculateAll(
+  data,
+  [MAIndicator()],
+  [MACDIndicator()],
+);
+
+KChartWidget(
+  data,
+  const KChartStyle(),
+  const KChartColors(),
+  isTrendLine: false,
+  detailBuilder: (entity) => Text(entity.close.toString()),
+  mainIndicators: [MAIndicator()],
+  secondaryIndicators: [MACDIndicator()],
+)
+```
+
+---
+
+## 4. Entry point & exports
+
+File chính import: `package:k_chart_wikex/k_chart_plus.dart`. Re-export:
+
+| Export | Chứa gì |
+|---|---|
+| `k_chart_widget.dart` | `KChartWidget`, `TimeFormat`, `WidgetDetailBuilder` |
+| `styles/k_chart_style.dart` | `KChartStyle`, `KChartColors` |
+| `styles/depth_chart_style.dart` | `DepthChartStyle`, `DepthChartColors` |
+| `depth_chart.dart` | `DepthChart` widget |
+| `chart_translations.dart` | `DepthChartTranslations` |
+| `utils/index.dart` | `DataUtil`, `dateFormat`, `NumberUtil`, format tokens |
+| `entity/index.dart` | Toàn bộ entity & mixin |
+| `renderer/index.dart` | `ChartPainter`, `BaseChartPainter`, renderer base |
+| `renderer/k_chart_controller.dart` | `KChartController` |
+| `extension/num_ext.dart` | `num.toStringAsFixedNoZero(...)` |
+| `indicator/indicator_template.dart` | `IndicatorTemplate`, `MainIndicator`, `SecondaryIndicator`, tất cả indicator + style |
+
+---
+
+## 5. Entity — data models
+
+### 5.1 `KLineEntity`
+
+Nến chính. Kế thừa `KEntity` (multi-mixin) → mang sẵn slot cho mọi chỉ báo.
+
+| Field | Kiểu | Ý nghĩa |
+|---|---|---|
+| `open` | `double` | Giá mở cửa |
+| `high` | `double` | Giá cao nhất |
+| `low` | `double` | Giá thấp nhất |
+| `close` | `double` | Giá đóng cửa |
+| `vol` | `double` | Volume |
+| `time` | `int?` | Timestamp **ms** (Unix epoch) |
+| `amount` | `double?` | Quote volume. Optional |
+| `change` | `double?` | Biến động giá tuyệt đối. Optional |
+| `ratio` | `double?` | % thay đổi. Optional |
+
+**Constructor:**
+- `KLineEntity.fromCustom(...)` — truyền field thẳng.
+- `KLineEntity.fromJson(json)` — parse từ Map. Fallback: nếu thiếu `time` lấy `id * 1000`.
+- `.toJson()` — serialize ngược.
+
+### 5.2 `KEntity` & các mixin
 
 ```dart
 class KEntity with
@@ -174,104 +219,478 @@ class KEntity with
     ZigZagEntity {}  // zigzag points
 ```
 
-Trường quan trọng theo nhóm:
+| Mixin | Field | Indicator dùng |
+|---|---|---|
+| `CandleEntity` | `open/high/low/close`, `maValueList`, `emaValueList`, `sar`, `boll` | MA, EMA, SAR, BOLL |
+| `VolumeEntity` | `open/close/vol`, `MA5Volume`, `MA10Volume` | Volume MA |
+| `MACDEntity` | `dea`, `dif`, `macd` | MACD |
+| `KDJEntity` | `k`, `d`, `j` | KDJ |
+| `RSIEntity` | `rsi` | RSI |
+| `WREntity` | `r` (%R) | WR |
+| `CCIEntity` | `cci` | CCI |
+| `OBVEntity` | `obv`, `obvSignal` | OBV |
+| `ZigZagEntity` | `zigzag` | ZigZag |
 
-- **Candle**: `open`, `high`, `low`, `close`, `time`.
-- **Volume**: `vol`, `MA5Volume`, `MA10Volume`.
-- **Main indicators**: `maValueList` (MA), `up/mb/dn` (BOLL), `ema` (EMA),
-  `sar` (SAR), `zigzag`.
-- **Secondary indicators**: `dif/dea/macd`, `k/d/j`, `rsi`, `r`, `cci`,
-  `obv/obvSignal`.
+**Thứ tự mixin quan trọng** — `OBVEntity` phải đứng trước `MACDEntity` (do `MACDEntity on ... OBVEntity`).
 
-Tính field bằng `DataUtil.calculateAll(data, mainIndicators, secondaryIndicators)`
-— gọi mỗi khi data thay đổi (load more, live tick, init).
+### 5.3 `InfoWindowEntity`
 
-### 2.2 Cấu hình hiển thị
+```dart
+class InfoWindowEntity {
+  KLineEntity kLineEntity;  // nến đang được chọn
+  bool isLeft;              // true: vẽ dialog bên trái
+}
+```
 
-Các tham số chính của `KChartWidget`:
+### 5.4 `DepthEntity`
 
-- `scaleX` (state): tỷ lệ zoom theo trục X (`minScale`–`maxScale`, default 0.5–2.2).
-- `scaleY` (state): tỷ lệ zoom theo trục Y main (0.3–5.0).
-- `scrollX` (state): giá trị scroll ngang, clamp `[0, maxScrollX]`.
-- `offsetY` (state): pan dọc main, clamp `|offsetY| ≤ baseHeight × scaleY / 2`.
-- `isLine`: chuyển giữa line chart và candlestick.
-- `mainIndicators`: `List<MainIndicator>` — overlay trên main (MA/BOLL/EMA/SAR/ZigZag).
-- `secondaryIndicators`: `List<SecondaryIndicator>` — mỗi entry sinh 1 panel
-  (VOL/MACD/KDJ/RSI/WR/CCI/OBV). Thứ tự = thứ tự panel.
-- `hideGrid`: ẩn lưới.
-- `showNowPrice`: vẽ đường + label giá hiện tại.
-- `livePrice`: override giá now-price (realtime socket).
-- `xFrontPadding`: padding bên phải sau nến cuối (default 100px tại chart ≥375px). Chart hẹp hơn → `effectiveRightPaddingPx` giảm tỷ lệ; đồng bộ vùng gesture scaleY.
-- `mBaseHeight` / `mSecondaryHeight`: chiều cao mỗi panel.
-- `backgroundLogo` / `backgroundLogoOpacity`: watermark widget giữa main.
-- `onLoadMore` / `isLoadingMore`: lazy load data cũ.
-- `onVerticalOverscroll`: forward overscroll Y ra parent (scroll handoff).
-- `chartScale`: `KChartScaleState?` — restore zoom state khi đổi timeframe. `scaleX` clamp theo `minScale`/`maxScale`.
-- `onChartScaleChanged`: `OnChartScaleChanged?` — emit snapshot sau pinch/scaleY/zoom controller/double-tap reset.
+```dart
+class DepthEntity {
+  double price;
+  double vol;  // phải là cumulative volume
+}
+```
 
-> **Khác chart_plush.md gốc:** không còn `mainState`/`secondaryState` enum —
-> indicator chính / phụ truyền bằng `List<MainIndicator>` / `List<SecondaryIndicator>`
-> để hỗ trợ multi-select. Cờ `volHidden` giữ nguyên như chart_plush.md.
+### 5.5 Mixin type system — generic indicator
+
+Khi dùng `List<SecondaryIndicator<MACDEntity, dynamic>>`, indicator mới cần entity riêng → thêm entity vào `on` clause của `MACDEntity` và đặt trước `MACDEntity` trong `KEntity`:
+
+```dart
+// Quy tắc khi thêm entity mới
+// 1. Tạo <Name>Entity mixin đơn giản (không có `on`)
+// 2. Thêm <Name>Entity vào `on` clause của MACDEntity
+// 3. Đặt <Name>Entity TRƯỚC MACDEntity trong KEntity
+// 4. Dùng MACDEntity làm T trong <Name>Indicator
+```
 
 ---
 
-## 3. Cách chia vùng và tính toán layout
+## 6. `KChartWidget` — API đầy đủ
 
-`BaseDimension` tính tổng chiều cao:
+File: `lib/k_chart_widget.dart`.
+
+### 6.1 Required
+
+| Param | Kiểu | Ý nghĩa |
+|---|---|---|
+| `datas` | `List<KLineEntity>?` | Data nguồn. Empty/null = chart trống. |
+| `chartStyle` | `KChartStyle` | Kích thước, padding, line width. |
+| `chartColors` | `KChartColors` | Toàn bộ màu. |
+| `detailBuilder` | `Widget Function(KLineEntity)` | Builder cho info dialog (long-press). |
+| `isTrendLine` | `bool` | Bật mode vẽ trend line. |
+
+### 6.2 Indicators & display
+
+| Param | Default | Ý nghĩa |
+|---|---|---|
+| `mainIndicators` | `[]` | List `MainIndicator` overlay trên main chart. |
+| `secondaryIndicators` | `[]` | List `SecondaryIndicator` thành panel riêng bên dưới. |
+| `volHidden` | `false` | Ẩn panel volume. |
+| `isLine` | `false` | `true` = line chart, `false` = candlestick. |
+| `hideGrid` | `false` | Ẩn lưới ngang/dọc. |
+| `showNowPrice` | `true` | Vẽ đường giá hiện tại. |
+| `showInfoDialog` | `true` | Cho phép hiện dialog detail. |
+| `isTapShowInfoDialog` | `false` | `true` = single tap hiện crosshair + dialog. |
+| `materialInfoDialog` | `true` | Style dialog Material vs Cupertino. |
+| `timeFormat` | `TimeFormat.yearMonthDay` | Format thời gian dưới X axis. |
+| `livePrice` | `null` | Giá realtime override cho now price. |
+| `xFrontPadding` | `100` | Padding phải sau nến cuối (px tại chart ≥375px). |
+| `verticalTextAlignment` | `right` | `left` / `right` — vị trí label giá dọc. |
+| `fixedLength` | `2` | Số chữ số thập phân format giá. |
+
+### 6.3 Pan / zoom / scroll
+
+| Param | Default | Ý nghĩa |
+|---|---|---|
+| `minScale` | `0.5` | Min cho `mScaleX`. |
+| `maxScale` | `2.2` | Max cho `mScaleX`. |
+| `flingTime` | `600` | ms — duration fling animation. |
+| `flingRatio` | `0.5` | Hệ số nhân vận tốc fling. |
+| `flingCurve` | `Curves.decelerate` | Curve animation fling. |
+| `mBaseHeight` | `360` | Height (px) của main chart panel. |
+| `mSecondaryHeight` | `mBaseHeight * 0.2` | Height (px) của mỗi secondary panel. |
+
+### 6.4 Load more / callback
+
+| Param | Kiểu | Ý nghĩa |
+|---|---|---|
+| `onLoadMore` | `void Function(bool isLeft)?` | Trigger khi scroll gần biên. `true` = load data cũ hơn. |
+| `isLoadingMore` | `bool` | Cờ khoá tránh duplicate request. |
+| `isOnDrag` | `void Function(bool)?` | Callback start/stop drag. |
+| `controller` | `KChartController?` | Điều khiển từ ngoài. |
+| `onChartScaleChanged` | `OnChartScaleChanged?` | Emit sau mỗi lần kết thúc pinch/scaleY/zoom/reset. |
+| `onVerticalOverscroll` | `ValueChanged<double>?` | Fire khi pan Y vượt clamp 50%. |
+
+### 6.5 Zoom state
+
+| Param | Kiểu | Ý nghĩa |
+|---|---|---|
+| `chartScale` | `KChartScaleState?` | Scale đã lưu — truyền lại khi đổi timeframe để restore. |
+
+### 6.6 Background watermark
+
+| Param | Default | Ý nghĩa |
+|---|---|---|
+| `backgroundLogo` | `null` | Widget overlay ở giữa main chart. Có `IgnorePointer` nội bộ. |
+| `backgroundLogoOpacity` | `1.0` | 0.0 ẩn — 1.0 hiện đầy đủ. |
+
+### 6.7 `TimeFormat` constants
 
 ```dart
-mDisplayHeight = mBaseHeight + totalSecondaryHeight + totalLabelHeight
-// totalSecondaryHeight = mSecondaryHeight × secondaryIndicators.length
-// totalLabelHeight     = 12 × mainIndicators.length  (chỗ label MA/BOLL...)
+TimeFormat.yearMonthDay         // yyyy-MM-dd
+TimeFormat.yearMonthDayWithHour // yyyy-MM-dd HH:mm
 ```
 
-`BaseChartPainter.initRect(size)` chia bố cục dọc theo thứ tự:
+---
+
+## 7. `KChartController`
+
+File: `lib/renderer/k_chart_controller.dart`. Là `ChangeNotifier`.
+
+| Method | Effect |
+|---|---|
+| `controller.zoomIn()` | `mScaleX += 0.1`, clamp `[minScale, maxScale]`. |
+| `controller.zoomOut()` | `mScaleX -= 0.1`. |
+| `controller.reset()` | `mScaleX = 1.0`, `mScrollX = 0.0`, `mSelectX = 0.0`. **Không reset `mScaleY` / `mOffsetY`**. |
+
+**Lifecycle:**
+
+```dart
+final ctrl = KChartController();
+@override
+void dispose() { ctrl.dispose(); super.dispose(); }
+```
+
+---
+
+## 8. `KChartStyle` & `KChartColors`
+
+### 8.1 `KChartStyle`
+
+| Field | Default | Ý nghĩa |
+|---|---|---|
+| `topPadding` | `20.0` | Padding trên main chart. |
+| `bottomPadding` | `16.0` | Chiều cao vùng date axis. |
+| `childPadding` | `12.0` | Padding giữa các panel. |
+| `space` | `4.0` | Khoảng cách trong label. |
+| `pointWidth` | `11.0` | Khoảng cách tâm-tâm giữa 2 nến. |
+| `candleWidth` | `8.5` | Bề rộng thân nến. |
+| `candleLineWidth` | `1.0` | Bề rộng wick. |
+| `volWidth` | `8.5` | Bề rộng cột volume. |
+| `crossWidth` | `0.8` | Bề rộng đường crosshair. |
+| `nowPriceLineWidth` | `0.8` | Bề rộng đường giá hiện tại. |
+| `borderWidth` | `0.5` | Border cho crosshair label & now-price label. |
+| `gridRows` | `4` | Số dòng grid ngang. |
+| `gridColumns` | `6` | Số cột grid dọc. |
+| `dateTimeFormat` | `null` | Custom format thời gian (override auto-detect). |
+| `volBarOpacity` | `1.0` | Độ trong suốt cột volume (0.0–1.0). |
+
+Constructor: `const KChartStyle([List<String>? dateTimeFormat, double volBarOpacity = 1.0])`.
+
+### 8.2 `KChartColors`
+
+| Field | Default | Vùng dùng |
+|---|---|---|
+| `bgColor` | `0xFFFFFFFF` | Background toàn chart. |
+| `kLineColor` | `0xFF217AFF` | Line chart. |
+| `kLineFillColors` | gradient blue | Fill bên dưới line. |
+| `ma5Color`, `ma10Color` | vàng / xanh | MA (override qua `MAStyle.maColors`). |
+| `upColor` | `0xFF14AD8F` | Nến tăng. |
+| `dnColor` | `0xFFD5405D` | Nến giảm. |
+| `volColor` | `0xFF2F8FD5` | Cột volume. |
+| `volUpColor` / `volDnColor` | xanh / đỏ | Cột volume theo trend. |
+| `defaultTextColor` | xám | Text mặc định (axis, label indicator). |
+| `nowPriceUpColor` / `nowPriceDnColor` | xanh / đỏ | Đường + label giá hiện tại. |
+| `trendLineColor` | cam | Trend line. |
+| `selectBorderColor` | đen | Border của crosshair label box. |
+| `selectFillColor` | trắng | Fill của crosshair label box. |
+| `gridColor` | xám nhạt | Đường grid. |
+| `crossColor` | đen | Crosshair lines. |
+| `crossTextColor` | đen | Text trong crosshair label. |
+| `maxColor` / `minColor` | đen | Label giá max/min trong khung hiển thị. |
+
+**Dark mode example:**
+
+```dart
+const KChartColors(
+  bgColor: Color(0xFF1C1C1E),
+  defaultTextColor: Color(0xFF8E8E93),
+  gridColor: Color(0xFF2C2C2E),
+  selectFillColor: Color(0xFF2C2C2E),
+  selectBorderColor: Color(0xFF636366),
+  crossColor: Color(0xFFEBEBF5),
+  crossTextColor: Color(0xFFEBEBF5),
+  maxColor: Color(0xFFEBEBF5),
+  minColor: Color(0xFFEBEBF5),
+)
+```
+
+---
+
+## 9. Indicators — main & secondary
+
+### 9.1 Hierarchy
+
+```
+IndicatorTemplate<T, K>   ← abstract
+├── MainIndicator<T, K>     ← overlay trên main chart
+│   ├── MAIndicator
+│   ├── BOLLIndicator
+│   ├── EMAIndicator
+│   ├── SARIndicator
+│   └── ZigZagIndicator
+└── SecondaryIndicator<T, K> ← panel riêng bên dưới
+    ├── MACDIndicator
+    ├── KDJIndicator
+    ├── RSIIndicator
+    ├── WRIndicator
+    ├── CCIIndicator
+    └── OBVIndicator
+```
+
+### 9.2 Built-in indicators
+
+#### MA — main
+- **Style:** `MAStyle({ List<Color> maColors })`
+- **calcParams:** `[5,10,30,60]`
+- **Output:** `entity.maValueList[i]`
+
+#### BOLL — main
+- **Style:** `BOLLStyle({ bollColor, ubColor, lbColor, fillColor })`
+- **calcParams:** `[20, 2]` — (period, std multiplier)
+- **Output:** `entity.boll = Boll { up, mid, dn, bollMa }`
+
+#### EMA — main
+- **Style:** `MAStyle`
+- **calcParams:** `[5, 10, 20]`
+- **Output:** `entity.emaValueList[i]`
+
+#### SAR — main
+- **Style:** `SARStyle({ sarColor, radius, strokeWidth })`
+- **Output:** `entity.sar = double?`
+
+#### ZigZag — main
+- **Style:** `ZigZagStyle({ zigzagColor, lineWidth })`
+- **calcParams:** `[5]` (deviation %)
+- **Output:** `entity.zigzag = double?` chỉ ở pivot
+
+#### MACD — secondary
+- **Style:** `MACDStyle({ upColor, dnColor, macdColor, difColor, deaColor, macdWidth })`
+- **calcParams:** `[12, 26, 9]`
+- **Output:** `entity.dif`, `entity.dea`, `entity.macd = (dif-dea)*2`
+
+#### KDJ — secondary
+- **Style:** `KDJStyle({ kColor, dColor, jColor })`
+- **calcParams:** `[9, 3, 3]`
+- **Output:** `k`, `d`, `j` ∈ [0, 100]
+
+#### RSI — secondary
+- **Style:** `RSIStyle({ rsiColor })`
+- **calcParams:** `[14]`
+- **Output:** `rsi` ∈ [0, 100]
+
+#### WR — secondary
+- **Style:** `WRStyle({ wrColor })`
+- **calcParams:** `[14]`
+- **Output:** `r` ∈ [-100, 0]
+
+#### CCI — secondary
+- **Style:** `CCIStyle({ cciColor })`
+- **calcParams:** `[14]`
+- **Output:** `cci`
+
+#### OBV — secondary
+- **Style:** `OBVStyle({ obvColor, signalColor })`
+- **calcParams:** `[5]` — period cho signal MA
+- **Output:** `obv` (cumulative), `obvSignal` (MA của OBV)
+- **Công thức:**
+  ```
+  obv[0] = vol[0]
+  obv[i] = obv[i-1] + vol[i]   // nến tăng
+  obv[i] = obv[i-1] - vol[i]   // nến giảm
+  signal = SMA(obv, 5)
+  ```
+
+### 9.3 Custom indicator
+
+```dart
+class MyIndicator extends MainIndicator<CandleEntity, MyStyle> {
+  MyIndicator() : super(
+    name: 'myThing', shortName: 'MY',
+    calcParams: [10], indicatorStyle: const MyStyle(),
+  );
+
+  @override
+  void calc(List<KLineEntity> data) { /* populate field */ }
+
+  @override
+  (double, double) getMaxMinValue(KLineEntity e, double minV, double maxV) { ... }
+
+  @override
+  void drawChart(lastPoint, curPoint, lastX, curX, getY, canvas, colors) { ... }
+
+  @override
+  TextSpan? drawFigure(CandleEntity e, int precision, KChartColors c) { ... }
+}
+```
+
+### 9.4 Pattern thêm secondary indicator mới
+
+```
+1. Tạo lib/entity/<name>_entity.dart
+2. Thêm vào lib/entity/macd_entity.dart (on clause)
+3. Thêm vào lib/entity/k_entity.dart (TRƯỚC MACDEntity)
+4. Export trong lib/entity/index.dart
+5. Thêm <Name>Style vào lib/indicator/indicator_style.dart
+6. Tạo lib/indicator/secondary/<name>_indicator.dart
+7. Thêm part vào indicator_template.dart
+8. Thêm button + case vào example/main.dart
+```
+
+---
+
+## 10. `DataUtil` & helpers
+
+### 10.1 `DataUtil`
+
+| Method | Effect |
+|---|---|
+| `calculateAll(data, mains, secondaries)` | Gọi `calcVolumeMA` + tính tất cả indicator. Phải gọi mỗi khi data thay đổi. |
+| `calculateIndicators(data, mains, secondaries)` | Chỉ tính indicator, bỏ qua volume MA. |
+| `calculateIndicator(data, indicator)` | Tính 1 indicator riêng. |
+| `calcVolumeMA(data)` | Tính `MA5Volume` & `MA10Volume`. |
+
+**Quan trọng:** Khi load thêm data cũ (left), phải merge list rồi gọi `calculateAll` LẠI trên list mới — indicator phụ thuộc vào toàn bộ historical data.
+
+### 10.2 `NumberUtil`
+
+| Method | Ví dụ |
+|---|---|
+| `NumberUtil.format(value, precision)` | Format tự động (loại trailing zero). |
+| `NumberUtil.formatFixed(value, precision)` | Fix precision (giữ trailing zero). |
+
+### 10.3 Date format
+
+`dateFormat(DateTime, List<String> tokens)` — tokens trong `date_format_util.dart`:
+
+| Token | Output |
+|---|---|
+| `yyyy` `yy` | Năm 4/2 chữ số |
+| `mm` | Tháng (padded) |
+| `dd` `d` | Ngày (padded/compact) |
+| `hour24Padded` `H` | Giờ 24h |
+| `nn` `n` | Phút |
+| `ss` `s` | Giây |
+
+### 10.4 Auto-detect time format & grid alignment
+
+`initFormats()` trong `BaseChartPainter` tự chọn format **và** override `mGridColumns` dựa vào khoảng cách giữa 2 candle đầu:
+
+| Khoảng cách | Format | `mGridColumns` | Số mốc |
+|---|---|---|---|
+| ≥ 28 ngày (monthly) | `yy-MM` | 4 | 5 |
+| ≥ 1 ngày (daily) | `yy-MM-dd` | 4 | 5 |
+| Intraday (phút/giờ) | `MM-dd HH:mm` | 3 | 4 |
+| < 2 items (fallback) | `MM-dd HH:mm` | — (giữ từ `KChartStyle`) | — |
+
+**Grid-time alignment:** `drawDate()` vẽ label tại đúng vị trí `columnSpace * i` (`i = 0..mGridColumns`) — trùng khớp với vị trí `drawGrid()` vẽ đường dọc. Mỗi đường grid dọc ứng đúng 1 time label bên dưới.
+
+> `mGridColumns` được `initFormats()` override, thắng giá trị `gridColumns = 6` mặc định trong `KChartStyle`. `KChartStyle.gridColumns` chỉ có tác dụng khi `datas < 2` hoặc khi truyền `dateTimeFormat` custom (không qua auto-detect).
+
+---
+
+## 11. `DepthChart` — orderbook depth
+
+File: `lib/depth_chart.dart`. Widget độc lập với `KChartWidget`.
+
+### Constructor
+
+```dart
+DepthChart(
+  bids,                              // List<DepthEntity>
+  asks,                              // List<DepthEntity>
+  chartColors, {                     // DepthChartColors
+  baseUnit = 2,
+  quoteUnit = 6,
+  offset = const Offset(8, 0),
+  chartTranslations = const DepthChartTranslations(),
+  chartStyle = const DepthChartStyle(),
+  backgroundLogo,
+  backgroundLogoOpacity = 1,
+  bottomLabelCount = 5,              // số mốc giá ở trục dưới (>=2)
+})
+```
+
+**`bottomLabelCount`:** Nội suy tuyến tính từng đoạn:
+- `[bids.first.price..centerPrice]` nửa trái
+- `[centerPrice..asks.last.price]` nửa phải
+- `centerPrice = (bids.last.price + asks.first.price) / 2`
+
+### `DepthChartStyle`
+
+| Field | Default |
+|---|---|
+| `lineWidth` | `1.0` |
+| `radius` | `4.0` |
+| `strokeWidth` | `0.6` |
+| `space` | `2.0` |
+| `padding` | `6.0` |
+| `dotRadius` | `5.0` |
+| `crossWidth` | `0.5` |
+
+### `DepthChartColors`
+
+- `upColor` / `upFillPathColor` — bid (xanh + fill mờ).
+- `dnColor` / `dnFillPathColor` — ask (đỏ + fill mờ).
+- `defaultTextColor`, `annotationColor`, `crossColor`, `barrierColor`, `selectBorderColor`, `selectFillColor`.
+
+---
+
+## 12. Renderer internals
+
+### Layout dọc
 
 ```
 ┌───────────────────────────────────────────┐
 │  mTopPadding (chartStyle.topPadding + N×12) │ ← N main indicators
 ├───────────────────────────────────────────┤
-│                                           │
 │              mMainRect                    │ candles + main indicators
-│                                           │
 ├───────────────────────────────────────────┤
 │  mVolRect   (mVolumeHeight)               │ vol panel (null nếu volHidden)
 ├───────────────────────────────────────────┤
-│  mSecondaryRectList[0]                    │ panel đầu (vd: MACD)
+│  mSecondaryRectList[0]                    │ MACD
 ├───────────────────────────────────────────┤
-│  mSecondaryRectList[1]                    │ panel kế (vd: RSI)
-├───────────────────────────────────────────┤
-│  ...                                      │
+│  mSecondaryRectList[1]                    │ RSI
 ├───────────────────────────────────────────┤
 │  mDateRect  (chartStyle.bottomPadding)    │ trục thời gian (đáy cùng)
 └───────────────────────────────────────────┘
 ```
 
-- `mMainRect`: vùng nến + main indicators (không bị overlay volume).
-- `mVolRect`: panel volume riêng — `null` khi `volHidden = true`.
-- `mSecondaryRectList[i]`: xếp chồng dưới `mVolRect` (hoặc `mMainRect` nếu vol
-  ẩn). Mỗi cái cao `mSecondaryHeight` + `mChildPadding` ở đỉnh để chừa chỗ label.
-- `mDateRect`: **đáy cùng** — dưới panel cuối (vol/secondary/main). Khớp UX
-  trading app: time axis luôn ở dưới cùng, mọi panel chart nằm liên tục phía trên.
+### Tọa độ X
 
-> **Khớp chart_plush.md:** layout có 3 vùng `main/vol/secondary` như sơ đồ
-> đơn giản. Vol KHÔNG còn overlay 20% trong `mMainRect` — nó là rect độc lập.
+```dart
+getX(index)         = index * mPointWidth + mPointWidth / 2
+xToTranslateX(x)    = -mTranslateX + x / scaleX
+indexOfTranslateX() = binary search trên getX(i)
+translateXtoX(tx)   = (tx + mTranslateX) * scaleX
+```
 
----
+### Tọa độ Y
 
-## 4. Tính toán giá trị hiển thị
+```dart
+// BaseChartRenderer
+scaleY = chartRect.height / (maxValue - minValue)
+getY(v) = (maxValue - v) * scaleY + chartRect.top
 
-`BaseChartPainter.calculateValue()`:
+// Screen Y thực sự (sau canvas transform scaleY + offsetY):
+double _applyScaleY(double rawY) {
+  final centerY = (mMainRect.top + mMainRect.bottom) / 2;
+  return (centerY + (rawY - centerY) * scaleY + offsetY)
+      .clamp(mMainRect.top, mMainRect.bottom);
+}
+```
 
-- Xác định `maxScrollX = |getMinTranslateX()|`.
-- Set `mTranslateX = scrollX + getMinTranslateX()`.
-- Tìm `mStartIndex = indexOfTranslateX(xToTranslateX(0))`,
-  `mStopIndex  = indexOfTranslateX(xToTranslateX(mWidth))`
-  bằng tìm kiếm nhị phân.
-
-### 4.0 Padding phải & `getMinTranslateX`
-
-Khoảng trống sau nến cuối khi scroll tới biên phải:
+### Padding phải tỷ lệ
 
 ```dart
 static const double referenceChartWidth = 375.0;
@@ -289,632 +708,328 @@ double getMinTranslateX() {
 }
 ```
 
-- `effectiveRightPaddingPx / scaleX`: chuyển padding **screen px** → **data space** để gap màn hình ổn định khi pinch `scaleX`.
-- `referenceChartWidth`: tại 375px logical, padding = `xFrontPadding` đầy đủ; chart hẹp hơn co tỷ lệ.
-- `KChartWidget`: vùng scaleY + `_isScaleYGesture` dùng cùng helper; `mInfoWindowStream` = `broadcast()`.
-- Duyệt `i = mStartIndex..mStopIndex`:
-  - `getMainMaxMinValue(item, i)` → `mMainMaxValue`, `mMainMinValue`,
-    `mMainMaxIndex`, `mMainMinIndex`, `mMainHighMaxValue`, `mMainLowMinValue`.
-  - `getVolMaxMinValue(item)` (nếu `mVolRect != null`) → `mVolMaxValue` =
-    `max(vol, MA5Volume, MA10Volume)`, `mVolMinValue = 0` (chốt 0 để cột vol
-    neo đáy panel).
-  - `getSecondaryMaxMinValue(idx, item)` → cập nhật
-    `mSecondaryRectList[idx].mMaxValue/mMinValue` qua
-    `secondaryIndicators[idx].getMaxMinValue(item, minV, maxV)`.
-
-### 4.1 Main range
-
-`MainIndicator.getMaxMinValue` mở rộng `(high, low)` ban đầu:
-- **MA**: cộng vào range mọi `maValueList[i]`.
-- **BOLL**: cộng `up`, `dn` (mb nằm trong khoảng).
-- **EMA**: cộng các đường EMA period.
-- **SAR/ZigZag**: cộng điểm SAR / zigzag point.
-- **isLine == true**: bypass — chỉ dùng `close`.
-
-### 4.2 Vol range
-
-Tính qua `BaseChartPainter.getVolMaxMinValue` (chỉ gọi khi `mVolRect != null`):
-
-```dart
-final ma5 = item.MA5Volume ?? 0;
-final ma10 = item.MA10Volume ?? 0;
-mVolMaxValue = max(mVolMaxValue, max(item.vol, max(ma5, ma10)));
-mVolMinValue = min(mVolMinValue, item.vol);  // từ data thực tế (không còn hardcode 0)
-```
-
-`mVolMinValue` dùng để render **label min** ở góc dưới-phải panel vol (`VolRenderer.drawVerticalText`). Scale cột vol vẫn neo đáy panel — `VolRenderer.getY` dùng `(max - v) * (height / max) + top`, không phụ thuộc `mVolMinValue`.
-
-### 4.3 Secondary range
-
-Tuỳ indicator, cộng vào `(minV, maxV)`:
-
-- **MACD**: `macd`, `dif`, `dea`.
-- **KDJ**: `k`, `d`, `j`.
-- **RSI**: `rsi`.
-- **WR**: `r` (giá trị âm).
-- **CCI**: `cci`.
-- **OBV**: `obv`, `obvSignal` (giá trị tích luỹ rất lớn).
-
----
-
-## 5. Chuyển đổi toạ độ & hiển thị dữ liệu
-
-### 5.1 Tọa độ X
-
-```dart
-getX(index)         = index * mPointWidth + mPointWidth / 2
-xToTranslateX(x)    = -mTranslateX + x / scaleX
-indexOfTranslateX() = binary search trên getX(i)
-translateXtoX(tx)   = (tx + mTranslateX) * scaleX
-```
-
-### 5.2 Tọa độ Y
-
-`BaseChartRenderer.getY(value)`:
-
-```dart
-scaleY = chartRect.height / (maxValue - minValue)
-getY(v) = (maxValue - v) * scaleY + chartRect.top
-```
-
-Cho main, **screen Y** thực sự (sau canvas transform scaleY + offsetY):
-
-```dart
-double _applyScaleY(double rawY) {
-  final centerY = (mMainRect.top + mMainRect.bottom) / 2;
-  return (centerY + (rawY - centerY) * scaleY + offsetY)
-      .clamp(mMainRect.top, mMainRect.bottom);
-}
-```
-
-Dùng cho `drawNowPrice`, `drawMaxAndMin` (vẽ ngoài canvas transform).
-
----
-
-## 6. Vẽ chart chính
-
-`ChartPainter.drawChart(canvas, size)`:
-
-```
-canvas.save()
-canvas.translate(mTranslateX * scaleX, 0)
-canvas.scale(scaleX, 1.0)
-
-  canvas.save()  ─── scaleY scope ───
-  canvas.clipRect(mMainRect band)
-  canvas.translate(0, centerY*(1-scaleY) + offsetY)
-  canvas.scale(1.0, scaleY)
-  for i in mStartIndex..mStopIndex:
-      mMainRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas)
-  canvas.restore()
-
-  for i in mStartIndex..mStopIndex:                  ← ngoài scaleY
-      mVolRenderer?.drawChart(lastPoint, curPoint, lastX, curX, size, canvas)
-      for each renderer in mSecondaryRendererList:
-          renderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas)
-
-  if longPress|tap && !isTrendLine:  drawCrossLine()
-  if isTrendLine:                    drawTrendLines()
-
-canvas.restore()
-```
-
-### 6.1 MainRenderer
-
-`MainRenderer.drawChart()`:
-
-- `drawPolyline` khi `isLine == true` (line + gradient fill bên dưới).
-- `drawCandle` khi `isLine == false`:
-  - Thân nến: `canvas.drawRect(open..close)` màu `upColor`/`dnColor`.
-  - Bóng nến: line đứng từ `high` đến `low`.
-- Sau nến, gọi từng `MainIndicator.drawChart(lastPoint, curPoint, lastX, curX,
-  getY, canvas, chartColors)` → MA/BOLL/EMA/SAR/ZigZag overlay trên nến.
-
-#### 6.1.1 Vẽ nến
-
-- Dùng `curPoint.high/low/open/close` để tính `top/bottom`.
-- Vẽ thân (rect) + bóng (line) bằng `canvas.drawRect` / `drawLine`.
-- Màu: `chartColors.upColor` khi `close >= open`, ngược lại `dnColor`.
-
-#### 6.1.2 Vẽ đường (line chart)
-
-- `Path` + `cubicTo` nối điểm `close`.
-- Fill path bằng gradient `kLineFillColors`, stroke `kLineColor`.
-
-#### 6.1.3 Vẽ MA / BOLL / EMA
-
-- Chạy qua `MainIndicator.drawChart(getY, ...)` cho mỗi indicator trong
-  `mainIndicators`. Mỗi indicator quản lý paint + màu riêng từ
-  `indicatorStyle`.
-
----
-
-## 7. Vẽ volume
-
-Volume có **renderer riêng** (`VolRenderer extends BaseChartRenderer<VolumeEntity>`)
-vẽ vào `mVolRect`. Toggle bằng cờ `volHidden`:
-
-```dart
-KChartWidget(
-  data, chartStyle, chartColors,
-  volHidden: false,    // bật panel vol
-  secondaryIndicators: [MACDIndicator()],
-)
-```
-
-`VolRenderer.drawChart(lastPoint, curPoint, lastX, curX, size, canvas)`:
-
-- Bar: `canvas.drawRect(curX - r, getY(vol), curX + r, chartRect.bottom)`,
-  màu `chartColors.volUpColor`/`volDnColor`, alpha = `chartStyle.volBarOpacity`
-  (default 1.0 = đặc, set thấp hơn để cột mờ).
-- MA5 line: `drawLine(MA5Volume, MA5Volume, ...)`, màu `chartColors.ma5Color`.
-- MA10 line: tương tự `MA10Volume`, màu `chartColors.ma10Color`.
-- `getY` của `VolRenderer` override: `(max - v) * (height / max) + top` —
-  giả định min = 0, cột vol luôn neo đáy panel.
-
-`MA5Volume`/`MA10Volume` được `DataUtil.calcVolumeMA(data)` tính sẵn — gọi
-qua `DataUtil.calculateAll(data, mainIndicators, secondaryIndicators)` mỗi khi
-data đổi.
-
-**Tách scope với scaleY:** mặc dù `VolRenderer` chạy ngay sau `mMainRenderer`,
-nó nằm **ngoài** `canvas.scale(1, scaleY)` của main → panel vol không bị giãn
-khi user zoom dọc nến. Đây là điểm bổ sung so với chart_plush.md gốc (gốc
-không có scaleY).
-
----
-
-## 8. Vẽ secondary indicator
-
-`SecondaryRenderer.drawChart()` chỉ là wrapper, gọi
-`indicator.drawChart(getY: getY, ...)`. Mỗi indicator tự vẽ:
-
-- **VOL**: bars + MA5/MA10 line (xem mục 7).
-- **MACD**: thanh MACD (rect tô đặc/stroke theo trend) + đường `dif`, `dea`.
-- **KDJ**: 3 đường `k`, `d`, `j` màu khác nhau.
-- **RSI**: đường `rsi`.
-- **WR**: đường `r` (Williams %R, giá trị âm).
-- **CCI**: đường `cci`.
-- **OBV**: đường `obv` + signal MA (`obvSignal`).
-
-Mỗi indicator có `IndicatorStyle` con (`MACDStyle`, `KDJStyle`, `OBVStyle`, …)
-chứa color overrides + line width.
-
----
-
-## 9. Vẽ nền và lưới
-
-`ChartPainter.drawBg(canvas, size)`:
-
-- **Skip nếu `skipBg == true`** (khi có `backgroundLogo` → canvas trong suốt,
-  background được render bằng `ColoredBox` layer dưới).
-- Vẽ `mMainRect` band + `mVolRect` band (nếu có) + mỗi `mSecondaryRect` band +
-  `mDateRect` bằng `chartColors.bgColor`.
-
-`drawGrid()` gọi:
-
-- `mMainRenderer.drawGrid(canvas, mGridRows, mGridColumns)`.
-- `mVolRenderer?.drawGrid(...)` — đường đáy panel vol + cột dọc.
-- Mỗi `SecondaryRenderer.drawGrid(...)` — đường đáy + cột dọc theo `gridColumns`.
-
----
-
-## 10. Vẽ text hiển thị
-
-### 10.1 Giá trị trục dọc
-
-- `mMainRenderer.drawVerticalText`: max/min ở cạnh phải `mMainRect`, vị trí
-  theo `verticalTextAlignment` (`left`/`right`).
-- `mVolRenderer?.drawVerticalText`: chỉ hiển thị max (compact) ở góc phải
-  panel — min = 0 nên skip để không đè đường lưới đáy.
-- Mỗi `SecondaryRenderer.drawVerticalText`: gọi
-  `indicator.drawVerticalText(chartRect, maxValue, minValue, …)` →
-  hiển thị max + min ở góc trên-phải / dưới-phải panel.
-
-### 10.2 Ngày giờ dưới đáy
-
-`drawDate()`:
-
-- Lặp `i = 0..mGridColumns`, tính `translateX = xToTranslateX(columnSpace*i)`.
-- Nếu nằm trong `[startX, stopX]`, lấy `indexOfTranslateX(translateX)` và format
-  `datas[index].time` theo `mFormats` (auto theo khoảng cách 2 nến hoặc
-  `chartStyle.dateTimeFormat` override).
-
-### 10.3 Thông tin MA/indicator dòng trên cùng
-
-`drawText(canvas, getItem(mStopIndex), chartStyle.space)`:
-
-- Khi long-press/tap: thay `data` bằng `getItem(calculateSelectedX(selectX))`
-  (nến tại crosshair).
-- `mMainRenderer.drawText()` → label MA/BOLL/EMA trên đầu `mMainRect`.
-- `mVolRenderer?.drawText()` → label `VOL: 1.23K  MA5: 1.5K  MA10: 1.8K`
-  trên đầu `mVolRect`.
-- Mỗi `SecondaryRenderer.drawText()` → label panel (vd MACD: `MACD(12,26,9)
-  MACD:… DIF:… DEA:…`).
-
-> **Khác chart_plush.md gốc:** label dùng `getItem(mStopIndex)` (nến phải nhất
-> đang hiển thị) thay vì `datas!.last` cố định. Khi user scroll sang trái, label
-> cập nhật theo nến hiển thị, không kẹt ở nến cuối.
-
----
-
-## 11. Tương tác và crosshair
-
-`KChartWidget` xử lý tap, drag, scale, long press, pointer tracking:
-
-### 11.1 Trục X (scroll + zoom)
-
-- **Horizontal drag (1 ngón)**: `mScrollX += dx / scaleX`, clamp
-  `[0, maxScrollX]`. Trigger `onLoadMore(true)` khi `mScrollX >= 0.8 * maxScrollX`
-  **hoặc khi `maxScrollX <= 0`** (tất cả data vừa màn hình — không scroll được).
-- **Pinch (2 ngón)**: `mScaleX = lastScale * details.scale`, clamp
-  `[minScale, maxScale]`. Sau khi kết thúc pinch, nếu `maxScrollX` giảm về 0
-  (zoom out quá), post-frame callback sẽ trigger `onLoadMore(true)`.
-- **Fling**: animate `mScrollX` theo velocity sau khi thả tay (ngoại trừ khi
-  drag bắt đầu trong tap mode để di chuyển crosshair).
-- **Restore từ `chartScale`**: khi widget nhận `chartScale != null` (hoặc
-  `chartScale` object thay đổi), tự restore `mScaleX`/`mScaleY`/`mScrollX`.
-  `mScrollX` được clamp lại sau layout (post-frame) vì `maxScrollX` chưa biết
-  trước khi paint lần đầu.
-
-### 11.1.1 `KChartScaleState` — snapshot zoom state
+| `mWidth` (xFrontPadding=100) | Padding màn hình |
+|---|---|
+| ≥ 375px | 100px |
+| 250px | ~67px |
+| 187px | ~50px |
+
+### `KChartScaleState`
 
 ```dart
 class KChartScaleState {
-  final double scaleX;   // zoom ngang, chưa clamp — widget tự clamp khi restore
-  final double scaleY;   // zoom dọc main (0.3–5.0)
+  final double scaleX;   // zoom ngang
+  final double scaleY;   // zoom dọc main
   final double scrollX;  // offset scroll (0 = nến mới nhất)
+
+  const KChartScaleState({
+    this.scaleX = 1.0,
+    this.scaleY = 1.0,
+    this.scrollX = 0.0,
+  });
+
+  KChartScaleState clampedTo({required double minScale, required double maxScale});
+  KChartScaleState copyWith({double? scaleX, double? scaleY, double? scrollX});
 }
 ```
 
-**Khi `onChartScaleChanged` được emit:**
+### Luồng vẽ mỗi frame
 
-| Sự kiện | Ghi chú |
+```
+paint()
+├── initRect()
+├── calculateValue()
+├── initChartRenderer()
+├── drawBg()
+├── drawGrid()
+├── drawChart()
+│   ├── canvas transform (scaleX, translateX)
+│   ├── canvas transform (scaleY, offsetY) → clip mMainRect
+│   │   ├── MainRenderer.drawChart()
+│   │   └── VolRenderer.drawChart()    ← ngoài scaleY scope
+│   └── SecondaryRenderer.drawChart()  ← ngoài scaleY scope
+├── drawVerticalText()
+├── drawDate()
+├── drawText()          ← dùng getItem(mStopIndex) không phải datas!.last
+├── drawMaxAndMin()
+└── drawNowPrice()
+```
+
+---
+
+## 13. Gesture model
+
+### 13.1 Single tap
+
+- Trong main rect: toggle crosshair.
+- `isTrendLine: true`: tap = record điểm cho trend line.
+
+### 13.2 Long press
+
+- Hiện crosshair + drag để di chuyển.
+- Phát `InfoWindowEntity` qua stream → `detailBuilder` render dialog.
+
+### 13.3 Scale
+
+`onScaleStart` chốt 2 cờ:
+- `_isScaleYGesture`: 1 ngón + drag dọc trong vùng phải (`effectiveRightPaddingPx`) → scaleY.
+- `_gestureInMain`: `painter.isInMainRect(localFocalPoint)`. Nếu **false** (vol/secondary/date), chỉ scroll X, forward dy cho outer scroll.
+
+`onScaleUpdate` — 4 nhánh khi `_gestureInMain == true`:
+
+| Điều kiện | Hành vi |
 |---|---|
-| `onScaleEnd` (pinch / scaleY drag kết thúc) | Chỉ emit khi `scaleX` hoặc `scaleY` thực sự thay đổi |
-| `KChartController.zoomIn()` / `zoomOut()` / `reset()` | Sau khi cập nhật `mScaleX` |
-| Double-tap vùng phải | Sau khi reset `scaleY = 1`, `offsetY = 0` |
-| Restore từ `chartScale` | **Không emit** (suppress nội bộ) |
+| `_dragStartedInTapMode` && 1 ngón | Di chuyển crosshair. |
+| `_isScaleYGesture` && 1 ngón | `mScaleY -= delta * 0.005`, clamp `[0.3, 5.0]`. |
+| `details.scale != 1.0` (≥2 ngón) | `mScaleX = lastScale * scale`, clamp. |
+| 1 ngón drag tự do | `mScrollX += dx / mScaleX`. Pan Y chỉ active khi `mScaleY != 1.0`. |
 
-**Pattern lưu/khôi phục khi đổi timeframe:**
+**Gesture gate vol/secondary:**
+
+```
+Finger chạm vol/secondary + 1 ngón:
+  dx → scrollX nến (như main)
+  dy → forward onVerticalOverscroll (KHÔNG pan chart Y)
+Pinch ≥2 ngón: scaleX bình thường
+```
+
+### 13.4 Clamp `mOffsetY`
+
+```dart
+double _clampOffsetY(double v) {
+  final maxOffset = mBaseHeight * mScaleY / 2;
+  return v.clamp(-maxOffset, maxOffset);
+}
+```
+
+### 13.5 Overscroll handoff
+
+```dart
+// Trong KChartWidget — detect overscroll
+if (mScaleY != 1.0) {
+  final newOffsetY = mOffsetY + dy;
+  final clampedOffsetY = _clampOffsetY(newOffsetY);
+  mOffsetY = clampedOffsetY;
+  final overscroll = newOffsetY - clampedOffsetY;
+  if (overscroll != 0) widget.onVerticalOverscroll?.call(overscroll);
+}
+```
+
+**Quy ước dấu:** `delta > 0` = finger drag DOWN (chart ở biên +max); `delta < 0` = finger drag UP.
+
+### 13.6 Double-tap (vùng phải scaleY)
+
+Double-tap → reset `mScaleY = 1.0`, `mOffsetY = 0.0`.
+
+### 13.7 Fling
+
+Sau drag end, animation Tween chạy với `flingTime` ms, `flingCurve`, `flingRatio` × velocity.
+
+### 13.8 Auto-compensate scroll khi append nến mới
+
+```dart
+void _compensateScrollOnDataChange(KChartWidget oldWidget) {
+  final diff = newData.length - oldData.length;
+  if (diff <= 0) return;
+  final appended = oldData.first.time == newData.first.time
+      && oldData.last.time != newData.last.time;
+  if (!appended) return;
+  if (mScrollX <= 0.0) return;  // rightmost → auto-follow
+  mScrollX += diff * widget.chartStyle.pointWidth;
+}
+```
+
+---
+
+## 14. Recipes — công thức thường dùng
+
+### 14.1 Live tick
+
+```dart
+void onTick(double newClose) {
+  final last = data.last;
+  final updated = KLineEntity.fromCustom(
+    time: last.time!,
+    open: last.open,
+    close: newClose,
+    high: max(last.high, newClose),
+    low: min(last.low, newClose),
+    vol: last.vol + 0.1,
+    amount: 0,
+  );
+  final next = [...data.sublist(0, data.length - 1), updated];
+  DataUtil.calculateAll(next, mains, secondaries);
+  setState(() => data = next);
+}
+```
+
+### 14.2 Load more khi scroll trái
+
+```dart
+KChartWidget(
+  data, style, colors,
+  detailBuilder: ...,
+  isTrendLine: false,
+  isLoadingMore: _isFetching,
+  onLoadMore: (isLeft) async {
+    if (!isLeft || _isFetching) return;
+    setState(() => _isFetching = true);
+    final older = await fetchOlderCandles(from: data.first.time!);
+    final merged = [...older, ...data];
+    DataUtil.calculateAll(merged, mains, secondaries);
+    setState(() {
+      data = merged;
+      _isFetching = false;
+    });
+  },
+)
+```
+
+### 14.3 Dark theme
+
+```dart
+KChartColors(
+  bgColor: Color(0xFF1C1C1E),
+  defaultTextColor: Color(0xFF8E8E93),
+  gridColor: Color.fromARGB(255, 187, 187, 187),
+  selectFillColor: Color(0xFF2C2C2E),
+  selectBorderColor: Color(0xFF636366),
+  crossColor: Color(0xFFEBEBF5),
+  crossTextColor: Color(0xFFEBEBF5),
+  maxColor: Color(0xFFEBEBF5),
+  minColor: Color(0xFFEBEBF5),
+)
+```
+
+### 14.4 Toggle nhiều secondary
+
+```dart
+List<SecondaryIndicator> get _secondary => [
+  if (showMACD) MACDIndicator(),
+  if (showKDJ) KDJIndicator(),
+  if (showRSI) RSIIndicator(),
+];
+```
+
+### 14.5 Custom date format
+
+```dart
+KChartWidget(
+  data, style, colors,
+  detailBuilder: ...,
+  isTrendLine: false,
+  timeFormat: const [dd, '/', mm, ' ', hour24Padded, ':', nn],
+)
+```
+
+### 14.6 Watermark logo
+
+```dart
+KChartWidget(
+  ...,
+  backgroundLogo: SvgPicture.asset('assets/logo.svg', width: 80, height: 80),
+  backgroundLogoOpacity: 0.15,
+)
+```
+
+### 14.7 External zoom buttons
+
+```dart
+final ctrl = KChartController();
+KChartWidget(..., controller: ctrl)
+IconButton(onPressed: ctrl.zoomIn, icon: Icon(Icons.zoom_in))
+IconButton(onPressed: ctrl.zoomOut, icon: Icon(Icons.zoom_out))
+IconButton(onPressed: ctrl.reset, icon: Icon(Icons.refresh))
+```
+
+### 14.8 Lưu/khôi phục zoom state khi đổi timeframe
 
 ```dart
 KChartScaleState? _savedScale;
 
-// Build:
 KChartWidget(
   _data, chartStyle, chartColors,
   chartScale: _savedScale,
-  onChartScaleChanged: (s) => _savedScale = s,  // lưu (không cần setState)
+  onChartScaleChanged: (s) => setState(() => _savedScale = s),
   ...
 )
-
-// Đổi timeframe:
-setState(() {
-  _data = newData;
-  // _savedScale giữ nguyên → widget tự restore view của user
-});
+// Khi đổi timeframe: truyền _savedScale vào instance mới → widget tự restore.
 ```
 
-### 11.2 Trục Y (zoom dọc + pan dọc) — chỉ áp cho main
-
-- **ScaleY gesture**: 1 ngón drag dọc trong vùng `Positioned` bên phải (width =
-  `effectiveRightPaddingPx`) → `mScaleY -= delta * 0.005`, clamp `[0.3, 5.0]`.
-- **Pan Y**: chỉ active khi `mScaleY != 1.0`. `mOffsetY += dy`, clamp
-  `|offsetY| ≤ baseHeight × scaleY / 2` (50% rule).
-- **Overscroll handoff**: phần `dy` vượt clamp emit qua
-  `onVerticalOverscroll(delta)` → parent forward sang outer `ScrollController`
-  (negate dấu, dùng `jumpTo` để bypass physics).
-- **Double-tap vùng phải**: reset `mScaleY = 1.0`, `mOffsetY = 0.0`.
-
-### 11.2.1 Gesture gate theo vùng — vol/secondary không di chuyển nến
-
-**Vấn đề:** Trước đây `GestureDetector` của `KChartWidget` bọc toàn bộ stack
-(`mMainRect` + `mVolRect` + `mSecondaryRectList` + `mDateRect`). Mọi drag bất
-kể chạm vào panel nào đều update `mScrollX` / `mOffsetY` → kéo trên vol panel
-cũng kéo nến đi theo. Khi chart được nhúng trong list cuộn (vd page có
-Order Book / form trade), user kỳ vọng drag trên vol/MACD/RSI cuộn list,
-không phải xê dịch chart.
-
-**Giải pháp:** Gate gesture bằng vị trí touch start. Chỉ khi điểm chạm xuất
-phát trong `mMainRect`, chart mới xử lý scroll/scale. Ngoài ra forward
-`dy` cho outer scroll.
-
-#### State
+### 14.9 Overscroll handoff sang outer scrollview
 
 ```dart
-// true khi gesture bắt đầu TRONG mMainRect. Khi false (vol/secondary/date),
-// chart không xử lý scroll/scale — forward delta Y cho outer scroll qua
-// `onVerticalOverscroll`, parent tự quyết định cuộn theo.
-bool _gestureInMain = true;
-```
-
-#### Lifecycle
-
-```dart
-onScaleStart: (details) {
-  // ... existing logic (isScale, _stopAnimation, _isScaleYGesture …)
-  _gestureInMain = painter.isInMainRect(details.localFocalPoint);
-},
-
-onScaleUpdate: (details) {
-  // Touch ngoài main + 1 ngón: chỉ chặn pan Y, vẫn cho scroll X.
-  //   - dx → scrollX nến (giống main)
-  //   - dy → forward outer scroll (KHÔNG pan chart Y)
-  // Pinch (≥2 ngón) đi xuống nhánh dưới → scaleX bình thường.
-  if (!_gestureInMain && details.pointerCount < 2) {
-    isOnTap = false;
-    mScrollX = (mScrollX + details.focalPointDelta.dx / mScaleX)
-        .clamp(0.0, ChartPainter.maxScrollX)
-        .toDouble();
-    final dy = details.focalPointDelta.dy;
-    if (dy != 0 && widget.onVerticalOverscroll != null) {
-      widget.onVerticalOverscroll!(dy);
-    }
-    if (!widget.isLoadingMore &&
-        widget.onLoadMore != null &&
-        ChartPainter.maxScrollX > 0 &&
-        mScrollX >= ChartPainter.maxScrollX * 0.8) {
-      widget.onLoadMore!(true);
-    }
-    notifyChanged();
-    return;
+void _onChartVerticalOverscroll(double delta) {
+  if (!_outerScrollController.hasClients) return;
+  final pos = _outerScrollController.position;
+  // Đảo dấu: chart pan dùng mOffsetY += dy (content theo finger).
+  // Scroll Flutter ngược lại: pixels TĂNG = reveal content dưới.
+  final target = (pos.pixels - delta).clamp(
+    pos.minScrollExtent,
+    pos.maxScrollExtent,
+  );
+  if (target != pos.pixels) {
+    _outerScrollController.jumpTo(target);
   }
-  // ... existing logic (scaleY zone, pinch, scroll X, pan Y, …)
-},
+}
 
-onScaleEnd: (details) {
-  // fling X cho mọi drag scroll thường, kể cả từ vol/secondary
-  // (vì 1-ngón drag ở đó cũng update mScrollX).
-  if (!_dragStartedInTapMode) {
-    _onFling(details.velocity.pixelsPerSecond.dx);
-  }
-  _dragStartedInTapMode = false;
-  _gestureInMain = true;   // reset cho gesture kế tiếp
-},
-```
-
-#### Decision tree khi user drag
-
-```
-Finger chạm xuống
-│
-├─ Trong mMainRect ?
-│   ├─ YES → _gestureInMain = true
-│   │   └─ onScaleUpdate xử lý bình thường:
-│   │       ├─ 2 ngón tay      → pinch scaleX
-│   │       ├─ 1 ngón vùng phải → scaleY (zoom dọc)
-│   │       ├─ 1 ngón crosshair → di chuyển selectX
-│   │       └─ 1 ngón drag tự do → scrollX (+ pan Y nếu scaleY≠1)
-│   │   onScaleEnd
-│   │       └─ fling X theo velocity (nếu không phải crosshair drag)
-│   │
-│   └─ NO (vol / secondary / date) → _gestureInMain = false
-│       └─ onScaleUpdate phân nhánh theo pointerCount:
-│           ├─ pointerCount ≥ 2 (pinch) →
-│           │   ★ vẫn xử lý scaleX bình thường (như drag trong main)
-│           │   → user pinch trên vol/secondary vẫn zoom chart ngang
-│           │
-│           └─ pointerCount == 1 (drag 1 ngón) →
-│               ├─ dx → scrollX nến (như drag trong main)
-│               ├─ dy → forward onVerticalOverscroll (KHÔNG pan chart Y)
-│               ├─ chart KHÔNG đổi mScaleX/mScaleY/mOffsetY
-│               └─ vẫn trigger onLoadMore khi scroll X đạt 80%
-│       onScaleEnd
-│           └─ fling X bình thường (vẫn chạy cho drag từ vol/secondary)
-```
-
-**Tóm gọn:** vol/secondary chỉ chặn duy nhất **pan Y**. Mọi thao tác khác
-(scroll X, fling X, pinch scaleX, lazy load) vẫn hoạt động.
-
-#### Vùng chính xác
-
-`painter.isInMainRect(point)` chỉ test `mMainRect.contains(point)`:
-
-```dart
-bool isInMainRect(Offset point) => mMainRect.contains(point);
-```
-
-Layout (xem mục 3):
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  mMainRect          ★ full chart gestures               │ ← scroll/pan/pinch
-├─────────────────────────────────────────────────────────┤
-│  mVolRect           ◐ scroll X + pinch | outer scroll Y │
-├─────────────────────────────────────────────────────────┤
-│  mSecondaryRect[0]  ◐ scroll X + pinch | outer scroll Y │
-├─────────────────────────────────────────────────────────┤
-│  mSecondaryRect[1]  ◐ scroll X + pinch | outer scroll Y │
-├─────────────────────────────────────────────────────────┤
-│  mDateRect          ◐ scroll X + pinch | outer scroll Y │
-└─────────────────────────────────────────────────────────┘
-```
-
-Ngoài `mMainRect`: tách rạch giữa **X (chart)** và **Y (outer scroll)**.
-Pan Y của chart bị chặn riêng để không xung đột với outer scroll.
-
-#### Tương tác với physics của outer scroll
-
-Example tham khảo set physics theo state `_scaleYActive && _pointerOnChart`:
-
-```dart
+// Build:
 SingleChildScrollView(
   controller: _outerScrollController,
   physics: (_scaleYActive && _pointerOnChart)
-      ? const NeverScrollableScrollPhysics()  // khoá outer khi chart focused
+      ? const NeverScrollableScrollPhysics()
       : const ClampingScrollPhysics(),
-  ...
+  child: Column(children: [
+    KChartWidget(..., onVerticalOverscroll: _onChartVerticalOverscroll),
+    const OrderBookSection(),
+  ]),
 )
 ```
 
-Khi user touch vol/secondary, có 2 case:
+---
 
-1. **Chưa từng kích hoạt scaleY** → `_scaleYActive == false` → physics =
-   `ClampingScrollPhysics` → outer scroll bằng cả gesture tự nhiên (Flutter
-   propagate vertical gesture lên parent qua gesture arena) **lẫn**
-   `jumpTo` từ `onVerticalOverscroll`. Cả 2 cùng đẩy parent → có thể double.
-   Thực tế gesture của chart đã giành arena trước (vì `GestureDetector` ngoài
-   cùng) → tự nhiên không propagate; chỉ `jumpTo` là kênh duy nhất.
+## 15. Troubleshooting & pitfalls
 
-2. **Đã scaleY → `_scaleYActive == true` & `_pointerOnChart`** → physics =
-   `NeverScrollableScrollPhysics` → outer khoá hoàn toàn với gesture native.
-   Nhưng `jumpTo` **bypass physics**, vẫn cuộn được → list ngoài cuộn theo
-   `dy` được forward từ chart.
+### "Indicator không hiện"
+- Đã gọi `DataUtil.calculateAll(data, mains, secondaries)` chưa? Phải gọi lại MỖI khi list data thay đổi.
+- Đủ data cho period chưa? VD MA30 cần ≥30 nến.
 
-Kết luận: dùng `jumpTo` là quan trọng — đảm bảo outer cuộn bất kể state
-physics, không cần đổi physics khi user chạm vol/secondary.
+### "Sai data sau load more"
+- Phải merge `[...older, ...current]` ROI `calculateAll` lại trên list merged.
 
-#### Hành vi không bị ảnh hưởng
+### "Time hiển thị sai"
+- `time` phải là **milliseconds** Unix epoch. Nếu API trả seconds, nhân 1000.
 
-- **Tap** (`onTapUp`) đã có check `painter.isInMainRect(details.localPosition)`
-  trước khi toggle crosshair → tap vol/secondary không hiện crosshair, đã
-  đúng từ trước.
-- **Long press** (`onLongPressStart`) hiện vẫn set `isLongPress = true` ở mọi
-  vị trí — vì long press chỉ hiển thị crosshair (info), không di chuyển chart.
-  Có thể gate bằng `isInMainRect` nếu cần, nhưng UX thông dụng là cho phép
-  long press ở vol/secondary để inspect candle tương ứng.
-- **Scroll X**: 1-ngón drag ngang ở vol/secondary vẫn cuộn nến — user kỳ vọng
-  drag X bất cứ đâu trong chart đều cuộn timeline.
-- **Fling X**: vẫn chạy sau scroll X từ vol/secondary để có momentum tự nhiên
-  khi user vuốt nhanh.
-- **Lazy load**: vol/secondary drag X vẫn trigger `onLoadMore(true)` khi
-  `mScrollX >= maxScrollX * 0.8`.
-- **Pinch scaleX**: 2-ngón pinch bất cứ đâu (kể cả vol/secondary) đều zoom
-  được chart ngang.
+### "Crosshair label dính vào cạnh"
+- Tăng `xFrontPadding` (mặc định 100px tại chart ≥375px).
 
-#### Edge cases
+### "Chart hẹp vẫn chừa khoảng trống lớn bên phải"
+- Giảm `xFrontPadding` hoặc chỉnh `referenceChartWidth` trong `base_chart_painter.dart`.
 
-- **Drag chéo từ main sang vol**: `onScaleStart` đã chốt `_gestureInMain`
-  theo điểm bắt đầu. Nếu start trong main thì cả sequence được xử lý như
-  drag chart (gồm scroll X + pan Y nếu scaleY≠1), kể cả khi finger lướt
-  sang vol giữa chừng — đúng UX (gesture thuộc về vùng bắt đầu).
-- **Drag chéo từ vol sang main**: start ngoài main → vẫn áp dụng nhánh
-  vol/secondary: scroll X qua dx, forward dy. Finger lướt vào main không
-  giành lại pan Y, tránh giật chart.
-- **Pinch 2 ngón trên vol**: `localFocalPoint` ngoài main → `_gestureInMain =
-  false`. Nhưng `pointerCount >= 2` nên bypass không kích hoạt — pinch vẫn
-  xử lý scaleX bình thường ở nhánh `details.scale != 1.0`.
-- **Pinch 1 ngón main + 1 ngón vol**: focalPoint nằm giữa 2 ngón. `_gestureInMain`
-  set theo focalPoint nhưng `pointerCount >= 2` nên vẫn pinch bình thường.
-- **Drag chéo (dx + dy lớn) ở vol/secondary**: chart cuộn X theo dx, đồng
-  thời outer scroll Y theo dy. Cả 2 chuyển động xảy ra song song — user thấy
-  nến lướt ngang đồng thời list cuộn dọc, phản ánh đúng gesture chéo.
-- **Drag X nhanh ở vol rồi nhả**: `onScaleEnd` không skip fling nữa →
-  nến tiếp tục trượt theo momentum như drag từ main.
+### "Stream has already been listened to"
+- `mInfoWindowStream` phải là `StreamController.broadcast()`.
 
-### 11.3 Crosshair / Trend line
+### "Pan dọc không hoạt động"
+- Pan dọc CHỈ active sau khi user đã scaleY (`mScaleY != 1.0`). Drag dọc vùng phải (`effectiveRightPaddingPx`) để zoom dọc trước.
 
-- **Tap (`isTapShowInfoDialog: true`)**: tap lần 1 hiện crosshair, tap lần 2 ẩn.
-- **Long press**: cố định cross line tại vị trí ngón tay, drag → di chuyển.
-- **Trend line mode (`isTrendLine: true`)**: tap 2 điểm liên tiếp để vẽ
-  `TrendLine(p1, p2)`. State giữ trong `lines: List<TrendLine>`.
+### "Outer scroll ăn gesture chart"
+- Khi nhúng trong `SingleChildScrollView`, track pointer events và toggle physics → `NeverScrollableScrollPhysics` khi finger trên chart.
 
-`ChartPainter` vẽ:
+### "Live tick lag"
+- `DataUtil.calculateAll` chạy O(n × số indicator). Với n > 1000 nến cân nhắc tính incremental.
 
-- `drawCrossLine`: đường dash ngang/dọc + dot tại nến chọn.
-- `drawCrossLineText`: box giá (close của nến) bên trái/phải tuỳ vị trí,
-  box ngày trong `mDateRect`. Emit `InfoWindowEntity` qua `sink` →
-  `KChartWidget` build popup bằng `detailBuilder`.
-- `drawTrendLines`: nối các điểm trong `lines` bằng `canvas.drawLine`.
+### "Mixin order error"
+- Giữ đúng thứ tự mixin trong `k_entity.dart`. `OBVEntity` PHẢI trước `MACDEntity`.
+
+### "onLoadMore không được gọi khi zoom out nhỏ"
+- Điều kiện đã mở rộng: `maxScrollX <= 0 || mScrollX >= maxScrollX * 0.8`. Post-frame callback trong `onScaleEnd` xử lý trường hợp pinch zoom out.
+
+### "Volume panel không tách ra dưới chart"
+- `BaseDimension._mVolumeHeight = 0` theo design hiện tại; volume overlay vào main rect.
+
+### "ZigZagIndicator chỉ vẽ vài điểm"
+- Bình thường — chỉ pivot mới có value. Tăng/giảm `calcParams[0]` (deviation %) để có nhiều/ít pivot.
 
 ---
 
-## 12. Depth chart (độ sâu)
-
-`DepthChartPainter` standalone, không kế thừa `BaseChartPainter`.
-
-```dart
-DepthChart(
-  bids, asks, chartColors, {
-  baseUnit = 2,                       // decimal cho amount
-  quoteUnit = 6,                      // decimal cho price
-  offset = const Offset(8, 0),
-  chartTranslations,
-  chartStyle,
-  backgroundLogo,                     // ★ watermark Widget?
-  backgroundLogoOpacity = 1,          // ★ 0.0–1.0
-  bottomLabelCount = 5,               // ★ số mốc giá ở trục dưới (>=2)
-})
-```
-
-`DepthChartPainter.paint(canvas, size)`:
-
-- `drawBuy`: path xanh nửa trái, `quadraticBezierTo` nối điểm.
-- `drawSell`: path đỏ nửa phải.
-- `drawText`:
-  - 4 mốc volume bên phải.
-  - **`bottomLabelCount` mốc giá ở trục dưới** (vòng lặp, nội suy tuyến tính
-    từng đoạn quanh `centerPrice = (bids.last.price + asks.first.price) / 2`):
-
-    ```dart
-    for (int i = 0; i < n; i++) {
-      final t = i / (n - 1);       // 0..1
-      final x = t * mWidth;
-      final price = t <= 0.5
-          ? startPrice + (centerPrice - startPrice) * (t * 2)
-          : centerPrice + (endPrice - centerPrice) * ((t - 0.5) * 2);
-      // align: i=0 trái, i=n-1 phải, giữa center quanh x (clamp)
-    }
-    ```
-
-  - Crosshair popup (`price` + `amount`) khi `isLongPress`.
-
-Watermark `backgroundLogo`: khi != null, `build` bọc `CustomPaint` trong `Stack`
-với logo `Center` + `IgnorePointer` ở dưới, chart vẽ chồng lên trên.
-
-> **Khác chart_plush.md gốc:** thêm `backgroundLogo`, `backgroundLogoOpacity`,
-> `bottomLabelCount`. Mốc giá ở trục dưới không còn hardcode 5.
-
----
-
-## 13. Hướng dẫn cho source khác
-
-Nếu muốn làm theo kiến trúc này, tách rõ thành 3 lớp chính:
-
-1. **Widget** quản lý tương tác và trạng thái (gesture, scaleX/scaleY,
-   scrollX/offsetY, selectX/Y, lines).
-2. **Painter chung** điều phối:
-   - tính toán vùng hiển thị (`mStartIndex..mStopIndex`),
-   - xác định max/min cho main + từng secondary panel,
-   - chia layout (main → date → secondary list),
-   - vẽ background, grid, ngày giờ, text chung.
-3. **Renderer riêng** từng phần:
-   - `MainRenderer` cho nến + main indicators,
-   - `VolRenderer` cho panel volume (bars + MA),
-   - `SecondaryRenderer` cho mỗi panel indicator phụ
-     (macd/kdj/rsi/wr/cci/obv… đều dùng chung lớp này).
-
-### Các điểm cần kế thừa
-
-- **Mỗi `KEntity` phải có đủ field** cho mọi indicator (mix nhiều mixin).
-- **Tính `max/min` chỉ trên vùng visible**, không trên toàn dataset.
-- **Dùng canvas transform** cho scroll/zoom:
-  - `scaleX + translate` áp cho cả frame.
-  - `scaleY + translate` áp riêng cho main (centerY anchor + offsetY pan).
-- **Secondary indicators luôn vẽ ngoài `scaleY` transform** để không bị giãn.
-- **Mọi label vẽ ngoài transform** qua helper `_applyScaleY`.
-- **Volume có rect riêng (`mVolRect`)**, không phải overlay trong main và
-  cũng không phải secondary indicator — toggle bằng cờ `volHidden`.
-- **Mixin type system**: cho mọi secondary dùng cùng generic `T`
-  (project này dùng `MACDEntity` mix `on` OBV+KDJ+RSI+WR+CCI) để
-  `List<SecondaryIndicator<T, _>>` chứa được tất cả.
-- **Pan Y clamp 50%** + **overscroll handoff** để chart sống cùng outer scroll.
-- **Lazy load**: trigger `onLoadMore(true)` ở 80% maxScrollX, guard bằng
-  `isLoadingMore`. Sau khi prepend data nhớ `DataUtil.calculateAll` lại.
-
----
-
-## 14. Tổng kết
-
-Mô hình này ưu tiên:
-
-- **Tách biệt rõ trách nhiệm** giữa widget (state), painter (layout +
-  orchestration), renderer (draw).
-- **Tối ưu dữ liệu visible** bằng `mStartIndex` / `mStopIndex`.
-- **3 renderer độc lập** khớp với sơ đồ đơn giản của `chart_plush.md`:
-  `MainRenderer` + `VolRenderer` + `SecondaryRenderer`.
-- **Hỗ trợ zoom/scroll cả 2 trục** + chọn điểm data trực tiếp +
-  watermark logo + lazy load + overscroll handoff với outer scroll.
-
-Với tài liệu này, source khác có thể tham khảo cách chia vùng, tính giá trị
-và vẽ theo từng bước — phản ánh đúng nguồn hiện tại của `k_chart_wikex`.
+*Cập nhật: 2026-06-26*
