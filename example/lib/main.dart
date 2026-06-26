@@ -843,8 +843,6 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       mainIndicators: _mainIndicators,
       secondaryIndicators: _secondaryIndicators,
       controller: _controller,
-      minScale: 0.2,
-      maxScale: 2.2,
       chartScale: _savedChartScale,
       onChartScaleChanged: (scale) {
         debugPrint('[scale_state] $scale');
@@ -853,7 +851,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       showNowPrice: true,
       showInfoDialog: true,
       mBaseHeight: 280,
-      timeFormat: TimeFormat.yearMonthDayWithHour,
+      timeFormat: TimeFormat.yearMonthDay,
       onLoadMore: _onLoadMore,
       isLoadingMore: _isFetching,
       detailBuilder: _buildInfoCard,

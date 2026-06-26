@@ -115,12 +115,15 @@ abstract class BaseChartPainter extends CustomPainter {
     // monthly line
     if (time >= 24 * 60 * 60 * 28) {
       mFormats = [yy, '-', mm];
+      mGridColumns = 4; // 5 mốc
     } else if (time >= 24 * 60 * 60) {
       // daily line
       mFormats = [yy, '-', mm, '-', dd];
+      mGridColumns = 4; // 5 mốc
     } else {
-      // hour line
+      // hour/minute line
       mFormats = [mm, '-', dd, ' ', hour24Padded, ':', nn];
+      mGridColumns = 3; // 4 mốc
     }
   }
 

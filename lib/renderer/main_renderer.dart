@@ -296,7 +296,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
       );
     }
     double columnSpace = chartRect.width / gridColumns;
-    for (int i = 0; i <= columnSpace; i++) {
+    for (int i = 0; i <= gridColumns; i++) {
       canvas.drawLine(
         Offset(columnSpace * i, 0),
         Offset(columnSpace * i, chartRect.bottom),

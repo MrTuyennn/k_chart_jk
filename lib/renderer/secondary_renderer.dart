@@ -81,8 +81,7 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
       gridPaint,
     );
     double columnSpace = chartRect.width / gridColumns;
-    for (int i = 0; i <= columnSpace; i++) {
-      //mSecondaryRect垂直线
+    for (int i = 0; i <= gridColumns; i++) {
       canvas.drawLine(
         Offset(columnSpace * i, chartRect.top - topPadding),
         Offset(columnSpace * i, chartRect.bottom),
