@@ -26,8 +26,6 @@ abstract class BaseChartPainter extends CustomPainter {
   bool isOnTap;
   bool isLine;
 
-  late Rect mMainLabelRect;
-
   /// Rectangle box of main chart
   late Rect mMainRect;
 
@@ -39,10 +37,7 @@ abstract class BaseChartPainter extends CustomPainter {
   /// Secondary list support
   List<RenderRect> mSecondaryRectList = [];
   late double mDisplayHeight, mWidth;
-  // padding
-  // mBottomPadding: dateRect height
   double mTopPadding = 20.0, mBottomPadding = 16.0, mChildPadding = 12.0;
-  // grid: rows - columns
   int mGridRows = 4, mGridColumns = 4;
   int mStartIndex = 0, mStopIndex = 0;
   double mMainMaxValue = double.minPositive, mMainMinValue = double.maxFinite;
@@ -55,7 +50,6 @@ abstract class BaseChartPainter extends CustomPainter {
   double mDataLen = 0.0; // the data occupies the total length of the screen
   final KChartStyle chartStyle;
   late double mPointWidth;
-  // format time
   List<String> mFormats = [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
   /// Giá trị padding phải tối đa (px tại [referenceChartWidth]). Thực tế qua [_effectiveRightPaddingPx].
   double xFrontPadding;
@@ -98,31 +92,23 @@ abstract class BaseChartPainter extends CustomPainter {
 
   /// init format time
   void initFormats() {
-    if (chartStyle.dateTimeFormat != null) {
-      mFormats = chartStyle.dateTimeFormat!;
-      return;
-    }
-
     if (mItemCount < 2) {
-      mFormats = [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
+      mFormats = chartStyle.dateTimeFormat ?? [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
       return;
     }
 
     int firstTime = datas!.first.time ?? 0;
     int secondTime = datas![1].time ?? 0;
-    int time = secondTime - firstTime;
-    time ~/= 1000;
-    // monthly line
-    if (time >= 24 * 60 * 60 * 28) {
-      mFormats = [yy, '-', mm];
-      mGridColumns = 4; // 5 mốc
-    } else if (time >= 24 * 60 * 60) {
-      // daily line
-      mFormats = [yy, '-', mm, '-', dd];
+    int time = (secondTime - firstTime) ~/ 1000;
+
+    if (time >= 24 * 60 * 60) {
+      // daily or monthly line
+      mFormats = chartStyle.dateTimeFormat ??
+          (time >= 24 * 60 * 60 * 28 ? [yy, '-', mm] : [yy, '-', mm, '-', dd]);
       mGridColumns = 4; // 5 mốc
     } else {
       // hour/minute line
-      mFormats = [mm, '-', dd, ' ', hour24Padded, ':', nn];
+      mFormats = chartStyle.dateTimeFormat ?? [mm, '-', dd, ' ', hour24Padded, ':', nn];
       mGridColumns = 3; // 4 mốc
     }
   }
@@ -138,7 +124,6 @@ abstract class BaseChartPainter extends CustomPainter {
     initChartRenderer();
 
     canvas.save();
-    canvas.scale(1, 1);
     drawBg(canvas, size);
     drawGrid(canvas);
     if (datas != null && datas!.isNotEmpty) {
@@ -152,7 +137,7 @@ abstract class BaseChartPainter extends CustomPainter {
       drawMaxAndMin(canvas);
       drawNowPrice(canvas);
 
-      if (isLongPress == true || (isTapShowInfoDialog && isOnTap)) {
+      if (isLongPress || (isTapShowInfoDialog && isOnTap)) {
         drawCrossLineText(canvas, size);
       }
     }
@@ -291,7 +276,7 @@ abstract class BaseChartPainter extends CustomPainter {
       mMainMinIndex = i;
     }
 
-    if (isLine == true) {
+    if (isLine) {
       mMainMaxValue = max(mMainMaxValue, item.close);
       mMainMinValue = min(mMainMinValue, item.close);
     }
@@ -343,14 +328,7 @@ abstract class BaseChartPainter extends CustomPainter {
   /// @param position index value
   double getX(int position) => position * mPointWidth + mPointWidth / 2;
 
-  KLineEntity getItem(int position) {
-    return datas![position];
-    // if (datas != null) {
-    //   return datas[position];
-    // } else {
-    //   return null;
-    // }
-  }
+  KLineEntity getItem(int position) => datas![position];
 
   /// scrollX convert to TranslateX
   void setTranslateXFromScrollX(double scrollX) =>
@@ -406,7 +384,16 @@ abstract class BaseChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(BaseChartPainter oldDelegate) {
-    return true;
+    return oldDelegate.datas != datas ||
+        oldDelegate.scaleX != scaleX ||
+        oldDelegate.scrollX != scrollX ||
+        oldDelegate.isLongPress != isLongPress ||
+        oldDelegate.selectX != selectX ||
+        oldDelegate.isOnTap != isOnTap ||
+        oldDelegate.offsetY != offsetY ||
+        oldDelegate.volHidden != volHidden ||
+        oldDelegate.mainIndicators != mainIndicators ||
+        oldDelegate.secondaryIndicators != secondaryIndicators;
   }
 }
 

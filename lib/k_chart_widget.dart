@@ -344,7 +344,7 @@ class _KChartWidgetState extends State<KChartWidget>
       scrollX: mScrollX,
       offsetY: mOffsetY,
       selectX: mSelectX,
-      isLongPass: isLongPress,
+      isLongPress: isLongPress,
       isOnTap: isOnTap,
       isTapShowInfoDialog: widget.isTapShowInfoDialog,
       mainIndicators: widget.mainIndicators,

@@ -845,7 +845,6 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       controller: _controller,
       chartScale: _savedChartScale,
       onChartScaleChanged: (scale) {
-        debugPrint('[scale_state] $scale');
         setState(() => _savedChartScale = scale);
       },
       showNowPrice: true,

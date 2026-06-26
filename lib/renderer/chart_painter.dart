@@ -42,9 +42,9 @@ class ChartPainter extends BaseChartPainter {
   int fixedLength;
   final KChartColors chartColors;
   late Paint paintCross, selectPointPaint, selectorBorderPaint;
-  late Paint nowPriceSelectorPaint,
-      nowPriceSelectorBorderPaint,
-      nowPriceLinePaint;
+  late Paint nowPriceSelectorPaint, nowPriceSelectorBorderPaint, nowPriceLinePaint;
+  late Paint _bgPaint;
+  late Paint _trendLinePaint, _trendLineStrokePaint, _trendLineSegmentPaint;
   final bool hideGrid;
   final bool showNowPrice;
   final VerticalTextAlignment verticalTextAlignment;
@@ -64,7 +64,7 @@ class ChartPainter extends BaseChartPainter {
     required super.scaleX,
     required super.scaleY,
     required super.scrollX,
-    required isLongPass,
+    required super.isLongPress,
     required super.selectX,
     required super.xFrontPadding,
     required super.baseDimension,
@@ -80,7 +80,7 @@ class ChartPainter extends BaseChartPainter {
     this.showNowPrice = true,
     this.fixedLength = 2,
     this.skipBg = false,
-  }) : super(isLongPress: isLongPass) {
+  }) {
     paintCross = Paint()
       ..color = chartColors.crossColor
       ..strokeWidth = chartStyle.crossWidth
@@ -104,6 +104,19 @@ class ChartPainter extends BaseChartPainter {
     nowPriceLinePaint = Paint()
       ..strokeWidth = chartStyle.nowPriceLineWidth
       ..isAntiAlias = true;
+    _bgPaint = Paint()..color = chartColors.bgColor;
+    _trendLinePaint = Paint()
+      ..color = chartColors.trendLineColor
+      ..strokeWidth = 1
+      ..isAntiAlias = true;
+    _trendLineStrokePaint = Paint()
+      ..color = chartColors.trendLineColor
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    _trendLineSegmentPaint = Paint()
+      ..color = Colors.yellow
+      ..strokeWidth = 2;
   }
 
   @override
@@ -158,36 +171,24 @@ class ChartPainter extends BaseChartPainter {
   @override
   void drawBg(Canvas canvas, Size size) {
     if (skipBg) return;
-    Paint mBgPaint = Paint()..color = chartColors.bgColor;
-    Rect mainRect = Rect.fromLTRB(
-      0,
-      0,
-      mMainRect.width,
-      mMainRect.height + mTopPadding,
+    canvas.drawRect(
+      Rect.fromLTRB(0, 0, mMainRect.width, mMainRect.height + mTopPadding),
+      _bgPaint,
     );
-    canvas.drawRect(mainRect, mBgPaint);
-
     if (mVolRect != null) {
-      Rect volRect = Rect.fromLTRB(
-        0,
-        mVolRect!.top - mChildPadding,
-        mVolRect!.width,
-        mVolRect!.bottom,
+      canvas.drawRect(
+        Rect.fromLTRB(0, mVolRect!.top - mChildPadding, mVolRect!.width, mVolRect!.bottom),
+        _bgPaint,
       );
-      canvas.drawRect(volRect, mBgPaint);
     }
-
     for (int i = 0; i < mSecondaryRectList.length; ++i) {
-      Rect? mSecondaryRect = mSecondaryRectList[i].mRect;
-      Rect secondaryRect = Rect.fromLTRB(
-        0,
-        mSecondaryRect.top - mChildPadding,
-        mSecondaryRect.width,
-        mSecondaryRect.bottom,
+      final r = mSecondaryRectList[i].mRect;
+      canvas.drawRect(
+        Rect.fromLTRB(0, r.top - mChildPadding, r.width, r.bottom),
+        _bgPaint,
       );
-      canvas.drawRect(secondaryRect, mBgPaint);
     }
-    canvas.drawRect(mDateRect, mBgPaint);
+    canvas.drawRect(mDateRect, _bgPaint);
   }
 
   @override
@@ -243,11 +244,10 @@ class ChartPainter extends BaseChartPainter {
       }
     }
 
-    if ((isLongPress == true || (isTapShowInfoDialog && isOnTap)) &&
-        isTrendLine == false) {
+    if ((isLongPress || (isTapShowInfoDialog && isOnTap)) && !isTrendLine) {
       drawCrossLine(canvas, size);
     }
-    if (isTrendLine == true) drawTrendLines(canvas, size);
+    if (isTrendLine) drawTrendLines(canvas, size);
     canvas.restore();
   }
 
@@ -278,8 +278,6 @@ class ChartPainter extends BaseChartPainter {
       if (translateX < startX || translateX > stopX) continue;
 
       int index = indexOfTranslateX(translateX);
-      if (datas?[index] == null) continue;
-
       TextPainter tp = getTextPainter(getDate(datas![index].time), null);
       y = mDateRect.top + (mBottomPadding - tp.height) / 2;
       x = columnSpace * i - tp.width / 2;
@@ -287,17 +285,6 @@ class ChartPainter extends BaseChartPainter {
       if (x > size.width - tp.width) x = size.width - tp.width;
       tp.paint(canvas, Offset(x, y));
     }
-
-    //    double translateX = xToTranslateX(0);
-    //    if (translateX >= startX && translateX <= stopX) {
-    //      TextPainter tp = getTextPainter(getDate(datas[mStartIndex].id));
-    //      tp.paint(canvas, Offset(0, y));
-    //    }
-    //    translateX = xToTranslateX(size.width);
-    //    if (translateX >= startX && translateX <= stopX) {
-    //      TextPainter tp = getTextPainter(getDate(datas[mStopIndex].id));
-    //      tp.paint(canvas, Offset(size.width - tp.width, y));
-    //    }
   }
 
   /// draw the cross line. when user focus
@@ -404,7 +391,7 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void drawMaxAndMin(Canvas canvas) {
-    if (isLine == true) return;
+    if (isLine) return;
     //plot maxima and minima
     double x = translateXtoX(getX(mMainMinIndex));
     double y = _applyScaleY(getMainY(mMainLowMinValue));
@@ -500,70 +487,35 @@ class ChartPainter extends BaseChartPainter {
     tp.paint(canvas, Offset(offsetX + paddingX, top));
   }
 
-  //For TrendLine
   void drawTrendLines(Canvas canvas, Size size) {
-    var index = calculateSelectedX(selectX);
-    Paint paintY = Paint()
-      ..color = chartColors.trendLineColor
-      ..strokeWidth = 1
-      ..isAntiAlias = true;
-    double x = getX(index);
+    final index = calculateSelectedX(selectX);
+    final double x = getX(index);
     trendLineX = x;
+    final double y = selectY;
 
-    double y = selectY;
-    // getMainY(point.close);
-
-    // K-line chart vertical line
-    canvas.drawLine(Offset(x, mTopPadding), Offset(x, size.height), paintY);
-    Paint paintX = Paint()
-      ..color = chartColors.trendLineColor
-      ..strokeWidth = 1
-      ..isAntiAlias = true;
-    Paint paint = Paint()
-      ..color = chartColors.trendLineColor
-      ..strokeWidth = 1.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(x, mTopPadding), Offset(x, size.height), _trendLinePaint);
     canvas.drawLine(
       Offset(-mTranslateX, y),
       Offset(-mTranslateX + mWidth / scaleX, y),
-      paintX,
+      _trendLinePaint,
     );
-    if (scaleX >= 1) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(x, y),
-          height: 15.0 * scaleX,
-          width: 15.0,
-        ),
-        paint,
+    canvas.drawOval(
+      scaleX >= 1
+          ? Rect.fromCenter(center: Offset(x, y), height: 15.0 * scaleX, width: 15.0)
+          : Rect.fromCenter(center: Offset(x, y), height: 10.0, width: 10.0 / scaleX),
+      _trendLineStrokePaint,
+    );
+
+    for (final element in lines) {
+      final y1 = -((element.p1.dy - 35) / element.scale) + element.maxHeight;
+      final y2 = -((element.p2.dy - 35) / element.scale) + element.maxHeight;
+      final a = (trendLineMax! - y1) * trendLineScale! + trendLineContentRec!;
+      final b = (trendLineMax! - y2) * trendLineScale! + trendLineContentRec!;
+      canvas.drawLine(
+        Offset(element.p1.dx, a),
+        element.p2 == Offset(-1, -1) ? Offset(x, y) : Offset(element.p2.dx, b),
+        _trendLineSegmentPaint,
       );
-    } else {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(x, y),
-          height: 10.0,
-          width: 10.0 / scaleX,
-        ),
-        paint,
-      );
-    }
-    if (lines.isNotEmpty) {
-      for (final element in lines) {
-        var y1 = -((element.p1.dy - 35) / element.scale) + element.maxHeight;
-        var y2 = -((element.p2.dy - 35) / element.scale) + element.maxHeight;
-        var a = (trendLineMax! - y1) * trendLineScale! + trendLineContentRec!;
-        var b = (trendLineMax! - y2) * trendLineScale! + trendLineContentRec!;
-        var p1 = Offset(element.p1.dx, a);
-        var p2 = Offset(element.p2.dx, b);
-        canvas.drawLine(
-          p1,
-          element.p2 == Offset(-1, -1) ? Offset(x, y) : p2,
-          Paint()
-            ..color = Colors.yellow
-            ..strokeWidth = 2,
-        );
-      }
     }
   }
 
@@ -606,12 +558,20 @@ class ChartPainter extends BaseChartPainter {
     return tp;
   }
 
-  String getDate(int? date) => dateFormat(
-    DateTime.fromMillisecondsSinceEpoch(
-      date ?? DateTime.now().millisecondsSinceEpoch,
-    ),
-    mFormats,
-  );
+  static final Map<int, String> _dateStringCache = {};
+  static List<String>? _cacheFormats;
+
+  String getDate(int? date) {
+    if (date == null) return '';
+    if (_cacheFormats != mFormats) {
+      _dateStringCache.clear();
+      _cacheFormats = mFormats;
+    }
+    return _dateStringCache.putIfAbsent(
+      date,
+      () => dateFormat(DateTime.fromMillisecondsSinceEpoch(date), mFormats),
+    );
+  }
 
   double getMainY(double y) => mMainRenderer.getY(y);
 
@@ -622,12 +582,6 @@ class ChartPainter extends BaseChartPainter {
     return (centerY + (rawY - centerY) * scaleY + offsetY)
         .clamp(mMainRect.top, mMainRect.bottom);
   }
-
-  /// Whether the point is in the SecondaryRect
-  // bool isInSecondaryRect(Offset point) {
-  //   // return mSecondaryRect.contains(point) == true);
-  //   return false;
-  // }
 
   /// Whether the point is in MainRect
   bool isInMainRect(Offset point) {
