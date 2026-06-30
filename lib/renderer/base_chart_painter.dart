@@ -37,7 +37,10 @@ abstract class BaseChartPainter extends CustomPainter {
   /// Secondary list support
   List<RenderRect> mSecondaryRectList = [];
   late double mDisplayHeight, mWidth;
-  double mTopPadding = 20.0, mBottomPadding = 16.0, mChildPadding = 12.0;
+  double mTopPadding = 20.0,
+      mBottomPadding = 16.0,
+      mChildPadding = 12.0,
+      mPaddingMainChild = 10.0;
   int mGridRows = 4, mGridColumns = 4;
   int mStartIndex = 0, mStopIndex = 0;
   double mMainMaxValue = double.minPositive, mMainMinValue = double.maxFinite;
@@ -51,6 +54,7 @@ abstract class BaseChartPainter extends CustomPainter {
   final KChartStyle chartStyle;
   late double mPointWidth;
   List<String> mFormats = [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
+
   /// Giá trị padding phải tối đa (px tại [referenceChartWidth]). Thực tế qua [_effectiveRightPaddingPx].
   double xFrontPadding;
 
@@ -93,7 +97,9 @@ abstract class BaseChartPainter extends CustomPainter {
   /// init format time
   void initFormats() {
     if (mItemCount < 2) {
-      mFormats = chartStyle.dateTimeFormat ?? [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
+      mFormats =
+          chartStyle.dateTimeFormat ??
+          [yyyy, '-', mm, '-', dd, ' ', hour24Padded, ':', nn];
       return;
     }
 
@@ -103,12 +109,15 @@ abstract class BaseChartPainter extends CustomPainter {
 
     if (time >= 24 * 60 * 60) {
       // daily or monthly line
-      mFormats = chartStyle.dateTimeFormat ??
+      mFormats =
+          chartStyle.dateTimeFormat ??
           (time >= 24 * 60 * 60 * 28 ? [yy, '-', mm] : [yy, '-', mm, '-', dd]);
       mGridColumns = 4; // 5 mốc
     } else {
       // hour/minute line
-      mFormats = chartStyle.dateTimeFormat ?? [mm, '-', dd, ' ', hour24Padded, ':', nn];
+      mFormats =
+          chartStyle.dateTimeFormat ??
+          [mm, '-', dd, ' ', hour24Padded, ':', nn];
       mGridColumns = 3; // 4 mốc
     }
   }
@@ -191,15 +200,18 @@ abstract class BaseChartPainter extends CustomPainter {
     double mainHeight = mDisplayHeight;
     mainHeight -= volHeight;
     mainHeight -= baseDimension.totalSecondaryHeight;
+    // Nhường mPaddingMainChild cho gap giữa main và vol — main chart ngắn hơn,
+    // vol chart vẫn đủ chiều cao.
+    if (!volHidden) mainHeight -= mPaddingMainChild;
 
     mMainRect = Rect.fromLTRB(0, mTopPadding, mWidth, mTopPadding + mainHeight);
 
     if (!volHidden) {
       mVolRect = Rect.fromLTRB(
         0,
-        mMainRect.bottom + mChildPadding,
+        mMainRect.bottom + mChildPadding + mPaddingMainChild,
         mWidth,
-        mMainRect.bottom + volHeight,
+        mMainRect.bottom + mPaddingMainChild + volHeight,
       );
     } else {
       mVolRect = null;
@@ -356,8 +368,7 @@ abstract class BaseChartPainter extends CustomPainter {
   double getMinTranslateX() {
     // paddingData: px → data space (/ scaleX) để gap màn hình ≈ _effectiveRightPaddingPx khi pinch zoom.
     final paddingData = _effectiveRightPaddingPx / scaleX;
-    var x =
-        -mDataLen + mWidth / scaleX - mPointWidth / 2 - paddingData;
+    var x = -mDataLen + mWidth / scaleX - mPointWidth / 2 - paddingData;
     return x >= 0 ? 0.0 : x;
   }
 

@@ -177,7 +177,7 @@ class ChartPainter extends BaseChartPainter {
     );
     if (mVolRect != null) {
       canvas.drawRect(
-        Rect.fromLTRB(0, mVolRect!.top - mChildPadding, mVolRect!.width, mVolRect!.bottom),
+        Rect.fromLTRB(0, mMainRect.bottom, mVolRect!.width, mVolRect!.bottom),
         _bgPaint,
       );
     }
