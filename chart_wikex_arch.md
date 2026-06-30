@@ -20,7 +20,9 @@
 12. [Renderer internals](#12-renderer-internals)
 13. [Gesture model](#13-gesture-model)
 14. [Recipes — công thức thường dùng](#14-recipes--công-thức-thường-dùng)
+    - [14.10 Real-time WebSocket price ticker](#1410-real-time-websocket-price-ticker)
 15. [Troubleshooting & pitfalls](#15-troubleshooting--pitfalls)
+16. [Phân tích cơ chế Y Grid & Anchor Zoom (MEXC / TradingView)](#16-phân-tích-cơ-chế-y-grid--anchor-zoom-mexc--tradingview)
 
 ---
 
@@ -752,7 +754,66 @@ paint()
 ├── drawDate()
 ├── drawText()          ← dùng getItem(mStopIndex) không phải datas!.last
 ├── drawMaxAndMin()
-└── drawNowPrice()
+└── drawNowPrice()      ← dùng livePrice nếu có, fallback datas!.last.close
+```
+
+### shouldRepaint — logic kiểm soát khi nào vẽ lại
+
+`ChartPainter` được tạo mới mỗi lần `build()` nhưng `paint()` chỉ chạy khi `shouldRepaint` trả `true`.
+
+**`BaseChartPainter.shouldRepaint`** so sánh:
+```
+datas, scaleX, scaleY, scrollX, isLongPress, selectX, isOnTap, offsetY, volHidden, mainIndicators, secondaryIndicators
+```
+
+**`ChartPainter.shouldRepaint`** (override) bổ sung:
+```
+livePrice  ← bắt buộc vì livePrice nằm trong ChartPainter, không phải BaseChartPainter
+```
+
+**Quy tắc:** nếu thêm field mới vào `ChartPainter` mà ảnh hưởng visual → phải thêm vào `shouldRepaint`, nếu không chart sẽ không cập nhật.
+
+### livePrice — cập nhật giá real-time
+
+`livePrice: double?` là prop riêng biệt với `datas`. Dùng để cập nhật đường giá hiện tại (`drawNowPrice`) theo WebSocket tick mà **không cần tạo hoặc thay thế list `datas`**.
+
+```dart
+// chart_painter.dart — drawNowPrice()
+final double value = livePrice ?? datas!.last.close;
+// → màu đường so theo value vs datas!.last.open
+```
+
+**Pattern đúng:**
+
+```dart
+// ✓ datas chỉ thay đổi khi nến đóng; livePrice thay đổi mỗi tick
+KChartWidget(
+  datas: _closedCandles,
+  livePrice: _currentPrice,
+  ...
+)
+```
+
+**Anti-pattern — sửa candle in-place:**
+
+```dart
+// ❌ datas cùng reference → shouldRepaint trả false → chart không update
+_datas.last.close = newPrice;
+setState(() {});
+
+// ✓ nếu muốn update datas: tạo list mới
+setState(() => _datas = [..._datas.sublist(0, _datas.length - 1), updatedCandle]);
+```
+
+**Throttle khi tick tần suất cao (>10/giây):**
+
+```dart
+// Chỉ setState tối đa 60fps; cập nhật _currentPrice mọi lúc
+_currentPrice = newPrice;
+if (_lastRender == null || now - _lastRender! > 16) {
+  setState(() {});
+  _lastRender = now;
+}
 ```
 
 ---
@@ -956,6 +1017,42 @@ KChartWidget(
 // Khi đổi timeframe: truyền _savedScale vào instance mới → widget tự restore.
 ```
 
+### 14.10 Real-time WebSocket price ticker
+
+```dart
+// State:
+double? _livePrice;
+List<KLineEntity> _datas = [];
+
+// WebSocket onMessage:
+void _onTick(double price) {
+  _livePrice = price;
+  setState(() {});  // chỉ update livePrice, không đụng _datas
+}
+
+// Khi nến đóng (push nến mới từ server):
+void _onCandleClose(KLineEntity newCandle) {
+  final next = [..._datas, newCandle];
+  DataUtil.calculateAll(next, mains, secondaries);
+  setState(() {
+    _datas = next;
+    _livePrice = null;  // reset để drawNowPrice tự fallback về close của nến cuối
+  });
+}
+
+// Build:
+KChartWidget(
+  _datas,
+  chartStyle, chartColors,
+  livePrice: _livePrice,
+  datas: _datas,
+  ...
+)
+```
+
+> `livePrice` thay đổi → `shouldRepaint` trả `true` → chỉ `drawNowPrice()` là thực sự cần vẽ lại.  
+> `datas` reference thay đổi → full repaint (tính lại min/max, grid, toàn bộ nến).
+
 ### 14.9 Overscroll handoff sang outer scrollview
 
 ```dart
@@ -1015,8 +1112,14 @@ SingleChildScrollView(
 ### "Outer scroll ăn gesture chart"
 - Khi nhúng trong `SingleChildScrollView`, track pointer events và toggle physics → `NeverScrollableScrollPhysics` khi finger trên chart.
 
+### "Live price không cập nhật"
+- Không sửa `datas` in-place (`_datas.last.close = x`) — cùng reference, `shouldRepaint` trả `false`.
+- Dùng `livePrice` prop thay thế, hoặc tạo list mới: `_datas = [..._datas.dropLast(), updated]`.
+- Nếu thêm field visual mới vào `ChartPainter`: bắt buộc thêm vào `shouldRepaint`, nếu không chart không vẽ lại khi field đó thay đổi.
+
 ### "Live tick lag"
 - `DataUtil.calculateAll` chạy O(n × số indicator). Với n > 1000 nến cân nhắc tính incremental.
+- Tick tần suất cao (>10/giây): throttle `setState` về 60fps thay vì gọi mỗi message.
 
 ### "Mixin order error"
 - Giữ đúng thứ tự mixin trong `k_entity.dart`. `OBVEntity` PHẢI trước `MACDEntity`.
@@ -1032,4 +1135,135 @@ SingleChildScrollView(
 
 ---
 
-*Cập nhật: 2026-06-26*
+---
+
+## 16. Phân tích cơ chế Y Grid & Anchor Zoom (MEXC / TradingView)
+
+> Tổng hợp từ phân tích kỹ thuật `anchor_zoom.md` và `scroll_vertical_y.md`. Đây là tham khảo thiết kế — k_chart_wikex hiện dùng mô hình `mScaleY + mOffsetY` (canvas transform), không phải `visibleMinPrice / visibleMaxPrice`.
+
+### 16.1 Vertical Scroll — di chuyển khoảng giá
+
+TradingView **không** dùng `translateY`. Thay vào đó nó quản lý hai biến:
+
+```dart
+double visibleMinPrice;
+double visibleMaxPrice;
+```
+
+Khi người dùng kéo dọc:
+
+```dart
+void onVerticalDrag(double dy) {
+  final deltaPrice = dy / scaleY;   // pixel → price unit
+  visibleMinPrice += deltaPrice;
+  visibleMaxPrice += deltaPrice;
+  repaint();
+}
+```
+
+`scaleY` luôn được tính lại từ price range:
+
+```dart
+double scaleY = chartHeight / (visibleMaxPrice - visibleMinPrice);
+```
+
+**Công thức render:**
+
+```dart
+// price → screen Y
+screenY = chartHeight - (price - visibleMinPrice) * scaleY;
+
+// screen Y → price (inverse)
+price = visibleMinPrice + (chartHeight - y) / scaleY;
+```
+
+**So sánh với translateY đơn giản:**
+
+| | `translateY += dy` | TradingView approach |
+|---|---|---|
+| Cài đặt | Đơn giản | Phức tạp hơn |
+| Price range | Không rõ | Tường minh |
+| Anchor zoom | Khó | Chính xác |
+| Grid đồng bộ | Dễ lệch | Luôn đúng |
+| Auto scale | Khó | Dễ triển khai |
+
+---
+
+### 16.2 Dynamic Y Grid
+
+MEXC / TradingView **không** dùng grid cố định. Mục tiêu: giữ khoảng cách giữa 2 đường grid vào khoảng **50–100 px**.
+
+**Thuật toán chọn gridStep:**
+
+```dart
+// 1. rawStep từ số line mong muốn
+final targetLines = chartHeight / 80;         // ≈ số đường grid
+final rawStep     = priceRange / targetLines;
+
+// 2. Normalize về giá đẹp (1, 2, 5, 10, 20, 50, 100, ...)
+double normalizeStep(double raw) {
+  final exponent = pow(10, log10(raw).floor()).toDouble();
+  final fraction = raw / exponent;
+  if (fraction <= 1) return exponent;
+  if (fraction <= 2) return 2 * exponent;
+  if (fraction <= 5) return 5 * exponent;
+  return 10 * exponent;
+}
+```
+
+**Tính gridLine đầu tiên và render:**
+
+```dart
+final gridStep  = normalizeStep(rawStep);
+final firstGrid = (visibleMin / gridStep).floor() * gridStep;
+
+double p = firstGrid;
+while (p <= visibleMax) {
+  drawLine(yOfPrice(p));
+  drawLabel(p);
+  p += gridStep;
+}
+```
+
+**Tại sao grid không nhảy:** `firstGrid` dịch chuyển liên tục theo `visibleMin`. Line đầu chỉ biến mất khi vượt hẳn qua `visibleMin`, line mới xuất hiện từ dưới — tạo cảm giác trượt mượt.
+
+---
+
+### 16.3 Anchor Zoom
+
+Mục tiêu: giá tại vị trí ngón tay / con trỏ **không thay đổi** sau khi zoom.
+
+**Thuật toán hoàn chỉnh:**
+
+```dart
+void zoomAtPoint(double mouseY, double factor) {
+  // 1. Lưu giá tại điểm chạm
+  final anchorPrice = visibleMinPrice + (chartHeight - mouseY) / scaleY;
+
+  // 2. Thay đổi scale
+  scaleY *= factor;
+
+  // 3. Tính lại visible range sao cho anchorPrice vẫn tại mouseY
+  visibleMinPrice = anchorPrice - (chartHeight - mouseY) / scaleY;
+  visibleMaxPrice = visibleMinPrice + chartHeight / scaleY;
+}
+```
+
+**Pinch zoom 2 ngón:** lấy trung điểm làm `mouseY`:
+
+```dart
+final anchorY = (finger1Y + finger2Y) / 2;
+zoomAtPoint(anchorY, newScale / oldScale);
+```
+
+**Ví dụ số:**
+
+| | Trước | Sau (scaleY: 8→12) |
+|---|---|---|
+| `visibleMin` | 100 | 122.91 |
+| `visibleMax` | 200 | 189.58 |
+| Giá tại `mouseY=250` | 168.75 | 168.75 ✓ |
+
+---
+
+*Cập nhật: 2026-06-30 — thêm shouldRepaint logic, livePrice real-time pattern, recipe 14.10, pitfalls, section 16 (Y Grid & Anchor Zoom)*
