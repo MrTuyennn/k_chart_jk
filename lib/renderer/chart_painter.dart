@@ -563,7 +563,7 @@ class ChartPainter extends BaseChartPainter {
 
   String getDate(int? date) {
     if (date == null) return '';
-    if (_cacheFormats != mFormats) {
+    if (!_formatsEqual(_cacheFormats, mFormats)) {
       _dateStringCache.clear();
       _cacheFormats = mFormats;
     }
@@ -571,6 +571,15 @@ class ChartPainter extends BaseChartPainter {
       date,
       () => dateFormat(DateTime.fromMillisecondsSinceEpoch(date), mFormats),
     );
+  }
+
+  static bool _formatsEqual(List<String>? a, List<String>? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null || a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   double getMainY(double y) => mMainRenderer.getY(y);
@@ -585,10 +594,30 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   bool shouldRepaint(BaseChartPainter oldDelegate) {
-    if (oldDelegate is ChartPainter && oldDelegate.livePrice != livePrice) {
-      return true;
+    if (oldDelegate is ChartPainter) {
+      if (oldDelegate.livePrice != livePrice ||
+          oldDelegate.isTrendLine != isTrendLine ||
+          oldDelegate.selectY != selectY ||
+          !_trendLinesEqual(oldDelegate.lines, lines)) {
+        return true;
+      }
     }
     return super.shouldRepaint(oldDelegate);
+  }
+
+  static bool _trendLinesEqual(List<TrendLine> a, List<TrendLine> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      final TrendLine x = a[i], y = b[i];
+      if (x.p1 != y.p1 ||
+          x.p2 != y.p2 ||
+          x.maxHeight != y.maxHeight ||
+          x.scale != y.scale) {
+        return false;
+      }
+    }
+    return true;
   }
 
   bool isInMainRect(Offset point) => mMainRect.contains(point);
