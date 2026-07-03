@@ -404,6 +404,7 @@ abstract class BaseChartPainter extends CustomPainter {
         oldDelegate.offsetY != offsetY ||
         oldDelegate.scaleY != scaleY ||
         oldDelegate.volHidden != volHidden ||
+        oldDelegate.isLine != isLine ||
         oldDelegate.mainIndicators != mainIndicators ||
         oldDelegate.secondaryIndicators != secondaryIndicators;
   }

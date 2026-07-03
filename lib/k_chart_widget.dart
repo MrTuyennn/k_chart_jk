@@ -333,7 +333,7 @@ class _KChartWidgetState extends State<KChartWidget>
       widget.chartColors,
       livePrice: widget.livePrice,
       baseDimension: baseDimension,
-      lines: lines, //For TrendLine
+      lines: List<TrendLine>.of(lines), //For TrendLine
       sink: mInfoWindowStream.sink,
       xFrontPadding: widget.xFrontPadding,
       isTrendLine: widget.isTrendLine, //For TrendLine

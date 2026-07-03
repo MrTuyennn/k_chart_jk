@@ -36,6 +36,9 @@
 * **refactor:** `KChartStyle.gridColumns` đổi từ `8` → `6` (giảm từ 7 đường time nội xuống 5 đường).
 * **refactor:** `initFormats()` giờ override `mGridColumns` theo timeframe: intraday (phút/giờ) = `3` (4 mốc), daily/monthly = `4` (5 mốc). Override này thắng giá trị `gridColumns` trong `KChartStyle`.
 * **refactor:** `drawDate()` căn chỉnh label thời gian **trùng khớp với grid line dọc** — mỗi đường grid dọc ứng đúng 1 time label ở dưới. Label vẽ tại `columnSpace * i` cho `i = 0..mGridColumns`, cùng vị trí với `drawGrid`.
+* **fix:** `BaseChartPainter.shouldRepaint` thiếu so sánh `isLine` — toggle nến/line (candlestick ↔ line chart) không trigger repaint. Đã thêm `oldDelegate.isLine != isLine`.
+* **fix:** `ChartPainter.shouldRepaint` thiếu so sánh `isTrendLine`, `selectY`, `lines` — thêm điểm trend line không lên hình. Nguyên nhân sâu hơn: `lines` bị mutate in-place trong `KChartWidget` (`lines.add(...)`, `lines.removeLast()`) nên so sánh theo reference (`!=`) không bao giờ phát hiện thay đổi (oldDelegate và delegate hiện tại trỏ cùng 1 List). Đã sửa 2 chỗ: (1) `k_chart_widget.dart` truyền `List<TrendLine>.of(lines)` (snapshot mới mỗi build) thay vì reference gốc; (2) `shouldRepaint` so sánh `lines` theo giá trị từng phần tử (`_trendLinesEqual`) thay vì reference.
+* **fix:** `getDate()` cache (`_dateStringCache`) bị clear gần như mỗi frame vì so sánh `mFormats` theo List identity (`_cacheFormats != mFormats`), trong khi `mFormats` được gán 1 list literal MỚI mỗi lần `ChartPainter` được dựng (mỗi build) qua `initFormats()`. Cache coi như vô tác dụng. Đã đổi sang so sánh theo nội dung (`_formatsEqual`, so từng phần tử) để cache sống sót qua các lần rebuild.
 
 ### 0.0.1
 
@@ -584,6 +587,8 @@ class MyIndicator extends MainIndicator<CandleEntity, MyStyle> {
 | `nn` `n` | Phút |
 | `ss` `s` | Giây |
 
+**Cache label ngày (`ChartPainter.getDate`):** kết quả `dateFormat()` được cache trong `static Map<int, String> _dateStringCache` (key = timestamp) để tránh format lại mỗi frame. Cache bị clear khi `mFormats` đổi — so sánh **theo nội dung** (`_formatsEqual`, so từng phần tử), KHÔNG theo reference, vì `initFormats()` gán 1 list literal mới mỗi lần `ChartPainter` được dựng lại (mỗi build) dù nội dung format không đổi; so theo reference sẽ khiến cache bị xoá gần như mỗi frame và mất tác dụng.
+
 ### 10.4 Auto-detect time format & grid alignment
 
 `initFormats()` trong `BaseChartPainter` tự chọn format **và** override `mGridColumns` dựa vào khoảng cách giữa 2 candle đầu:
@@ -763,15 +768,22 @@ paint()
 
 **`BaseChartPainter.shouldRepaint`** so sánh:
 ```
-datas, scaleX, scaleY, scrollX, isLongPress, selectX, isOnTap, offsetY, volHidden, mainIndicators, secondaryIndicators
+datas, scaleX, scaleY, scrollX, isLongPress, selectX, isOnTap, offsetY, volHidden, isLine, mainIndicators, secondaryIndicators
 ```
 
 **`ChartPainter.shouldRepaint`** (override) bổ sung:
 ```
-livePrice  ← bắt buộc vì livePrice nằm trong ChartPainter, không phải BaseChartPainter
+livePrice     ← bắt buộc vì livePrice nằm trong ChartPainter, không phải BaseChartPainter
+isTrendLine
+selectY
+lines         ← so sánh THEO GIÁ TRỊ (_trendLinesEqual), KHÔNG theo reference
 ```
 
-**Quy tắc:** nếu thêm field mới vào `ChartPainter` mà ảnh hưởng visual → phải thêm vào `shouldRepaint`, nếu không chart sẽ không cập nhật.
+**Quy tắc:** nếu thêm field mới vào `ChartPainter`/`BaseChartPainter` mà ảnh hưởng visual → phải thêm vào `shouldRepaint`, nếu không chart sẽ không cập nhật (đã xảy ra thật với `isLine`, `isTrendLine`/`selectY`/`lines` — xem changelog).
+
+**Bẫy `!=` trên field bị mutate in-place:** `lines` (`List<TrendLine>`) bị `KChartWidget` sửa in-place (`lines.add(...)`, `lines.removeLast()`) rồi truyền cùng reference vào `ChartPainter` mỗi build → `oldDelegate.lines` và `lines` LUÔN là cùng 1 object, so sánh `!=` không bao giờ đúng dù nội dung đã đổi. Cách sửa đúng — áp dụng cùng nguyên tắc với `datas`/`livePrice`:
+1. Widget truyền **snapshot mới** mỗi build: `lines: List<TrendLine>.of(lines)`.
+2. `shouldRepaint` so sánh **theo giá trị** từng phần tử (`p1`, `p2`, `maxHeight`, `scale`), vì `TrendLine` không override `==`.
 
 ### livePrice — cập nhật giá real-time
 
@@ -1266,4 +1278,5 @@ zoomAtPoint(anchorY, newScale / oldScale);
 
 ---
 
+*Cập nhật: 2026-07-02 — fix 3 bug shouldRepaint/getDate-cache phát hiện qua code review (isLine, isTrendLine/selectY/lines, date-string cache identity), cập nhật section 12 & 10.3.*
 *Cập nhật: 2026-06-30 — thêm shouldRepaint logic, livePrice real-time pattern, recipe 14.10, pitfalls, section 16 (Y Grid & Anchor Zoom)*
