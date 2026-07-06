@@ -1,4 +1,4 @@
-## Unreleased
+## 1.0.0
 
 * **feat:** `KChartScaleState` — class lưu/khôi phục trạng thái zoom (`scaleX`, `scaleY`, `scrollX`). Truyền qua `KChartWidget.chartScale` để restore khi đổi timeframe; `scaleX` tự clamp theo `minScale`/`maxScale`. Callback `onChartScaleChanged` (`OnChartScaleChanged`) emit sau khi kết thúc pinch, scaleY drag, zoom controller, hoặc double-tap reset scaleY.
 * **fix:** `onLoadMore(true)` không được gọi khi scale nhỏ đến mức tất cả data vừa khung hình (`maxScrollX == 0`). Đã bỏ guard `ChartPainter.maxScrollX > 0` và thêm post-frame callback trong `onScaleEnd` để trigger load thêm sau khi pinch zoom out.
