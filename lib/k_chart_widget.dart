@@ -188,6 +188,12 @@ class _KChartWidgetState extends State<KChartWidget>
   // `onVerticalOverscroll`, parent tự quyết định cuộn theo.
   bool _gestureInMain = true;
 
+  // Chặn spam onLoadMore khi data chưa lấp đầy chiều rộng chart: chỉ request
+  // lại khi độ dài data thực sự thay đổi so với lần request gần nhất, tránh
+  // gọi trùng ở mỗi rebuild không liên quan (đổi style, đổi theme, ...) trong
+  // lúc chờ isLoadingMore được parent cập nhật ngược lại (thường bất đồng bộ).
+  int? _narrowLoadRequestedForLength;
+
   @override
   void dispose() {
     mInfoWindowStream.sink.close();
@@ -202,6 +208,7 @@ class _KChartWidgetState extends State<KChartWidget>
     super.initState();
     widget.controller?.addListener(_onController);
     _restoreChartScaleFromWidget(reclampScrollAfterLayout: true);
+    _maybeLoadMoreForNarrowData();
   }
 
   @override
@@ -217,6 +224,25 @@ class _KChartWidgetState extends State<KChartWidget>
         widget.chartScale != oldWidget.chartScale) {
       _restoreChartScaleFromWidget(reclampScrollAfterLayout: true);
     }
+    _maybeLoadMoreForNarrowData();
+  }
+
+  // Data ban đầu (hoặc sau khi load thêm) có thể chưa đủ lấp đầy chiều rộng
+  // chart (ChartPainter.maxScrollX <= 0). Các trigger onLoadMore khác chỉ bắn
+  // từ gesture (pinch/scroll/fling) nên nếu user chưa tương tác gì thì sẽ
+  // không bao giờ được gọi. Check lại đây sau mỗi frame để tự động load tiếp
+  // cho tới khi đủ full-width, giống hệt cơ chế đã dùng khi pinch zoom out.
+  void _maybeLoadMoreForNarrowData() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.isLoadingMore || widget.onLoadMore == null) return;
+      final data = widget.datas;
+      if (data == null || data.isEmpty) return;
+      if (ChartPainter.maxScrollX > 0) return;
+      if (_narrowLoadRequestedForLength == data.length) return;
+      _narrowLoadRequestedForLength = data.length;
+      widget.onLoadMore!(true);
+    });
   }
 
   KChartScaleState get _currentChartScale => KChartScaleState(
