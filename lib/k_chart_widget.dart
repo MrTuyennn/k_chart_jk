@@ -86,7 +86,7 @@ class KChartWidget extends StatefulWidget {
   /// Parent có thể dùng để forward sang outer ScrollController (handoff).
   final ValueChanged<double>? onVerticalOverscroll;
 
-  /// Scale đã lưu — truyền lại khi đổi timeframe; [scaleX] clamp theo [minScale]/[maxScale].
+  /// Scale đã lưu — truyền lại khi đổi timeframe; `scaleX` clamp theo [minScale]/[maxScale].
   final KChartScaleState? chartScale;
 
   /// Kết thúc pinch / scaleY / zoom controller / double-tap reset scaleY.

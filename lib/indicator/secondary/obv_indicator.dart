@@ -3,12 +3,14 @@ part of '../indicator_template.dart';
 /// OBV — On-Balance Volume
 ///
 /// Công thức:
+/// ```
 ///   obv[0] = vol[0]
 ///   obv[i] = obv[i-1] + vol[i]   nếu close[i] > close[i-1]  (nến tăng → cộng vol)
 ///   obv[i] = obv[i-1] - vol[i]   nếu close[i] < close[i-1]  (nến giảm → trừ vol)
 ///   obv[i] = obv[i-1]            nếu close[i] == close[i-1] (không đổi)
 ///
 ///   signal = SMA(obv, calcParams[0])  — mặc định MA5
+/// ```
 ///
 /// Cách đọc tín hiệu:
 ///   - OBV tăng + giá tăng  → xu hướng được xác nhận
@@ -17,12 +19,12 @@ part of '../indicator_template.dart';
 ///   - OBV giảm + giá đi ngang/tăng → bearish divergence (tiền đang thoát)
 ///
 /// Tham số:
-///   calcParams[0] = period của signal MA (mặc định 5)
+///   `calcParams[0]` = period của signal MA (mặc định 5)
 ///
 /// Generic type T = MACDEntity (nhất quán với RSI/KDJ/WR/CCI) thay vì OBVEntity.
 /// Lý do: MACDEntity khai báo `on OBVEntity` nên có thể truy cập .obv / .obvSignal
 /// trực tiếp không cần cast. Nhờ đó OBVIndicator fit vào
-/// List<SecondaryIndicator<MACDEntity, dynamic>> mà không gây lỗi type.
+/// `List<SecondaryIndicator<MACDEntity, dynamic>>` mà không gây lỗi type.
 class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> {
   // Paint cho đường OBV chính (màu obvColor)
   late final Paint _linePaint;
