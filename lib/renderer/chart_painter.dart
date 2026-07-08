@@ -33,7 +33,7 @@ class ChartPainter extends BaseChartPainter {
   static double get maxScrollX => BaseChartPainter.maxScrollX;
   late BaseChartRenderer mMainRenderer;
   VolRenderer? mVolRenderer;
-  Set<BaseChartRenderer> mSecondaryRendererList = {};
+  Set<SecondaryRenderer> mSecondaryRendererList = {};
   StreamSink<InfoWindowEntity?> sink;
   Color? upColor, dnColor;
   Color? ma5Color, ma10Color, ma30Color;
@@ -204,6 +204,13 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   void drawChart(Canvas canvas, Size size) {
+    // Đường tham chiếu ngang (vd 20/80 của StochRSI) vẽ ở screen space,
+    // trước khi translate/scale để không bị giãn theo scaleX và luôn
+    // nằm phía sau đường indicator. Không gate bởi hideGrid.
+    for (final element in mSecondaryRendererList) {
+      element.drawReferenceLines(canvas);
+    }
+
     canvas.save();
     canvas.translate(mTranslateX * scaleX, 0.0);
     canvas.scale(scaleX, 1.0);

@@ -46,6 +46,26 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
     );
   }
 
+  /// Vẽ các đường tham chiếu ngang nét đứt (indicator.referenceValues).
+  /// Gọi 1 lần mỗi frame ở screen space, TRƯỚC vòng drawChart để vạch
+  /// nằm phía sau đường indicator.
+  void drawReferenceLines(Canvas canvas) {
+    if (indicator.referenceValues.isEmpty) return;
+    final paint = Paint()
+      ..color = chartColors.defaultTextColor.withAlpha(90)
+      ..strokeWidth = 0.5;
+    const dashWidth = 4.0;
+    const dashSpace = 4.0;
+    for (final value in indicator.referenceValues) {
+      final y = getY(value);
+      double x = 0;
+      while (x < chartRect.width) {
+        canvas.drawLine(Offset(x, y), Offset(x + dashWidth, y), paint);
+        x += dashWidth + dashSpace;
+      }
+    }
+  }
+
   @override
   void drawText(Canvas canvas, MACDEntity data, double x) {
     TextSpan? span = indicator.drawFigure(data, fixedLength, chartColors);

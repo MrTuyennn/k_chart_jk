@@ -11,6 +11,7 @@ export 'mtm_entity.dart';
 export 'obv_entity.dart';
 export 'rsi_entity.dart';
 export 'rw_entity.dart';
+export 'stoch_rsi_entity.dart';
 export 'trix_entity.dart';
 export 'volume_entity.dart';
 export 'zigzag_entity.dart';

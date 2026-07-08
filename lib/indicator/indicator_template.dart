@@ -22,6 +22,7 @@ part 'secondary/wr_indicator.dart';
 part 'secondary/obv_indicator.dart';
 part 'secondary/trix_indicator.dart';
 part 'secondary/mtm_indicator.dart';
+part 'secondary/stoch_rsi_indicator.dart';
 
 typedef GetYFunction = double Function(double y);
 
@@ -85,6 +86,11 @@ abstract class SecondaryIndicator<T, K> extends IndicatorTemplate<T, K> {
     required super.calcParams,
     required super.indicatorStyle,
   });
+
+  /// Các mốc ngang tham chiếu vẽ nét đứt trong panel (vd [20, 80] cho StochRSI).
+  /// Mặc định rỗng — không vẽ gì. SecondaryRenderer vẽ 1 lần mỗi frame,
+  /// phía sau đường indicator, không phụ thuộc hideGrid.
+  List<double> get referenceValues => const [];
 
   void drawVerticalText({
     required Canvas canvas,

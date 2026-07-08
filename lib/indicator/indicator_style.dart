@@ -148,6 +148,16 @@ class TRIXStyle extends IndicatorStyle {
   });
 }
 
+class StochRSIStyle extends IndicatorStyle {
+  final Color kColor;
+  final Color dColor;
+
+  const StochRSIStyle({
+    this.kColor = const Color(0xFFFFC634),
+    this.dColor = const Color(0xff35cdac),
+  });
+}
+
 class MTMStyle extends IndicatorStyle {
   final Color mtmColor;
   final Color mtmMaColor;

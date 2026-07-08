@@ -8,6 +8,7 @@ import 'volume_entity.dart';
 import 'cci_entity.dart';
 import 'trix_entity.dart';
 import 'mtm_entity.dart';
+import 'stoch_rsi_entity.dart';
 import 'zigzag_entity.dart';
 import 'avl_entity.dart';
 
@@ -24,7 +25,8 @@ class KEntity
         CCIEntity,
         OBVEntity,   // phải trước MACDEntity
         TRIXEntity,  // phải trước MACDEntity
-        MTMEntity,   // phải trước MACDEntity
+        MTMEntity,      // phải trước MACDEntity
+        StochRSIEntity, // phải trước MACDEntity
         MACDEntity,
         ZigZagEntity,
         AVLEntity {}

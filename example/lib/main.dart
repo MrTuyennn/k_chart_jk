@@ -88,7 +88,7 @@ List<KLineEntity> _generateMockData(int count, Duration candleInterval) {
 
 enum _MainType { ma, boll, ema, superTrend, zigzag, avl, none }
 
-enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, mtm, none }
+enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, mtm, stochRsi, none }
 
 enum _ChartTimeframe {
   m15('15m', Duration(minutes: 15)),
@@ -420,6 +420,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       _SecondaryType.obv,
       _SecondaryType.trix,
       _SecondaryType.mtm,
+      _SecondaryType.stochRsi,
     ];
     return order
         .where((t) => _secondaryTypes.contains(t))
@@ -433,6 +434,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             _SecondaryType.obv => OBVIndicator(),
             _SecondaryType.trix => TRIXIndicator(),
             _SecondaryType.mtm => MTMIndicator(),
+            _SecondaryType.stochRsi => StochRSIIndicator(),
             _ => throw StateError('unreachable'),
           },
         )
@@ -1127,6 +1129,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 'MTM',
                 _secondaryTypes.contains(_SecondaryType.mtm),
                 () => _toggleSecondary(_SecondaryType.mtm),
+              ),
+              _chip(
+                'StochRSI',
+                _secondaryTypes.contains(_SecondaryType.stochRsi),
+                () => _toggleSecondary(_SecondaryType.stochRsi),
               ),
             ],
           ),
