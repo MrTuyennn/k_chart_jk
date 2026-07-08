@@ -1,3 +1,9 @@
+## 1.0.3
+
+* **feat:** New secondary indicator `StochRSIIndicator` (StochRSI) — Stochastic RSI oscillator, `calcParams: [n1, n2, m1, m2]` (default `14, 14, 3, 3`: RSI period, Stoch period, %K smoothing, %D smoothing). Computes an internal Wilder-smoothed RSI (independent of `RSIIndicator` so it works even when RSI isn't enabled), then `StochRSI = (RSI - min(RSI, n2)) / (max(RSI, n2) - min(RSI, n2)) × 100`, `%K = SMA(StochRSI, m1)`, `%D = SMA(%K, m2)`. Draws the %K/%D line pair (`StochRSIStyle.kColor`/`dColor`) plus fixed 20/80 dashed reference lines, with the panel's min/max range always widened to include 20 and 80 so the reference lines never clip.
+* **feat:** New main indicator `AVLIndicator` (AVL) — average value line, no period parameter. Plots the average execution price of each candle, `AVL = amount / vol` (quote volume ÷ base volume), falling back to typical price `(high + low + close) / 3` when `amount` is missing or zero, so the line always tracks inside the candle body like Binance's AVL. Styled via `AVLStyle.avlColor`.
+* **feat:** New secondary indicator `MTMIndicator` (MTM) — momentum oscillator, `calcParams: [n, m]` (default `12, 6`: momentum period, signal MA period). `MTM = close - close[n bars ago]`, `MTMMA = MA(MTM, m)`. Draws the MTM/MTMMA line pair via `MTMStyle.mtmColor`/`mtmMaColor`, following the same `SecondaryIndicator` structure as MACD/TRIX.
+
 ## 1.0.2
 
 * **feat:** New main indicator `SuperTrendIndicator` (SUPER) — an ATR-based trend line (Wilder's smoothing), `calcParams: [period, multiplier*10]`, direction (`isUp`) derived from the final upper/lower band, colored via `upColor`/`dnColor`. Also draws a shaded fill (`upFillColor`/`dnFillColor` on `SuperTrendStyle`) between the SuperTrend line and the close price to highlight the trend region, instead of just a single line.
