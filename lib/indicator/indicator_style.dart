@@ -148,6 +148,16 @@ class TRIXStyle extends IndicatorStyle {
   });
 }
 
+class MTMStyle extends IndicatorStyle {
+  final Color mtmColor;
+  final Color mtmMaColor;
+
+  const MTMStyle({
+    this.mtmColor = const Color(0xFFFFC634),
+    this.mtmMaColor = const Color(0xff35cdac),
+  });
+}
+
 class OBVStyle extends IndicatorStyle {
   final Color obvColor;
   final Color signalColor;

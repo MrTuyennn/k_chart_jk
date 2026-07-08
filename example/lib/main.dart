@@ -86,9 +86,9 @@ List<KLineEntity> _generateMockData(int count, Duration candleInterval) {
 
 // ── Demo page ─────────────────────────────────────────────────────────────────
 
-enum _MainType { ma, boll, ema, superTrend, none }
+enum _MainType { ma, boll, ema, superTrend, zigzag, none }
 
-enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, none }
+enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, mtm, none }
 
 enum _ChartTimeframe {
   m15('15m', Duration(minutes: 15)),
@@ -405,6 +405,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     _MainType.boll => [BOLLIndicator()],
     _MainType.ema => [EMAIndicator()],
     _MainType.superTrend => [SuperTrendIndicator()],
+    _MainType.zigzag => [ZigZagIndicator()],
     _MainType.none => [],
   };
 
@@ -417,6 +418,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       _SecondaryType.cci,
       _SecondaryType.obv,
       _SecondaryType.trix,
+      _SecondaryType.mtm,
     ];
     return order
         .where((t) => _secondaryTypes.contains(t))
@@ -429,6 +431,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             _SecondaryType.cci => CCIIndicator(),
             _SecondaryType.obv => OBVIndicator(),
             _SecondaryType.trix => TRIXIndicator(),
+            _SecondaryType.mtm => MTMIndicator(),
             _ => throw StateError('unreachable'),
           },
         )
@@ -1061,6 +1064,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 () => _setMain(_MainType.superTrend),
               ),
               _chip(
+                'ZigZag',
+                _mainType == _MainType.zigzag,
+                () => _setMain(_MainType.zigzag),
+              ),
+              _chip(
                 'None',
                 _mainType == _MainType.none,
                 () => _setMain(_MainType.none),
@@ -1108,6 +1116,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 'TRIX',
                 _secondaryTypes.contains(_SecondaryType.trix),
                 () => _toggleSecondary(_SecondaryType.trix),
+              ),
+              _chip(
+                'MTM',
+                _secondaryTypes.contains(_SecondaryType.mtm),
+                () => _toggleSecondary(_SecondaryType.mtm),
               ),
             ],
           ),

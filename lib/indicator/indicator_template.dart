@@ -20,6 +20,7 @@ part 'secondary/rsi_indicator.dart';
 part 'secondary/wr_indicator.dart';
 part 'secondary/obv_indicator.dart';
 part 'secondary/trix_indicator.dart';
+part 'secondary/mtm_indicator.dart';
 
 typedef GetYFunction = double Function(double y);
 

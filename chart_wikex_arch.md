@@ -35,6 +35,9 @@
 
 ### Unreleased
 
+* **feat:** `MTMIndicator` — secondary indicator Momentum (MTM/MTMMA), params mặc định `[12, 6]`. Xem [9.2](#92-built-in-indicators).
+* **feat:** `TRIXIndicator` — secondary indicator TRIX/MATRIX (triple-smoothed EMA rate of change), params mặc định `[12, 20]`. Xem [9.2](#92-built-in-indicators).
+* **feat:** `SuperTrendIndicator` — main indicator SuperTrend (ATR-based trend band, đổi màu theo hướng trend + fill mờ), params mặc định `[10, 30]`. Xem [9.2](#92-built-in-indicators).
 * **feat:** `KChartScaleState` — class lưu/khôi phục trạng thái zoom (`scaleX`, `scaleY`, `scrollX`). Truyền qua `KChartWidget.chartScale` để restore khi đổi timeframe; `scaleX` tự clamp theo `minScale`/`maxScale`. Callback `onChartScaleChanged` (`OnChartScaleChanged`) emit sau khi kết thúc pinch, scaleY drag, zoom controller, hoặc double-tap reset scaleY.
 * **fix:** `onLoadMore(true)` không được gọi khi scale nhỏ đến mức tất cả data vừa khung hình (`maxScrollX == 0`). Đã bỏ guard `ChartPainter.maxScrollX > 0` và thêm post-frame callback trong `onScaleEnd` để trigger load thêm sau khi pinch zoom out.
 * **feat:** Panel volume hiển thị thêm label giá trị nhỏ nhất (min vol trong vùng hiển thị) ở góc dưới-phải, giống cách MACD hiển thị min. `mVolMinValue` không còn hardcode `0` mà được tính từ data thực tế.
@@ -67,9 +70,9 @@ Mã nguồn chart được thiết kế theo mô hình:
 - `KChartWidget`: widget chứa, xử lý tương tác (gesture, scroll, scale, long-press, pointer tracking cho parent), và tạo `ChartPainter`.
 - `ChartPainter`: lớp vẽ chính, kế thừa `BaseChartPainter`.
 - `BaseChartPainter`: xử lý layout (chia rect), phạm vi dữ liệu (visible window), và điều phối paint.
-- `MainRenderer`: vẽ đồ thị chính (nến hoặc line), chạy từng `MainIndicator` (MA/BOLL/EMA/SAR/ZigZag) trong cùng vùng `mMainRect`.
+- `MainRenderer`: vẽ đồ thị chính (nến hoặc line), chạy từng `MainIndicator` (MA/BOLL/EMA/SAR/ZigZag/SuperTrend) trong cùng vùng `mMainRect`.
 - `VolRenderer`: vẽ panel volume (bars + MA5/MA10) trong `mVolRect`. Toggle bằng `volHidden` ở `KChartWidget`.
-- `SecondaryRenderer`: vẽ một panel indicator phụ (MACD/KDJ/RSI/WR/CCI/OBV). Mỗi entry trong `secondaryIndicators` có 1 instance riêng.
+- `SecondaryRenderer`: vẽ một panel indicator phụ (MACD/KDJ/RSI/WR/CCI/OBV/TRIX/MTM). Mỗi entry trong `secondaryIndicators` có 1 instance riêng.
 - `DepthChartPainter`: vẽ orderbook depth (Buy/Sell pressure) — standalone, không gắn với `KChartWidget`.
 
 > **Ghi chú quan trọng:** toàn bộ chart chính của `KChartWidget` được vẽ trong một `CustomPaint` duy nhất. `KChartWidget` tạo ra `ChartPainter`, và `ChartPainter` quản lý canvas chung, dùng các renderer nội bộ để vẽ từng phần trong cùng một hộp vẽ.
@@ -218,20 +221,22 @@ Nến chính. Kế thừa `KEntity` (multi-mixin) → mang sẵn slot cho mọi 
 
 ```dart
 class KEntity with
-    CandleEntity,    // open, high, low, close
+    CandleEntity,    // open, high, low, close, superTrend
     VolumeEntity,    // vol, MA5Volume, MA10Volume        ★ trước MACDEntity
     KDJEntity,       // k, d, j
     RSIEntity,       // rsi
     WREntity,        // r (Williams %R)
     CCIEntity,       // cci
     OBVEntity,       // obv, obvSignal                    ★ trước MACDEntity
-    MACDEntity,      // dif, dea, macd  (on Vol+OBV+...)
+    TRIXEntity,      // trix, trixMa                      ★ trước MACDEntity
+    MTMEntity,       // mtm, mtmMa                        ★ trước MACDEntity
+    MACDEntity,      // dif, dea, macd  (on Vol+OBV+TRIX+MTM+...)
     ZigZagEntity {}  // zigzag points
 ```
 
 | Mixin | Field | Indicator dùng |
 |---|---|---|
-| `CandleEntity` | `open/high/low/close`, `maValueList`, `emaValueList`, `sar`, `boll` | MA, EMA, SAR, BOLL |
+| `CandleEntity` | `open/high/low/close`, `maValueList`, `emaValueList`, `sar`, `boll`, `superTrend` | MA, EMA, SAR, BOLL, SuperTrend |
 | `VolumeEntity` | `open/close/vol`, `MA5Volume`, `MA10Volume` | Volume MA |
 | `MACDEntity` | `dea`, `dif`, `macd` | MACD |
 | `KDJEntity` | `k`, `d`, `j` | KDJ |
@@ -239,9 +244,11 @@ class KEntity with
 | `WREntity` | `r` (%R) | WR |
 | `CCIEntity` | `cci` | CCI |
 | `OBVEntity` | `obv`, `obvSignal` | OBV |
+| `TRIXEntity` | `trix`, `trixMa` | TRIX |
+| `MTMEntity` | `mtm`, `mtmMa` | MTM |
 | `ZigZagEntity` | `zigzag` | ZigZag |
 
-**Thứ tự mixin quan trọng** — `OBVEntity` phải đứng trước `MACDEntity` (do `MACDEntity on ... OBVEntity`).
+**Thứ tự mixin quan trọng** — `OBVEntity`/`TRIXEntity`/`MTMEntity` phải đứng trước `MACDEntity` (do `MACDEntity on ... OBVEntity, TRIXEntity, MTMEntity`).
 
 ### 5.3 `InfoWindowEntity`
 
@@ -450,14 +457,17 @@ IndicatorTemplate<T, K>   ← abstract
 │   ├── BOLLIndicator
 │   ├── EMAIndicator
 │   ├── SARIndicator
-│   └── ZigZagIndicator
+│   ├── ZigZagIndicator
+│   └── SuperTrendIndicator
 └── SecondaryIndicator<T, K> ← panel riêng bên dưới
     ├── MACDIndicator
     ├── KDJIndicator
     ├── RSIIndicator
     ├── WRIndicator
     ├── CCIIndicator
-    └── OBVIndicator
+    ├── OBVIndicator
+    ├── TRIXIndicator
+    └── MTMIndicator
 ```
 
 ### 9.2 Built-in indicators
@@ -485,6 +495,20 @@ IndicatorTemplate<T, K>   ← abstract
 - **Style:** `ZigZagStyle({ zigzagColor, lineWidth })`
 - **calcParams:** `[5]` (deviation %)
 - **Output:** `entity.zigzag = double?` chỉ ở pivot
+
+#### SuperTrend — main
+- **Style:** `SuperTrendStyle({ upColor, dnColor, upFillColor, dnFillColor, lineWidth })`
+- **calcParams:** `[10, 30]` — (ATR period, ATR multiplier ÷10 → factor 3.0)
+- **Output:** `entity.superTrend = SuperTrend { value, isUp }` (class định nghĩa trong `super_trend_indicator.dart`, field nằm ở `CandleEntity` — KHÔNG cần entity mixin riêng vì là main indicator)
+- **Vẽ:** đường band đổi màu theo `isUp` (xanh khi uptrend — band dưới giá, đỏ khi downtrend — band trên giá) + fill mờ giữa band và giá. Label `SUPER: x` cũng đổi màu theo trend.
+- **Công thức:**
+  ```
+  ATR = RMA(TR, N)                   // TR = max(h-l, |h-prevC|, |l-prevC|)
+                                     // seed = SMA(TR,N), sau đó Wilder: atr = (atr×(N-1)+tr)/N
+  upperBand = (h+l)/2 + factor×ATR
+  lowerBand = (h+l)/2 - factor×ATR
+  trend flip khi close cắt qua band hiện tại
+  ```
 
 #### MACD — secondary
 - **Style:** `MACDStyle({ upColor, dnColor, macdColor, difColor, deaColor, macdWidth })`
@@ -522,6 +546,31 @@ IndicatorTemplate<T, K>   ← abstract
   obv[i] = obv[i-1] - vol[i]   // nến giảm
   signal = SMA(obv, 5)
   ```
+
+#### TRIX — secondary
+- **Style:** `TRIXStyle({ trixColor, trixMaColor })`
+- **calcParams:** `[12, 20]` — (N: chu kỳ triple EMA, M: chu kỳ MA signal)
+- **Output:** `entity.trix`, `entity.trixMa` (mixin `TRIXEntity`)
+- **Công thức:**
+  ```
+  EMA1 = EMA(CLOSE, N)
+  EMA2 = EMA(EMA1, N)
+  EMA3 = EMA(EMA2, N)
+  TRIX   = (EMA3 - REF(EMA3,1)) / REF(EMA3,1) × 100
+  MATRIX = MA(TRIX, M)
+  ```
+- **Lưu ý:** `trix` null ở nến đầu tiên (chưa có `prevEma3`); `trixMa` null cho tới khi đủ M giá trị TRIX. EMA seed bằng `close` của nến đầu. MA signal dùng sliding-window sum O(n).
+
+#### MTM — secondary
+- **Style:** `MTMStyle({ mtmColor, mtmMaColor })`
+- **calcParams:** `[12, 6]` — (N: chu kỳ momentum, M: chu kỳ MA signal)
+- **Output:** `entity.mtm`, `entity.mtmMa` (mixin `MTMEntity`)
+- **Công thức:**
+  ```
+  MTM   = CLOSE - REF(CLOSE, N)    // biến thể tuyệt đối (classic)
+  MTMMA = MA(MTM, M)
+  ```
+- **Lưu ý:** `mtm` null khi `i < N` (chưa đủ N nến trước); `mtmMa` null cho tới khi đủ M giá trị MTM. Giá trị MTM có scale phụ thuộc giá tuyệt đối của symbol (BTC sẽ ra hàng trăm/nghìn) — nếu cần scale % thì đổi công thức sang `(CLOSE - REF)/REF × 100` (ROC-style), chỉ 1 dòng trong `calc()`.
 
 ### 9.3 Custom indicator
 
