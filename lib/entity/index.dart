@@ -1,3 +1,4 @@
+export 'avl_entity.dart';
 export 'candle_entity.dart';
 export 'cci_entity.dart';
 export 'depth_entity.dart';
@@ -6,8 +7,11 @@ export 'kdj_entity.dart';
 export 'k_entity.dart';
 export 'k_line_entity.dart';
 export 'macd_entity.dart';
+export 'mtm_entity.dart';
 export 'obv_entity.dart';
 export 'rsi_entity.dart';
 export 'rw_entity.dart';
+export 'stoch_rsi_entity.dart';
+export 'trix_entity.dart';
 export 'volume_entity.dart';
 export 'zigzag_entity.dart';
