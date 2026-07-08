@@ -6,10 +6,11 @@ import 'rsi_entity.dart';
 import 'rw_entity.dart';
 import 'volume_entity.dart';
 import 'cci_entity.dart';
+import 'trix_entity.dart';
 import 'zigzag_entity.dart';
 
-// Thứ tự mixin quan trọng — OBVEntity phải đứng trước MACDEntity
-// vì MACDEntity khai báo `on OBVEntity` (xem macd_entity.dart).
+// Thứ tự mixin quan trọng — OBVEntity/TRIXEntity phải đứng trước MACDEntity
+// vì MACDEntity khai báo `on OBVEntity, TRIXEntity` (xem macd_entity.dart).
 // Dart yêu cầu mixin trong `on` clause phải được apply trước.
 class KEntity
     with
@@ -20,5 +21,6 @@ class KEntity
         WREntity,
         CCIEntity,
         OBVEntity,   // phải trước MACDEntity
+        TRIXEntity,  // phải trước MACDEntity
         MACDEntity,
         ZigZagEntity {}

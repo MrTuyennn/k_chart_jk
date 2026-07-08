@@ -58,6 +58,21 @@ class SARStyle extends IndicatorStyle {
   });
 }
 
+class SuperTrendStyle extends IndicatorStyle {
+  final Color upColor;
+  final Color dnColor;
+  final Color upFillColor;
+  final Color dnFillColor;
+
+  const SuperTrendStyle({
+    this.upColor = const Color(0xFF14AD8F),
+    this.dnColor = const Color(0xFFD5405D),
+    this.upFillColor = const Color(0x2614AD8F),
+    this.dnFillColor = const Color(0x26D5405D),
+    super.lineWidth = 1.5,
+  });
+}
+
 class CCIStyle extends IndicatorStyle {
   final Color cciColor;
 
@@ -120,6 +135,16 @@ class ZigZagStyle extends IndicatorStyle {
   const ZigZagStyle({
     this.zigzagColor = const Color(0xFFFFC634),
     super.lineWidth = 1.0,
+  });
+}
+
+class TRIXStyle extends IndicatorStyle {
+  final Color trixColor;
+  final Color trixMaColor;
+
+  const TRIXStyle({
+    this.trixColor = const Color(0xFFFFC634),
+    this.trixMaColor = const Color(0xff35cdac),
   });
 }
 

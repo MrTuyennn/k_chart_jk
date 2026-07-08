@@ -11,6 +11,7 @@ part 'main/ma_indicator.dart';
 part 'main/boll_indicator.dart';
 part 'main/ema_indicator.dart';
 part 'main/zigzag_indicator.dart';
+part 'main/super_trend_indicator.dart';
 
 part 'secondary/macd_indicator.dart';
 part 'secondary/cci_indicator.dart';
@@ -18,6 +19,7 @@ part 'secondary/kdj_indicator.dart';
 part 'secondary/rsi_indicator.dart';
 part 'secondary/wr_indicator.dart';
 part 'secondary/obv_indicator.dart';
+part 'secondary/trix_indicator.dart';
 
 typedef GetYFunction = double Function(double y);
 

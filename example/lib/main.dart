@@ -86,9 +86,9 @@ List<KLineEntity> _generateMockData(int count, Duration candleInterval) {
 
 // ── Demo page ─────────────────────────────────────────────────────────────────
 
-enum _MainType { ma, boll, ema, none }
+enum _MainType { ma, boll, ema, superTrend, none }
 
-enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, none }
+enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, none }
 
 enum _ChartTimeframe {
   m15('15m', Duration(minutes: 15)),
@@ -404,6 +404,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     _MainType.ma => [MAIndicator()],
     _MainType.boll => [BOLLIndicator()],
     _MainType.ema => [EMAIndicator()],
+    _MainType.superTrend => [SuperTrendIndicator()],
     _MainType.none => [],
   };
 
@@ -415,6 +416,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       _SecondaryType.wr,
       _SecondaryType.cci,
       _SecondaryType.obv,
+      _SecondaryType.trix,
     ];
     return order
         .where((t) => _secondaryTypes.contains(t))
@@ -426,6 +428,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             _SecondaryType.wr => WRIndicator(),
             _SecondaryType.cci => CCIIndicator(),
             _SecondaryType.obv => OBVIndicator(),
+            _SecondaryType.trix => TRIXIndicator(),
             _ => throw StateError('unreachable'),
           },
         )
@@ -510,9 +513,9 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           children: [
             _showDepth ? _buildDepthChartSection() : _buildChart(),
             const SizedBox(height: 8),
-            _sectionHeader('Order Book'),
-            _buildOrderBook(),
-            const SizedBox(height: 8),
+            // _sectionHeader('Order Book'),
+            // _buildOrderBook(),
+            // const SizedBox(height: 8),
             _buildControls(),
           ],
         ),
@@ -1053,6 +1056,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 () => _setMain(_MainType.ema),
               ),
               _chip(
+                'SUPER',
+                _mainType == _MainType.superTrend,
+                () => _setMain(_MainType.superTrend),
+              ),
+              _chip(
                 'None',
                 _mainType == _MainType.none,
                 () => _setMain(_MainType.none),
@@ -1095,6 +1103,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 'OBV',
                 _secondaryTypes.contains(_SecondaryType.obv),
                 () => _toggleSecondary(_SecondaryType.obv),
+              ),
+              _chip(
+                'TRIX',
+                _secondaryTypes.contains(_SecondaryType.trix),
+                () => _toggleSecondary(_SecondaryType.trix),
               ),
             ],
           ),
