@@ -1,3 +1,8 @@
+## 1.0.2
+
+* **feat:** New main indicator `SuperTrendIndicator` (SUPER) — an ATR-based trend line (Wilder's smoothing), `calcParams: [period, multiplier*10]`, direction (`isUp`) derived from the final upper/lower band, colored via `upColor`/`dnColor`. Also draws a shaded fill (`upFillColor`/`dnFillColor` on `SuperTrendStyle`) between the SuperTrend line and the close price to highlight the trend region, instead of just a single line.
+* **feat:** New secondary indicator `TRIXIndicator` (TRIX) — a triple-smoothed EMA rate-of-change oscillator, `calcParams: [12, 20]` (triple-EMA period, signal MA period). Draws the TRIX/MATRIX line pair (`TRIXStyle.trixColor`/`trixMaColor`) in the secondary panel, following the same `SecondaryIndicator` structure as MACD/RSI.
+
 ## 1.0.1
 
 * **fix:** `onLoadMore(true)` was never called when the initial data (or data after a previous load) didn't fill the chart's width (`ChartPainter.maxScrollX <= 0`) and the user hadn't performed any gesture yet. Previously `onLoadMore` only triggered from `onScaleUpdate`/`onScaleEnd`/fling, so a chart rendering fewer candles than its viewport width would sit stuck indefinitely. Added `_maybeLoadMoreForNarrowData()`, called from `initState`/`didUpdateWidget` (via `addPostFrameCallback` to wait for `ChartPainter.maxScrollX` to update after paint), guarded by `_narrowLoadRequestedForLength` so `onLoadMore` isn't re-fired on every rebuild unrelated to `datas` (style/theme changes, etc.).
