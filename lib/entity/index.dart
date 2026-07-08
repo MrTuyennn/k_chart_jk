@@ -1,3 +1,4 @@
+export 'avl_entity.dart';
 export 'candle_entity.dart';
 export 'cci_entity.dart';
 export 'depth_entity.dart';

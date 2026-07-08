@@ -35,6 +35,7 @@
 
 ### Unreleased
 
+* **feat:** `AVLIndicator` — main indicator Average Value Line kiểu Binance (giá khớp lệnh trung bình từng nến = `amount/vol`, fallback typical price), đường đi xuyên qua thân nến. Xem [9.2](#92-built-in-indicators).
 * **feat:** `MTMIndicator` — secondary indicator Momentum (MTM/MTMMA), params mặc định `[12, 6]`. Xem [9.2](#92-built-in-indicators).
 * **feat:** `TRIXIndicator` — secondary indicator TRIX/MATRIX (triple-smoothed EMA rate of change), params mặc định `[12, 20]`. Xem [9.2](#92-built-in-indicators).
 * **feat:** `SuperTrendIndicator` — main indicator SuperTrend (ATR-based trend band, đổi màu theo hướng trend + fill mờ), params mặc định `[10, 30]`. Xem [9.2](#92-built-in-indicators).
@@ -70,7 +71,7 @@ Mã nguồn chart được thiết kế theo mô hình:
 - `KChartWidget`: widget chứa, xử lý tương tác (gesture, scroll, scale, long-press, pointer tracking cho parent), và tạo `ChartPainter`.
 - `ChartPainter`: lớp vẽ chính, kế thừa `BaseChartPainter`.
 - `BaseChartPainter`: xử lý layout (chia rect), phạm vi dữ liệu (visible window), và điều phối paint.
-- `MainRenderer`: vẽ đồ thị chính (nến hoặc line), chạy từng `MainIndicator` (MA/BOLL/EMA/SAR/ZigZag/SuperTrend) trong cùng vùng `mMainRect`.
+- `MainRenderer`: vẽ đồ thị chính (nến hoặc line), chạy từng `MainIndicator` (MA/BOLL/EMA/SAR/ZigZag/SuperTrend/AVL) trong cùng vùng `mMainRect`.
 - `VolRenderer`: vẽ panel volume (bars + MA5/MA10) trong `mVolRect`. Toggle bằng `volHidden` ở `KChartWidget`.
 - `SecondaryRenderer`: vẽ một panel indicator phụ (MACD/KDJ/RSI/WR/CCI/OBV/TRIX/MTM). Mỗi entry trong `secondaryIndicators` có 1 instance riêng.
 - `DepthChartPainter`: vẽ orderbook depth (Buy/Sell pressure) — standalone, không gắn với `KChartWidget`.
@@ -231,7 +232,8 @@ class KEntity with
     TRIXEntity,      // trix, trixMa                      ★ trước MACDEntity
     MTMEntity,       // mtm, mtmMa                        ★ trước MACDEntity
     MACDEntity,      // dif, dea, macd  (on Vol+OBV+TRIX+MTM+...)
-    ZigZagEntity {}  // zigzag points
+    ZigZagEntity,    // zigzag points
+    AVLEntity {}     // avl (cumulative VWAP)
 ```
 
 | Mixin | Field | Indicator dùng |
@@ -247,6 +249,7 @@ class KEntity with
 | `TRIXEntity` | `trix`, `trixMa` | TRIX |
 | `MTMEntity` | `mtm`, `mtmMa` | MTM |
 | `ZigZagEntity` | `zigzag` | ZigZag |
+| `AVLEntity` | `avl` | AVL |
 
 **Thứ tự mixin quan trọng** — `OBVEntity`/`TRIXEntity`/`MTMEntity` phải đứng trước `MACDEntity` (do `MACDEntity on ... OBVEntity, TRIXEntity, MTMEntity`).
 
@@ -458,7 +461,8 @@ IndicatorTemplate<T, K>   ← abstract
 │   ├── EMAIndicator
 │   ├── SARIndicator
 │   ├── ZigZagIndicator
-│   └── SuperTrendIndicator
+│   ├── SuperTrendIndicator
+│   └── AVLIndicator
 └── SecondaryIndicator<T, K> ← panel riêng bên dưới
     ├── MACDIndicator
     ├── KDJIndicator
@@ -509,6 +513,19 @@ IndicatorTemplate<T, K>   ← abstract
   lowerBand = (h+l)/2 - factor×ATR
   trend flip khi close cắt qua band hiện tại
   ```
+
+#### AVL — main
+- **Style:** `AVLStyle({ avlColor, lineWidth })`
+- **calcParams:** `[]` — không có param chu kỳ
+- **Output:** `entity.avl` (mixin `AVLEntity` — theo pattern ZigZag: mixin đứng sau `MACDEntity` trong `KEntity`, indicator cast `entity as AVLEntity` vì main indicator dùng `CandleEntity` làm T)
+- **Vẽ:** đường line màu tím đi **xuyên qua thân từng nến** (kiểu AVL trên app Binance) — mỗi điểm là giá khớp lệnh trung bình của chính nến đó, nên luôn nằm trong range high–low.
+- **Công thức:**
+  ```
+  AVL = AMOUNT / VOL                   // quote volume ÷ base volume của nến
+  fallback (amount null/0 hoặc vol=0):
+  AVL = (HIGH + LOW + CLOSE) / 3       // typical price
+  ```
+- **Lưu ý:** cần API trả `amount` (quote volume) trong `KLineEntity` để có giá trị thực; thiếu thì fallback typical price — đường vẫn bám nến nhưng không phản ánh volume-weighting thực. Các biến thể từng thử và bỏ: cumulative VWAP (đường trôi xa khỏi cụm nến khi giá chạy dài, kéo giãn trục Y vì `getMaxMinValue` phải bao giá trị AVL) và rolling VWAP N nến (mượt hơn nhưng vẫn lệch khỏi nến, không giống Binance).
 
 #### MACD — secondary
 - **Style:** `MACDStyle({ upColor, dnColor, macdColor, difColor, deaColor, macdWidth })`

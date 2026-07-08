@@ -9,6 +9,7 @@ import 'cci_entity.dart';
 import 'trix_entity.dart';
 import 'mtm_entity.dart';
 import 'zigzag_entity.dart';
+import 'avl_entity.dart';
 
 // Thứ tự mixin quan trọng — OBVEntity/TRIXEntity/MTMEntity phải đứng trước MACDEntity
 // vì MACDEntity khai báo `on OBVEntity, TRIXEntity, MTMEntity` (xem macd_entity.dart).
@@ -25,4 +26,5 @@ class KEntity
         TRIXEntity,  // phải trước MACDEntity
         MTMEntity,   // phải trước MACDEntity
         MACDEntity,
-        ZigZagEntity {}
+        ZigZagEntity,
+        AVLEntity {}

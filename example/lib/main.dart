@@ -86,7 +86,7 @@ List<KLineEntity> _generateMockData(int count, Duration candleInterval) {
 
 // ── Demo page ─────────────────────────────────────────────────────────────────
 
-enum _MainType { ma, boll, ema, superTrend, zigzag, none }
+enum _MainType { ma, boll, ema, superTrend, zigzag, avl, none }
 
 enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, mtm, none }
 
@@ -406,6 +406,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     _MainType.ema => [EMAIndicator()],
     _MainType.superTrend => [SuperTrendIndicator()],
     _MainType.zigzag => [ZigZagIndicator()],
+    _MainType.avl => [AVLIndicator()],
     _MainType.none => [],
   };
 
@@ -1067,6 +1068,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 'ZigZag',
                 _mainType == _MainType.zigzag,
                 () => _setMain(_MainType.zigzag),
+              ),
+              _chip(
+                'AVL',
+                _mainType == _MainType.avl,
+                () => _setMain(_MainType.avl),
               ),
               _chip(
                 'None',

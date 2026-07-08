@@ -12,6 +12,7 @@ part 'main/boll_indicator.dart';
 part 'main/ema_indicator.dart';
 part 'main/zigzag_indicator.dart';
 part 'main/super_trend_indicator.dart';
+part 'main/avl_indicator.dart';
 
 part 'secondary/macd_indicator.dart';
 part 'secondary/cci_indicator.dart';

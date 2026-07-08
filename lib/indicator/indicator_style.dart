@@ -4,10 +4,7 @@ class IndicatorStyle {
   final double lineWidth;
   final double strokeWidth;
 
-  const IndicatorStyle({
-    this.lineWidth = 1.0,
-    this.strokeWidth = 0.8,
-  });
+  const IndicatorStyle({this.lineWidth = 1.0, this.strokeWidth = 0.8});
 }
 
 class MAStyle extends IndicatorStyle {
@@ -76,25 +73,19 @@ class SuperTrendStyle extends IndicatorStyle {
 class CCIStyle extends IndicatorStyle {
   final Color cciColor;
 
-  const CCIStyle({
-    this.cciColor = const Color(0xFFFFC634),
-  });
+  const CCIStyle({this.cciColor = const Color(0xFFFFC634)});
 }
 
 class RSIStyle extends IndicatorStyle {
   final Color rsiColor;
 
-  const RSIStyle({
-    this.rsiColor = const Color(0xFFFFC634),
-  });
+  const RSIStyle({this.rsiColor = const Color(0xFFFFC634)});
 }
 
 class WRStyle extends IndicatorStyle {
   final Color wrColor;
 
-  const WRStyle({
-    this.wrColor = const Color(0xFFFFC634),
-  });
+  const WRStyle({this.wrColor = const Color(0xFFFFC634)});
 }
 
 class KDJStyle extends IndicatorStyle {
@@ -134,6 +125,15 @@ class ZigZagStyle extends IndicatorStyle {
 
   const ZigZagStyle({
     this.zigzagColor = const Color(0xFFFFC634),
+    super.lineWidth = 1.0,
+  });
+}
+
+class AVLStyle extends IndicatorStyle {
+  final Color avlColor;
+
+  const AVLStyle({
+    this.avlColor = const Color(0xFFFFC634),
     super.lineWidth = 1.0,
   });
 }
