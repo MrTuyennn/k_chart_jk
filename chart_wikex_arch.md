@@ -28,6 +28,11 @@
 
 ## 1. Changelog
 
+### 1.0.1
+
+* **fix:** `onLoadMore(true)` không được tự động gọi khi data ban đầu (hoặc sau khi load thêm) chưa lấp đầy chiều rộng chart (`ChartPainter.maxScrollX <= 0`) và user chưa thực hiện gesture nào. Trước đây `onLoadMore` chỉ trigger từ `onScaleUpdate`/`onScaleEnd`/fling nên chart hiển thị ít data hơn màn hình sẽ đứng im vô thời hạn. Đã thêm `_maybeLoadMoreForNarrowData()` gọi trong `initState`/`didUpdateWidget` (qua `addPostFrameCallback`), guard bằng `_narrowLoadRequestedForLength` để không gọi trùng `onLoadMore` mỗi khi widget rebuild vì lý do không liên quan tới `datas`. Chi tiết: [13.9](#139-auto-load-khi-data-chưa-lấp-đầy-chart-không-cần-gesture).
+* **docs:** Sửa doc comment gây warning khi generate `dartdoc`: generic type `List<SecondaryIndicator<MACDEntity, dynamic>>` bị hiểu nhầm là thẻ HTML, và `[0]`/`[i]`/`[i-1]`/`[scaleX]` bị hiểu nhầm là doc-reference link không tồn tại.
+
 ### Unreleased
 
 * **feat:** `KChartScaleState` — class lưu/khôi phục trạng thái zoom (`scaleX`, `scaleY`, `scrollX`). Truyền qua `KChartWidget.chartScale` để restore khi đổi timeframe; `scaleX` tự clamp theo `minScale`/`maxScale`. Callback `onChartScaleChanged` (`OnChartScaleChanged`) emit sau khi kết thúc pinch, scaleY drag, zoom controller, hoặc double-tap reset scaleY.
@@ -319,12 +324,14 @@ File: `lib/k_chart_widget.dart`.
 
 | Param | Kiểu | Ý nghĩa |
 |---|---|---|
-| `onLoadMore` | `void Function(bool isLeft)?` | Trigger khi scroll gần biên. `true` = load data cũ hơn. |
+| `onLoadMore` | `void Function(bool isLeft)?` | Trigger khi scroll gần biên **hoặc** khi data chưa lấp đầy chart (xem [13.9](#139-auto-load-khi-data-chưa-lấp-đầy-chart-không-cần-gesture)). `true` = load data cũ hơn. |
 | `isLoadingMore` | `bool` | Cờ khoá tránh duplicate request. |
 | `isOnDrag` | `void Function(bool)?` | Callback start/stop drag. |
 | `controller` | `KChartController?` | Điều khiển từ ngoài. |
 | `onChartScaleChanged` | `OnChartScaleChanged?` | Emit sau mỗi lần kết thúc pinch/scaleY/zoom/reset. |
 | `onVerticalOverscroll` | `ValueChanged<double>?` | Fire khi pan Y vượt clamp 50%. |
+
+**Lưu ý:** `onLoadMore` không chỉ trigger từ gesture (pan/pinch/fling) mà còn tự bắn từ `initState`/`didUpdateWidget` nếu data hiện tại chưa đủ lấp đầy chiều rộng chart — không cần user tương tác gì (fix 1.0.1).
 
 ### 6.5 Zoom state
 
@@ -911,6 +918,47 @@ void _compensateScrollOnDataChange(KChartWidget oldWidget) {
   mScrollX += diff * widget.chartStyle.pointWidth;
 }
 ```
+
+### 13.9 Auto-load khi data chưa lấp đầy chart (không cần gesture)
+
+Các trigger `onLoadMore` khác (13.7 fling, `onScaleUpdate`/`onScaleEnd`) chỉ chạy khi user thực hiện gesture. Nếu data ban đầu (hoặc sau khi load thêm vẫn) chưa đủ lấp đầy chiều rộng chart — `ChartPainter.maxScrollX <= 0` — và user chưa tương tác gì, `onLoadMore` sẽ **không bao giờ** được gọi, chart đứng im thiếu data (fix trong 1.0.1).
+
+```dart
+int? _narrowLoadRequestedForLength;
+
+@override
+void initState() {
+  super.initState();
+  ...
+  _maybeLoadMoreForNarrowData();
+}
+
+@override
+void didUpdateWidget(KChartWidget oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  ...
+  _maybeLoadMoreForNarrowData();
+}
+
+void _maybeLoadMoreForNarrowData() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
+    if (widget.isLoadingMore || widget.onLoadMore == null) return;
+    final data = widget.datas;
+    if (data == null || data.isEmpty) return;
+    if (ChartPainter.maxScrollX > 0) return;
+    if (_narrowLoadRequestedForLength == data.length) return;
+    _narrowLoadRequestedForLength = data.length;
+    widget.onLoadMore!(true);
+  });
+}
+```
+
+Điểm quan trọng:
+
+* **`addPostFrameCallback`**: `ChartPainter.maxScrollX` chỉ đúng **sau** khi `paint()` chạy xong với data hiện tại (`base_chart_painter.dart:247`), nên phải đợi hết frame mới đọc được giá trị mới nhất.
+* **`_narrowLoadRequestedForLength` (dedupe guard)**: `didUpdateWidget` fire trên **mọi** rebuild của parent, kể cả những rebuild không liên quan tới `datas` (đổi theme, đổi style...). Nếu không có guard này, mỗi rebuild trong lúc `isLoadingMore` chưa kịp được parent set `true` (thường bất đồng bộ, sau khi await API) sẽ gọi lại `onLoadMore(true)` → spam nhiều request trùng. Guard chỉ cho phép request lại khi `data.length` thực sự thay đổi so với lần request gần nhất.
+* **Giới hạn đã biết**: `ChartPainter.maxScrollX` là field `static`, dùng chung cho **mọi instance** `KChartWidget` trong app. Nếu có nhiều chart cùng render trong 1 frame (multi-chart view), giá trị đọc được trong `addPostFrameCallback` có thể là của chart khác paint sau cùng trong frame đó, không phải của chính widget này. Không ảnh hưởng nếu app chỉ hiển thị 1 chart tại 1 thời điểm.
 
 ---
 
