@@ -16,4 +16,7 @@ mixin CandleEntity {
 
   // bollingerBands
   Boll? boll;
+
+  // superTrend
+  SuperTrend? superTrend;
 }
