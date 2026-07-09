@@ -7,6 +7,7 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
   SecondaryIndicator indicator;
   final KChartStyle chartStyle;
   final KChartColors chartColors;
+  late final Paint _referencePaint;
 
   SecondaryRenderer(
     Rect mainRect,
@@ -24,7 +25,11 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
         topPadding: topPadding,
         fixedLength: fixedLength,
         gridColor: chartColors.gridColor,
-      );
+      ) {
+    _referencePaint = Paint()
+      ..color = chartColors.defaultTextColor.withAlpha(90)
+      ..strokeWidth = 0.5;
+  }
 
   @override
   void drawChart(
@@ -49,20 +54,23 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
   /// Vẽ các đường tham chiếu ngang nét đứt (indicator.referenceValues).
   /// Gọi 1 lần mỗi frame ở screen space, TRƯỚC vòng drawChart để vạch
   /// nằm phía sau đường indicator.
+  @override
   void drawReferenceLines(Canvas canvas) {
     if (indicator.referenceValues.isEmpty) return;
-    final paint = Paint()
-      ..color = chartColors.defaultTextColor.withAlpha(90)
-      ..strokeWidth = 0.5;
     const dashWidth = 4.0;
     const dashSpace = 4.0;
     for (final value in indicator.referenceValues) {
       final y = getY(value);
+      // Gom toàn bộ các đoạn nét đứt vào 1 Path, vẽ bằng 1 lệnh drawPath
+      // thay vì hàng chục/hàng trăm lệnh drawLine riêng lẻ mỗi frame.
+      final path = Path();
       double x = 0;
       while (x < chartRect.width) {
-        canvas.drawLine(Offset(x, y), Offset(x + dashWidth, y), paint);
+        path.moveTo(x, y);
+        path.lineTo(x + dashWidth, y);
         x += dashWidth + dashSpace;
       }
+      canvas.drawPath(path, _referencePaint);
     }
   }
 

@@ -27,10 +27,8 @@ class StochRSIIndicator extends SecondaryIndicator<MACDEntity, StochRSIStyle> {
 
   @override
   (double, double) getMaxMinValue(KLineEntity entity, double minV, double maxV) {
-    // Ép range bao luôn 20/80 để 2 vạch tham chiếu không bao giờ
-    // chạy ra ngoài panel khi K/D chỉ dao động trong vùng hẹp.
-    minV = min(minV, 20.0);
-    maxV = max(maxV, 80.0);
+    // referenceValues (20/80) tự động được BaseChartPainter.getSecondaryMaxMinValue
+    // bao vào range — không cần tự ép ở đây nữa.
     if (entity.stochRsiK != null) {
       minV = min(minV, entity.stochRsiK!);
       maxV = max(maxV, entity.stochRsiK!);
@@ -153,7 +151,13 @@ class StochRSIIndicator extends SecondaryIndicator<MACDEntity, StochRSIStyle> {
           avgLoss = (avgLoss * (n1 - 1) + loss) / n1;
         }
         if (i >= n1) {
-          rsi = avgLoss == 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+          // Thị trường đi ngang tuyệt đối (không tăng cũng không giảm) → neutral 50,
+          // không phải avgLoss == 0 && avgGain > 0 (overbought thực sự) mới cho 100.
+          if (avgGain == 0 && avgLoss == 0) {
+            rsi = 50;
+          } else {
+            rsi = avgLoss == 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+          }
         }
       }
 

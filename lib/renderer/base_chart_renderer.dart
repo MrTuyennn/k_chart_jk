@@ -45,6 +45,10 @@ abstract class BaseChartRenderer<T> {
   void drawChart(T lastPoint, T curPoint, double lastX, double curX, Size size,
       Canvas canvas);
 
+  /// Vẽ các đường trang trí phụ (vd đường tham chiếu ngang nét đứt) ở screen
+  /// space, phía sau `drawChart`. No-op mặc định — renderer con nào cần thì override.
+  void drawReferenceLines(Canvas canvas) {}
+
   void drawLine(double? lastPrice, double? curPrice, Canvas canvas, double lastX, double curX, Color color) {
     if (lastPrice == null || curPrice == null) {
       return;

@@ -68,8 +68,11 @@ class AVLIndicator extends MainIndicator<CandleEntity, AVLStyle> {
         // Giá khớp lệnh trung bình thực của nến (quote/base volume).
         entity.avl = amount / entity.vol;
       } else {
-        // Thiếu amount (API không trả hoặc = 0): xấp xỉ bằng typical price
-        // — vẫn luôn nằm trong range high-low của nến.
+        // amount == null (API không trả) hoặc amount <= 0: cố ý coi 2 trường hợp
+        // này là "không có dữ liệu amount đáng tin" — nếu vol > 0 (có khớp lệnh
+        // thật) thì amount đúng nghĩa phải > 0, nên amount <= 0 lúc đó chỉ có thể
+        // là placeholder/thiếu dữ liệu, không phải giá trị thật. Xấp xỉ bằng
+        // typical price — vẫn luôn nằm trong range high-low của nến.
         entity.avl = (entity.high + entity.low + entity.close) / 3;
       }
     }

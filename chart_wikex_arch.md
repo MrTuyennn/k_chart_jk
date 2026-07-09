@@ -269,7 +269,7 @@ class KEntity with
     StochRSIEntity,  // stochRsiK, stochRsiD              ★ trước MACDEntity
     MACDEntity,      // dif, dea, macd  (on Vol+OBV+TRIX+MTM+StochRSI+...)
     ZigZagEntity,    // zigzag points
-    AVLEntity {}     // avl (cumulative VWAP)
+    AVLEntity {}     // avl (per-candle amount/vol, fallback HLC/3)
 ```
 
 | Mixin            | Field                                                                             | Indicator dùng                 |

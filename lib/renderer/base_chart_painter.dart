@@ -297,13 +297,20 @@ abstract class BaseChartPainter extends CustomPainter {
   // compute maximum and minimum of secondary value
   void getSecondaryMaxMinValue(int index, KLineEntity item) {
     SecondaryIndicator indicator = secondaryIndicators[index];
-    final value = indicator.getMaxMinValue(
+    var (minValue, maxValue) = indicator.getMaxMinValue(
       item,
       mSecondaryRectList[index].mMinValue,
       mSecondaryRectList[index].mMaxValue,
     );
-    mSecondaryRectList[index].mMinValue = value.$1;
-    mSecondaryRectList[index].mMaxValue = value.$2;
+    // Đảm bảo mọi đường tham chiếu ngang (vd 20/80 của StochRSI) luôn nằm
+    // trong range hiển thị, không phụ thuộc từng indicator tự chép logic này
+    // trong getMaxMinValue của nó.
+    for (final refValue in indicator.referenceValues) {
+      minValue = min(minValue, refValue);
+      maxValue = max(maxValue, refValue);
+    }
+    mSecondaryRectList[index].mMinValue = minValue;
+    mSecondaryRectList[index].mMaxValue = maxValue;
   }
 
   // translate x

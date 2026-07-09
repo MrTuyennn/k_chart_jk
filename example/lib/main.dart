@@ -86,9 +86,9 @@ List<KLineEntity> _generateMockData(int count, Duration candleInterval) {
 
 // ── Demo page ─────────────────────────────────────────────────────────────────
 
-enum _MainType { ma, boll, ema, superTrend, zigzag, avl, none }
+enum _MainType { ma, boll, ema, superTrend, zigzag, avl }
 
-enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, mtm, stochRsi, none }
+enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, mtm, stochRsi }
 
 enum _ChartTimeframe {
   m15('15m', Duration(minutes: 15)),
@@ -122,10 +122,10 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   final KChartController _controller = KChartController();
   final ScrollController _outerScrollController = ScrollController();
 
-  _MainType _mainType = _MainType.ma;
+  final Set<_MainType> _mainTypes = {_MainType.ma};
   _ChartTimeframe _timeframe = _ChartTimeframe.h1;
   KChartScaleState _savedChartScale = const KChartScaleState();
-  Set<_SecondaryType> _secondaryTypes = {_SecondaryType.macd};
+  final Set<_SecondaryType> _secondaryTypes = {_SecondaryType.macd};
   bool _isLine = false;
   bool _volHidden = false;
   bool _isDark = false;
@@ -160,7 +160,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   int _tickCount = 0;
   // Mỗi tick: cập nhật nến cuối. Mỗi _ticksPerCandle tick: đóng nến + mở nến mới.
   static const int _ticksPerCandle = 10;
-  static const Duration _tickInterval = Duration(milliseconds: 500);
+  static const Duration _tickInterval = Duration(milliseconds: 50);
   final Random _liveRandom = Random();
 
   @override
@@ -222,14 +222,15 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   void _updateLastCandle(double newClose) {
     final last = _data.last;
     // Tạo entity mới thay thế nến cuối với giá close mới
+    final newVol = last.vol + _liveRandom.nextDouble() * 5;
     final updated = KLineEntity.fromCustom(
       time: last.time!,
       open: last.open,
       close: newClose,
       high: max(last.high, newClose),
       low: min(last.low, newClose),
-      vol: last.vol + _liveRandom.nextDouble() * 5,
-      amount: last.amount ?? 0,
+      vol: newVol,
+      amount: newClose * newVol,
     );
     final newData = [..._data.sublist(0, _data.length - 1), updated];
     DataUtil.calculateAll(newData, _mainIndicators, _secondaryIndicators);
@@ -239,14 +240,15 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   void _addNewCandle(double prevClose) {
     // Mở nến mới với open = close của nến trước
     final last = _data.last;
+    final newVol = _liveRandom.nextDouble() * 50 + 10;
     final newCandle = KLineEntity.fromCustom(
       time: last.time! + _timeframe.interval.inMilliseconds,
       open: prevClose,
       close: prevClose,
       high: prevClose,
       low: prevClose,
-      vol: _liveRandom.nextDouble() * 50 + 10,
-      amount: 0,
+      vol: newVol,
+      amount: prevClose * newVol,
     );
     final newData = [..._data, newCandle];
     DataUtil.calculateAll(newData, _mainIndicators, _secondaryIndicators);
@@ -382,9 +384,13 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     return list;
   }
 
-  void _setMain(_MainType type) {
+  void _toggleMain(_MainType type) {
     setState(() {
-      _mainType = type;
+      if (_mainTypes.contains(type)) {
+        _mainTypes.remove(type);
+      } else {
+        _mainTypes.add(type);
+      }
       _recalculate();
     });
   }
@@ -400,15 +406,29 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     });
   }
 
-  List<MainIndicator> get _mainIndicators => switch (_mainType) {
-    _MainType.ma => [MAIndicator()],
-    _MainType.boll => [BOLLIndicator()],
-    _MainType.ema => [EMAIndicator()],
-    _MainType.superTrend => [SuperTrendIndicator()],
-    _MainType.zigzag => [ZigZagIndicator()],
-    _MainType.avl => [AVLIndicator()],
-    _MainType.none => [],
-  };
+  List<MainIndicator> get _mainIndicators {
+    const order = [
+      _MainType.ma,
+      _MainType.boll,
+      _MainType.ema,
+      _MainType.superTrend,
+      _MainType.zigzag,
+      _MainType.avl,
+    ];
+    return order
+        .where((t) => _mainTypes.contains(t))
+        .map<MainIndicator>(
+          (t) => switch (t) {
+            _MainType.ma => MAIndicator(),
+            _MainType.boll => BOLLIndicator(),
+            _MainType.ema => EMAIndicator(),
+            _MainType.superTrend => SuperTrendIndicator(),
+            _MainType.zigzag => ZigZagIndicator(),
+            _MainType.avl => AVLIndicator(),
+          },
+        )
+        .toList();
+  }
 
   List<SecondaryIndicator> get _secondaryIndicators {
     const order = [
@@ -435,7 +455,6 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             _SecondaryType.trix => TRIXIndicator(),
             _SecondaryType.mtm => MTMIndicator(),
             _SecondaryType.stochRsi => StochRSIIndicator(),
-            _ => throw StateError('unreachable'),
           },
         )
         .toList();
@@ -519,9 +538,9 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           children: [
             _showDepth ? _buildDepthChartSection() : _buildChart(),
             const SizedBox(height: 8),
-            // _sectionHeader('Order Book'),
-            // _buildOrderBook(),
-            // const SizedBox(height: 8),
+            _sectionHeader('Order Book'),
+            _buildOrderBook(),
+            const SizedBox(height: 8),
             _buildControls(),
           ],
         ),
@@ -1048,38 +1067,33 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             children: [
               _chip(
                 'MA',
-                _mainType == _MainType.ma,
-                () => _setMain(_MainType.ma),
+                _mainTypes.contains(_MainType.ma),
+                () => _toggleMain(_MainType.ma),
               ),
               _chip(
                 'BOLL',
-                _mainType == _MainType.boll,
-                () => _setMain(_MainType.boll),
+                _mainTypes.contains(_MainType.boll),
+                () => _toggleMain(_MainType.boll),
               ),
               _chip(
                 'EMA',
-                _mainType == _MainType.ema,
-                () => _setMain(_MainType.ema),
+                _mainTypes.contains(_MainType.ema),
+                () => _toggleMain(_MainType.ema),
               ),
               _chip(
                 'SUPER',
-                _mainType == _MainType.superTrend,
-                () => _setMain(_MainType.superTrend),
+                _mainTypes.contains(_MainType.superTrend),
+                () => _toggleMain(_MainType.superTrend),
               ),
               _chip(
                 'ZigZag',
-                _mainType == _MainType.zigzag,
-                () => _setMain(_MainType.zigzag),
+                _mainTypes.contains(_MainType.zigzag),
+                () => _toggleMain(_MainType.zigzag),
               ),
               _chip(
                 'AVL',
-                _mainType == _MainType.avl,
-                () => _setMain(_MainType.avl),
-              ),
-              _chip(
-                'None',
-                _mainType == _MainType.none,
-                () => _setMain(_MainType.none),
+                _mainTypes.contains(_MainType.avl),
+                () => _toggleMain(_MainType.avl),
               ),
             ],
           ),
