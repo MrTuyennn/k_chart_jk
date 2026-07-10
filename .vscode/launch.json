@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "example (dev)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "example",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=env.dev.json"]
+    },
+    {
+      "name": "example (staging)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "example",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=env.staging.json"]
+    },
+    {
+      "name": "example (prod)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "example",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=env.prod.json"]
+    },
+    {
+      "name": "example (prod, release)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "example",
+      "program": "lib/main.dart",
+      "flutterMode": "release",
+      "toolArgs": ["--dart-define-from-file=env.prod.json"]
+    }
+  ]
+}

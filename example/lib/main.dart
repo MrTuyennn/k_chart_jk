@@ -1,8 +1,14 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:k_chart_wikex/k_chart_plus.dart';
+
+import 'bloc/chart_bloc.dart';
+import 'bloc/chart_event.dart';
+import 'bloc/chart_state.dart';
+import 'market/market_env.dart';
+import 'market/order_book.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,94 +26,31 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF217AFF)),
         useMaterial3: true,
       ),
-      home: const ChartDemoPage(),
-    );
-  }
-}
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-List<KLineEntity> _generateMockData(int count, Duration candleInterval) {
-  final random = Random(42);
-  double price = 65000;
-  final now = DateTime.now();
-  final list = <KLineEntity>[];
-
-  for (int i = count - 1; i >= 0; i--) {
-    final time = now.subtract(candleInterval * i);
-    final change = (random.nextDouble() - 0.48) * 800;
-    final open = price;
-    final close = (price + change).clamp(10000.0, 200000.0);
-    final high = max(open, close) + random.nextDouble() * 300;
-    final low = min(open, close) - random.nextDouble() * 300;
-    final vol = 10 + random.nextDouble() * 500;
-
-    list.add(
-      KLineEntity.fromCustom(
-        time: time.millisecondsSinceEpoch,
-        open: open,
-        close: close,
-        high: high,
-        low: low,
-        vol: vol,
-        amount: close * vol,
+      home: BlocProvider(
+        create: (_) => ChartBloc(),
+        child: const ChartDemoPage(),
       ),
     );
-    price = close;
   }
-  return list;
-}
-
-// ── Mock orderbook ────────────────────────────────────────────────────────────
-
-({List<DepthEntity> bids, List<DepthEntity> asks}) _generateMockDepth(
-  double midPrice, {
-  int levels = 40,
-  double stepRatio = 0.0005,
-}) {
-  final random = Random(7);
-  final bids = <DepthEntity>[];
-  final asks = <DepthEntity>[];
-  double bidCum = 0;
-  double askCum = 0;
-
-  for (int i = 1; i <= levels; i++) {
-    final bidPrice = midPrice * (1 - stepRatio * i);
-    final askPrice = midPrice * (1 + stepRatio * i);
-    final bidVol = 0.5 + random.nextDouble() * 4;
-    final askVol = 0.5 + random.nextDouble() * 4;
-    bidCum += bidVol;
-    askCum += askVol;
-    bids.add(DepthEntity(bidPrice, bidCum));
-    asks.add(DepthEntity(askPrice, askCum));
-  }
-  return (bids: bids, asks: asks);
 }
 
 // ── Demo page ─────────────────────────────────────────────────────────────────
 
-enum _MainType { ma, boll, ema, superTrend, zigzag, avl }
-
-enum _SecondaryType { macd, kdj, rsi, wr, cci, obv, trix, mtm, stochRsi }
-
-enum _ChartTimeframe {
-  m15('15m', Duration(minutes: 15)),
-  h1('1H', Duration(hours: 1)),
-  h4('4H', Duration(hours: 4)),
-  d1('1D', Duration(days: 1));
-
-  const _ChartTimeframe(this.label, this.interval);
-  final String label;
-  final Duration interval;
-}
-
 class _OrderBookItem {
-  final DepthEntity? entity;
+  final OrderBookLevel? level;
   final Color? sideColor;
+
+  /// Max quantity của phía này (từ WS `maxAmount`) — scale độ dài depth bar.
+  final double sideMax;
   final bool isSpread;
 
-  _OrderBookItem.row(this.entity, this.sideColor) : isSpread = false;
-  _OrderBookItem.spread() : entity = null, sideColor = null, isSpread = true;
+  _OrderBookItem.row(this.level, this.sideColor, this.sideMax)
+    : isSpread = false;
+  _OrderBookItem.spread()
+    : level = null,
+      sideColor = null,
+      sideMax = 0,
+      isSpread = true;
 }
 
 class ChartDemoPage extends StatefulWidget {
@@ -117,25 +60,13 @@ class ChartDemoPage extends StatefulWidget {
   State<ChartDemoPage> createState() => _ChartDemoPageState();
 }
 
+/// Chỉ giữ state UI/gesture thuần túy (không phải data/business) — mọi thứ
+/// còn lại (candle data, indicator, timeframe, live-tick, load-more...) nằm
+/// trong [ChartBloc]/[ChartState]. View ở đây chỉ đọc [ChartState] qua
+/// [BlocBuilder] và dispatch [ChartEvent], không tự tính toán gì.
 class _ChartDemoPageState extends State<ChartDemoPage> {
-  late List<KLineEntity> _data;
   final KChartController _controller = KChartController();
   final ScrollController _outerScrollController = ScrollController();
-
-  final Set<_MainType> _mainTypes = {_MainType.ma};
-  _ChartTimeframe _timeframe = _ChartTimeframe.h1;
-  KChartScaleState _savedChartScale = const KChartScaleState();
-  final Set<_SecondaryType> _secondaryTypes = {_SecondaryType.macd};
-  bool _isLine = false;
-  bool _volHidden = false;
-  bool _isDark = false;
-  bool _showDepth = false;
-  int _depthBottomLabelCount = 3;
-
-  bool _isFetching = false;
-  int _totalLoaded = 200;
-  static const int _maxTotal = 500;
-  static const int _batchSize = 50;
 
   // Gesture priority cho chart vs outer scroll
   // true sau khi user drag dọc vùng phải chart (scaleY) — kích hoạt chart focused mode
@@ -154,116 +85,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   static const Duration _doubleTapMaxGap = Duration(milliseconds: 300);
   static const double _doubleTapMaxDistance = 20.0;
 
-  // Real-time simulation
-  Timer? _liveTimer;
-  bool _isLive = false;
-  int _tickCount = 0;
-  // Mỗi tick: cập nhật nến cuối. Mỗi _ticksPerCandle tick: đóng nến + mở nến mới.
-  static const int _ticksPerCandle = 10;
-  static const Duration _tickInterval = Duration(milliseconds: 50);
-  final Random _liveRandom = Random();
-
-  @override
-  void initState() {
-    super.initState();
-    _data = _generateMockData(200, _timeframe.interval);
-    _recalculate();
-  }
-
-  void _setTimeframe(_ChartTimeframe tf) {
-    if (_timeframe == tf) return;
-    setState(() {
-      _timeframe = tf;
-      _data = _generateMockData(200, tf.interval);
-      _totalLoaded = 200;
-      _recalculate();
-    });
-  }
-
   @override
   void dispose() {
-    _liveTimer?.cancel();
     _controller.dispose();
     _outerScrollController.dispose();
     super.dispose();
-  }
-
-  // ── Real-time simulation ───────────────────────────────────────────────────
-
-  void _toggleLive() {
-    if (_isLive) {
-      _liveTimer?.cancel();
-      setState(() => _isLive = false);
-    } else {
-      _tickCount = 0;
-      _liveTimer = Timer.periodic(_tickInterval, (_) => _onLiveTick());
-      setState(() => _isLive = true);
-    }
-  }
-
-  void _onLiveTick() {
-    if (!mounted) return;
-    _tickCount++;
-
-    final last = _data.last;
-    // Biến động giá nhỏ mỗi tick (~0.3% của giá hiện tại)
-    final change = (last.close * 0.003) * (_liveRandom.nextDouble() - 0.48);
-    final newClose = (last.close + change).clamp(1.0, double.infinity);
-
-    if (_tickCount % _ticksPerCandle == 0) {
-      // Đóng nến hiện tại, mở nến mới
-      _addNewCandle(newClose);
-    } else {
-      // Cập nhật nến cuối (tick trong cùng 1 nến)
-      _updateLastCandle(newClose);
-    }
-  }
-
-  void _updateLastCandle(double newClose) {
-    final last = _data.last;
-    // Tạo entity mới thay thế nến cuối với giá close mới
-    final newVol = last.vol + _liveRandom.nextDouble() * 5;
-    final updated = KLineEntity.fromCustom(
-      time: last.time!,
-      open: last.open,
-      close: newClose,
-      high: max(last.high, newClose),
-      low: min(last.low, newClose),
-      vol: newVol,
-      amount: newClose * newVol,
-    );
-    final newData = [..._data.sublist(0, _data.length - 1), updated];
-    DataUtil.calculateAll(newData, _mainIndicators, _secondaryIndicators);
-    setState(() => _data = newData);
-  }
-
-  void _addNewCandle(double prevClose) {
-    // Mở nến mới với open = close của nến trước
-    final last = _data.last;
-    final newVol = _liveRandom.nextDouble() * 50 + 10;
-    final newCandle = KLineEntity.fromCustom(
-      time: last.time! + _timeframe.interval.inMilliseconds,
-      open: prevClose,
-      close: prevClose,
-      high: prevClose,
-      low: prevClose,
-      vol: newVol,
-      amount: prevClose * newVol,
-    );
-    final newData = [..._data, newCandle];
-    DataUtil.calculateAll(newData, _mainIndicators, _secondaryIndicators);
-    setState(() {
-      _data = newData;
-      _totalLoaded++;
-    });
-    // KHÔNG gọi _controller.reset() — sẽ phá mScrollX/mScaleX/mSelectX
-    // của user đang xem lịch sử. Khi mScrollX = 0 (đang ở rightmost),
-    // chart tự động vẫn fit nến mới vào view; khi đang scroll history
-    // thì giữ nguyên vị trí, user không bị giật.
-  }
-
-  void _recalculate() {
-    DataUtil.calculateAll(_data, _mainIndicators, _secondaryIndicators);
   }
 
   // ── Chart pointer tracking ─────────────────────────────────────────────────
@@ -333,222 +159,170 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     }
   }
 
-  void _onLoadMore(bool isLeft) async {
-    if (!isLeft) return; // chỉ xử lý load data cũ hơn
-    if (_isFetching) return; // đang fetch rồi, bỏ qua
-    if (_totalLoaded >= _maxTotal) return; // đã hết data
-
-    setState(() => _isFetching = true);
-
-    // Giả lập network delay
-    await Future.delayed(const Duration(milliseconds: 1500));
-    if (!mounted) return;
-
-    final oldest = _data.first;
-    final olderData = _generateOlderData(_batchSize, oldest);
-    final merged = [...olderData, ..._data];
-    DataUtil.calculateAll(merged, _mainIndicators, _secondaryIndicators);
-
-    setState(() {
-      _data = merged;
-      _totalLoaded += _batchSize;
-      _isFetching = false;
-    });
-  }
-
-  List<KLineEntity> _generateOlderData(int count, KLineEntity oldest) {
-    final random = Random(oldest.time ?? 0);
-    double price = oldest.open;
-    final list = <KLineEntity>[];
-    for (int i = count; i >= 1; i--) {
-      final time = (oldest.time ?? 0) - i * _timeframe.interval.inMilliseconds;
-      final change = (random.nextDouble() - 0.48) * 800;
-      final open = price;
-      final close = (price - change).clamp(10000.0, 200000.0);
-      final high = max(open, close) + random.nextDouble() * 300;
-      final low = min(open, close) - random.nextDouble() * 300;
-      final vol = 10 + random.nextDouble() * 500;
-      list.add(
-        KLineEntity.fromCustom(
-          time: time,
-          open: open,
-          close: close,
-          high: high,
-          low: low,
-          vol: vol,
-          amount: close * vol,
-        ),
-      );
-      price = close;
+  void _onChartVerticalOverscroll(double delta) {
+    if (!_outerScrollController.hasClients) return;
+    final pos = _outerScrollController.position;
+    // Convention: chart pan Y dùng mOffsetY += dy (content theo finger).
+    // Scroll Flutter ngược lại: pos.pixels TĂNG = reveal content bên dưới
+    // (finger drag UP). Vì vậy phải NEGATE delta khi forward sang outer:
+    //   finger drag DOWN → overscroll > 0 → outer pos giảm (reveal content trên)
+    //   finger drag UP   → overscroll < 0 → outer pos tăng (reveal content dưới)
+    final target = (pos.pixels - delta).clamp(
+      pos.minScrollExtent,
+      pos.maxScrollExtent,
+    );
+    if (target != pos.pixels) {
+      // jumpTo bypass physics → vẫn cuộn được khi outer đang NeverScrollableScrollPhysics
+      _outerScrollController.jumpTo(target);
     }
-    return list;
   }
-
-  void _toggleMain(_MainType type) {
-    setState(() {
-      if (_mainTypes.contains(type)) {
-        _mainTypes.remove(type);
-      } else {
-        _mainTypes.add(type);
-      }
-      _recalculate();
-    });
-  }
-
-  void _toggleSecondary(_SecondaryType type) {
-    setState(() {
-      if (_secondaryTypes.contains(type)) {
-        _secondaryTypes.remove(type);
-      } else {
-        _secondaryTypes.add(type);
-      }
-      _recalculate();
-    });
-  }
-
-  List<MainIndicator> get _mainIndicators {
-    const order = [
-      _MainType.ma,
-      _MainType.boll,
-      _MainType.ema,
-      _MainType.superTrend,
-      _MainType.zigzag,
-      _MainType.avl,
-    ];
-    return order
-        .where((t) => _mainTypes.contains(t))
-        .map<MainIndicator>(
-          (t) => switch (t) {
-            _MainType.ma => MAIndicator(),
-            _MainType.boll => BOLLIndicator(),
-            _MainType.ema => EMAIndicator(),
-            _MainType.superTrend => SuperTrendIndicator(),
-            _MainType.zigzag => ZigZagIndicator(),
-            _MainType.avl => AVLIndicator(),
-          },
-        )
-        .toList();
-  }
-
-  List<SecondaryIndicator> get _secondaryIndicators {
-    const order = [
-      _SecondaryType.macd,
-      _SecondaryType.kdj,
-      _SecondaryType.rsi,
-      _SecondaryType.wr,
-      _SecondaryType.cci,
-      _SecondaryType.obv,
-      _SecondaryType.trix,
-      _SecondaryType.mtm,
-      _SecondaryType.stochRsi,
-    ];
-    return order
-        .where((t) => _secondaryTypes.contains(t))
-        .map<SecondaryIndicator>(
-          (t) => switch (t) {
-            _SecondaryType.macd => MACDIndicator(),
-            _SecondaryType.kdj => KDJIndicator(),
-            _SecondaryType.rsi => RSIIndicator(),
-            _SecondaryType.wr => WRIndicator(),
-            _SecondaryType.cci => CCIIndicator(),
-            _SecondaryType.obv => OBVIndicator(),
-            _SecondaryType.trix => TRIXIndicator(),
-            _SecondaryType.mtm => MTMIndicator(),
-            _SecondaryType.stochRsi => StochRSIIndicator(),
-          },
-        )
-        .toList();
-  }
-
-  KChartColors get _colors => _isDark
-      ? const KChartColors(
-          bgColor: Color(0xFF1C1C1E),
-          defaultTextColor: Color(0xFF8E8E93),
-          gridColor: Color.fromARGB(255, 187, 187, 187),
-          selectFillColor: Color(0xFF2C2C2E),
-          selectBorderColor: Color(0xFF636366),
-          crossColor: Color(0xFFEBEBF5),
-          crossTextColor: Color(0xFFEBEBF5),
-          maxColor: Color(0xFFEBEBF5),
-          minColor: Color(0xFFEBEBF5),
-        )
-      : const KChartColors(gridColor: Color.fromARGB(255, 237, 237, 237));
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _isDark ? const Color(0xFF1C1C1E) : Colors.white,
-      appBar: AppBar(
-        backgroundColor: _isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'BTC/USDT',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: _isDark ? Colors.white : Colors.black,
-              ),
-            ),
-            Text(
-              '${_data.last.close.toStringAsFixed(2)} USDT',
-              style: TextStyle(
-                fontSize: 13,
-                color: _data.last.close >= _data.last.open
-                    ? const Color(0xFF14AD8F)
-                    : const Color(0xFFD5405D),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Row(
-            children: [
-              Text(
-                'Depth',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _isDark ? Colors.white70 : Colors.black54,
+    return BlocBuilder<ChartBloc, ChartState>(
+      builder: (context, state) {
+        return Scaffold(
+          backgroundColor: state.isDark
+              ? const Color(0xFF1C1C1E)
+              : Colors.white,
+          appBar: AppBar(
+            backgroundColor: state.isDark
+                ? const Color(0xFF1C1C1E)
+                : Colors.white,
+            elevation: 0,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  MarketEnv.symbol,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: state.isDark ? Colors.white : Colors.black,
+                  ),
                 ),
+                if (state.data.isNotEmpty)
+                  Text(
+                    // Ưu tiên giá tick WS (thumb/kline) — cùng nguồn với
+                    // đường now-price trên chart.
+                    '${(state.livePrice ?? state.data.last.close).toStringAsFixed(2)} USDT',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color:
+                          (state.livePrice ?? state.data.last.close) >=
+                              state.data.last.open
+                          ? const Color(0xFF14AD8F)
+                          : const Color(0xFFD5405D),
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              Row(
+                children: [
+                  Text(
+                    'Depth',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: state.isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                  Switch(
+                    value: state.showDepth,
+                    onChanged: (v) => context.read<ChartBloc>().add(
+                      ChartDepthVisibilityChanged(v),
+                    ),
+                  ),
+                ],
               ),
-              Switch(
-                value: _showDepth,
-                onChanged: (v) => setState(() => _showDepth = v),
+              IconButton(
+                icon: Icon(
+                  state.isDark
+                      ? Icons.light_mode_outlined
+                      : Icons.dark_mode_outlined,
+                  color: state.isDark ? Colors.white70 : Colors.black54,
+                ),
+                onPressed: () =>
+                    context.read<ChartBloc>().add(const ChartThemeToggled()),
               ),
             ],
           ),
-          IconButton(
-            icon: Icon(
-              _isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              color: _isDark ? Colors.white70 : Colors.black54,
-            ),
-            onPressed: () => setState(() => _isDark = !_isDark),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        controller: _outerScrollController,
-        physics: (_scaleYActive && _pointerOnChart)
-            ? const NeverScrollableScrollPhysics()
-            : const ClampingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _showDepth ? _buildDepthChartSection() : _buildChart(),
-            const SizedBox(height: 8),
-            _sectionHeader('Order Book'),
-            _buildOrderBook(),
-            const SizedBox(height: 8),
-            _buildControls(),
-          ],
-        ),
-      ),
+          body: state.data.isEmpty
+              ? _buildEmptyBody(context, state)
+              : SingleChildScrollView(
+                  controller: _outerScrollController,
+                  physics: (_scaleYActive && _pointerOnChart)
+                      ? const NeverScrollableScrollPhysics()
+                      : const ClampingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      state.showDepth
+                          ? _buildDepthChartSection(context, state)
+                          : _buildChart(context, state),
+                      const SizedBox(height: 8),
+                      _buildControls(context, state),
+                      const SizedBox(height: 8),
+                      _sectionHeader('Order Book', state),
+                      _buildOrderBook(state),
+                    ],
+                  ),
+                ),
+        );
+      },
     );
   }
 
-  Widget _sectionHeader(String title) {
+  /// Chưa có nến nào (đang bootstrap REST hoặc lỗi mạng) — spinner / retry.
+  Widget _buildEmptyBody(BuildContext context, ChartState state) {
+    if (state.error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.wifi_off,
+              size: 40,
+              color: state.isDark ? Colors.white38 : Colors.black38,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              MarketEnv.isConfigured
+                  ? 'Không tải được dữ liệu từ ${MarketEnv.apiBaseUrl}'
+                  : 'Chưa cấu hình endpoint API',
+              style: TextStyle(
+                fontSize: 13,
+                color: state.isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                state.error!,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: state.isDark ? Colors.white38 : Colors.black38,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () =>
+                  context.read<ChartBloc>().add(const ChartStarted()),
+              child: const Text('Thử lại'),
+            ),
+          ],
+        ),
+      );
+    }
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  Widget _sectionHeader(String title, ChartState state) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Text(
@@ -556,35 +330,54 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: _isDark ? Colors.white70 : Colors.black87,
+          color: state.isDark ? Colors.white70 : Colors.black87,
         ),
       ),
     );
   }
 
-  Widget _buildOrderBook() {
-    final midPrice = _data.last.close;
-    final depth = _generateMockDepth(midPrice, levels: 30);
-    // Asks hiển thị từ giá cao → giá thấp (gần spread nhất ở dưới)
-    final asks = depth.asks.reversed.toList();
-    final bids = depth.bids;
-
-    final maxVol = [
-      ...asks.map((e) => e.vol),
-      ...bids.map((e) => e.vol),
-    ].fold<double>(0, max);
-
+  Widget _buildOrderBook(ChartState state) {
     final upColor = const Color(0xFF14AD8F);
     final dnColor = const Color(0xFFD5405D);
-    final textColor = _isDark ? Colors.white70 : Colors.black87;
-    final mutedColor = _isDark ? Colors.white38 : Colors.black38;
-    final isUp = _data.last.close >= _data.last.open;
+    final textColor = state.isDark ? Colors.white70 : Colors.black87;
+    final mutedColor = state.isDark ? Colors.white38 : Colors.black38;
+
+    final book = state.orderBook;
+    if (book == null || !book.hasBothSides) {
+      // Chưa nhận đủ 2 phía BUY/SELL từ WS trade-plate
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Text(
+            state.isLive
+                ? 'Đang chờ dữ liệu sổ lệnh realtime...'
+                : 'Bật Live để nhận dữ liệu sổ lệnh',
+            style: TextStyle(fontSize: 12, color: mutedColor),
+          ),
+        ),
+      );
+    }
+
+    const maxRows = 15;
+    // Asks hiển thị từ giá cao → giá thấp (gần spread nhất ở dưới)
+    final asks = book.asks.take(maxRows).toList().reversed.toList();
+    final bids = book.bids.take(maxRows).toList();
+
+    // Scale depth bar theo maxAmount server gửi từng phía; fallback max
+    // quantity của các mức đang hiển thị nếu thiếu.
+    double maxQtyOf(List<OrderBookLevel> levels) =>
+        levels.fold<double>(0, (m, l) => max(m, l.quantity.toDouble()));
+    final bidMax = book.maxBidQuantity?.toDouble() ?? maxQtyOf(bids);
+    final askMax = book.maxAskQuantity?.toDouble() ?? maxQtyOf(asks);
+
+    final midPrice = state.livePrice ?? state.data.last.close;
+    final isUp = midPrice >= state.data.last.open;
 
     // Gộp asks + spread + bids thành 1 list duy nhất
     final items = <_OrderBookItem>[
-      ...asks.map((e) => _OrderBookItem.row(e, dnColor)),
+      ...asks.map((l) => _OrderBookItem.row(l, dnColor, askMax)),
       _OrderBookItem.spread(),
-      ...bids.map((e) => _OrderBookItem.row(e, upColor)),
+      ...bids.map((l) => _OrderBookItem.row(l, upColor, bidMax)),
     ];
 
     return Padding(
@@ -633,8 +426,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 return _spreadRow(midPrice, isUp, upColor, dnColor, mutedColor);
               }
               return _orderBookRow(
-                item.entity!,
-                maxVol,
+                item.level!,
+                item.sideMax,
                 item.sideColor!,
                 textColor,
               );
@@ -690,13 +483,13 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   }
 
   Widget _orderBookRow(
-    DepthEntity entity,
-    double maxVol,
+    OrderBookLevel level,
+    double maxQty,
     Color sideColor,
     Color textColor,
   ) {
-    final ratio = maxVol == 0 ? 0.0 : (entity.vol / maxVol).clamp(0.0, 1.0);
-    final amount = entity.vol;
+    final amount = level.quantity.toDouble();
+    final ratio = maxQty == 0 ? 0.0 : (amount / maxQty).clamp(0.0, 1.0);
     return Stack(
       children: [
         // Bar nền theo volume (vẽ từ phải sang trái)
@@ -716,7 +509,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
               Expanded(
                 flex: 4,
                 child: Text(
-                  entity.price.toStringAsFixed(2),
+                  // Chuỗi wire gốc — không mất số 0 cuối (vd "0.09800")
+                  level.priceText,
                   style: TextStyle(
                     fontSize: 12,
                     color: sideColor,
@@ -739,7 +533,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
               Expanded(
                 flex: 3,
                 child: Text(
-                  (entity.price * amount).toStringAsFixed(2),
+                  (level.price.toDouble() * amount).toStringAsFixed(2),
                   textAlign: TextAlign.right,
                   style: TextStyle(
                     fontSize: 12,
@@ -755,14 +549,14 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildChart(BuildContext context, ChartState state) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Banner trạng thái load
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          height: _isFetching ? 28 : 0,
+          height: state.isFetching ? 28 : 0,
           color: const Color(0xFF217AFF),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -777,7 +571,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Đang tải thêm $_batchSize nến...',
+                'Đang tải thêm ${ChartState.loadMoreBatchSize} nến...',
                 style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ],
@@ -788,8 +582,14 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
           child: Row(
             children: [
-              for (final tf in _ChartTimeframe.values) ...[
-                _chip(tf.label, _timeframe == tf, () => _setTimeframe(tf)),
+              for (final tf in ChartTimeframe.values) ...[
+                _chip(
+                  tf.label,
+                  state.timeframe == tf,
+                  state.isDark,
+                  () =>
+                      context.read<ChartBloc>().add(ChartTimeframeChanged(tf)),
+                ),
                 const SizedBox(width: 6),
               ],
             ],
@@ -799,10 +599,10 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
           child: Text(
             'Pinch zoom rồi đổi timeframe — scaleX giữ nguyên '
-            '(${_savedChartScale.scaleX.toStringAsFixed(2)}×)',
+            '(${state.savedChartScale.scaleX.toStringAsFixed(2)}×)',
             style: TextStyle(
               fontSize: 10,
-              color: _isDark ? Colors.white38 : Colors.black38,
+              color: state.isDark ? Colors.white38 : Colors.black38,
             ),
           ),
         ),
@@ -812,11 +612,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           child: Row(
             children: [
               Text(
-                '${_data.length} nến · ${_timeframe.label}'
-                '${_totalLoaded >= _maxTotal ? ' · Đã tải hết' : ' · Kéo trái để tải thêm'}',
+                '${state.data.length} nến · ${state.timeframe.label}'
+                '${state.hasMoreHistory ? ' · Kéo trái để tải thêm' : ' · Đã tải hết'}',
                 style: TextStyle(
                   fontSize: 11,
-                  color: _isDark ? Colors.white38 : Colors.black38,
+                  color: state.isDark ? Colors.white38 : Colors.black38,
                 ),
               ),
               const Spacer(),
@@ -835,7 +635,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                     fontWeight: FontWeight.w600,
                     color: _scaleYActive
                         ? const Color(0xFF217AFF)
-                        : (_isDark ? Colors.white38 : Colors.black38),
+                        : (state.isDark ? Colors.white38 : Colors.black38),
                   ),
                 ),
               ),
@@ -851,7 +651,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
               onPointerMove: _onChartPointerMove,
               onPointerUp: _onChartPointerUp,
               onPointerCancel: _onChartPointerCancel,
-              child: _buildKChart(),
+              child: _buildKChart(context, state),
             );
           },
         ),
@@ -859,29 +659,34 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  Widget _buildKChart() {
+  Widget _buildKChart(BuildContext context, ChartState state) {
     return KChartWidget(
-      _data,
+      state.data,
       const KChartStyle(),
-      _colors,
-      key: ValueKey(_timeframe),
+      state.colors,
+      key: ValueKey(state.timeframe),
       isTrendLine: false,
-      isLine: _isLine,
-      volHidden: _volHidden,
-      mainIndicators: _mainIndicators,
-      secondaryIndicators: _secondaryIndicators,
+      isLine: state.isLine,
+      volHidden: state.volHidden,
+      mainIndicators: state.mainIndicators,
+      secondaryIndicators: state.secondaryIndicators,
       controller: _controller,
-      chartScale: _savedChartScale,
-      onChartScaleChanged: (scale) {
-        setState(() => _savedChartScale = scale);
-      },
+      chartScale: state.savedChartScale,
+      onChartScaleChanged: (scale) =>
+          context.read<ChartBloc>().add(ChartScaleSaved(scale)),
+      // Giá tick WS tách khỏi datas — chỉ repaint đường now-price,
+      // không rebuild list nến mỗi tick.
+      livePrice: state.livePrice,
       showNowPrice: true,
       showInfoDialog: true,
       mBaseHeight: 280,
-      timeFormat: TimeFormat.yearMonthDay,
-      onLoadMore: _onLoadMore,
-      isLoadingMore: _isFetching,
-      detailBuilder: _buildInfoCard,
+      timeFormat: state.timeframe == ChartTimeframe.d1
+          ? TimeFormat.yearMonthDay
+          : TimeFormat.yearMonthDayWithHour,
+      onLoadMore: (isLeft) =>
+          context.read<ChartBloc>().add(ChartMoreDataRequested(isLeft)),
+      isLoadingMore: state.isFetching,
+      detailBuilder: (entity) => _buildInfoCard(entity, state.isDark),
       onVerticalOverscroll: _onChartVerticalOverscroll,
       backgroundLogo: Builder(
         builder: (context) {
@@ -897,9 +702,38 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  Widget _buildDepthChartSection() {
-    final midPrice = _data.last.close;
-    final depth = _generateMockDepth(midPrice, levels: 40);
+  /// DepthEntity list tích luỹ từ snapshot — bids theo giá tốt→xa (desc),
+  /// asks theo giá tốt→xa (asc), vol cộng dồn dần theo hướng xa spread.
+  static List<DepthEntity> _cumulativeDepth(List<OrderBookLevel> levels) {
+    double cum = 0;
+    return [
+      for (final l in levels)
+        DepthEntity(l.price.toDouble(), cum += l.quantity.toDouble()),
+    ];
+  }
+
+  Widget _buildDepthChartSection(BuildContext context, ChartState state) {
+    final book = state.orderBook;
+    if (book == null || !book.hasBothSides) {
+      return SizedBox(
+        height: 280,
+        child: Center(
+          child: Text(
+            state.isLive
+                ? 'Đang chờ dữ liệu sổ lệnh realtime...'
+                : 'Bật Live để nhận dữ liệu sổ lệnh',
+            style: TextStyle(
+              fontSize: 12,
+              color: state.isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+        ),
+      );
+    }
+    final depth = (
+      bids: _cumulativeDepth(book.bids),
+      asks: _cumulativeDepth(book.asks),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Column(
@@ -912,15 +746,18 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 'Bottom labels:',
                 style: TextStyle(
                   fontSize: 11,
-                  color: _isDark ? Colors.white60 : Colors.black54,
+                  color: state.isDark ? Colors.white60 : Colors.black54,
                 ),
               ),
               const SizedBox(width: 8),
               for (final n in const [3, 5, 7, 9]) ...[
                 _chip(
                   '$n',
-                  _depthBottomLabelCount == n,
-                  () => setState(() => _depthBottomLabelCount = n),
+                  state.depthBottomLabelCount == n,
+                  state.isDark,
+                  () => context.read<ChartBloc>().add(
+                    ChartDepthBottomLabelCountChanged(n),
+                  ),
                 ),
                 const SizedBox(width: 6),
               ],
@@ -933,11 +770,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
               depth.bids,
               depth.asks,
               DepthChartColors(
-                defaultTextColor: _isDark
+                defaultTextColor: state.isDark
                     ? const Color(0xFF8E8E93)
                     : const Color(0xFF909196),
               ),
-              bottomLabelCount: _depthBottomLabelCount,
+              bottomLabelCount: state.depthBottomLabelCount,
               backgroundLogo: Builder(
                 builder: (context) {
                   final size = MediaQuery.sizeOf(context).width / 12;
@@ -956,31 +793,13 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  void _onChartVerticalOverscroll(double delta) {
-    if (!_outerScrollController.hasClients) return;
-    final pos = _outerScrollController.position;
-    // Convention: chart pan Y dùng mOffsetY += dy (content theo finger).
-    // Scroll Flutter ngược lại: pos.pixels TĂNG = reveal content bên dưới
-    // (finger drag UP). Vì vậy phải NEGATE delta khi forward sang outer:
-    //   finger drag DOWN → overscroll > 0 → outer pos giảm (reveal content trên)
-    //   finger drag UP   → overscroll < 0 → outer pos tăng (reveal content dưới)
-    final target = (pos.pixels - delta).clamp(
-      pos.minScrollExtent,
-      pos.maxScrollExtent,
-    );
-    if (target != pos.pixels) {
-      // jumpTo bypass physics → vẫn cuộn được khi outer đang NeverScrollableScrollPhysics
-      _outerScrollController.jumpTo(target);
-    }
-  }
-
-  Widget _buildInfoCard(KLineEntity entity) {
+  Widget _buildInfoCard(KLineEntity entity, bool isDark) {
     final isUp = entity.close >= entity.open;
     final color = isUp ? const Color(0xFF14AD8F) : const Color(0xFFD5405D);
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: _isDark ? const Color(0xFF2C2C2E) : Colors.white,
+        color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.4)),
         boxShadow: [
@@ -994,7 +813,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       child: DefaultTextStyle(
         style: TextStyle(
           fontSize: 11,
-          color: _isDark ? Colors.white70 : Colors.black87,
+          color: isDark ? Colors.white70 : Colors.black87,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1032,7 +851,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  Widget _buildControls() {
+  Widget _buildControls(BuildContext context, ChartState state) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
       child: Column(
@@ -1041,25 +860,57 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           // Row 1: chart type + zoom controls
           Row(
             children: [
-              _chip('Candle', !_isLine, () => setState(() => _isLine = false)),
+              _chip(
+                'Candle',
+                !state.isLine,
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartLineModeChanged(false),
+                ),
+              ),
               const SizedBox(width: 6),
-              _chip('Line', _isLine, () => setState(() => _isLine = true)),
+              _chip(
+                'Line',
+                state.isLine,
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartLineModeChanged(true),
+                ),
+              ),
               const SizedBox(width: 6),
               _chip(
                 'Volume',
-                !_volHidden,
-                () => setState(() => _volHidden = !_volHidden),
+                !state.volHidden,
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartVolumeVisibilityToggled(),
+                ),
               ),
               const SizedBox(width: 6),
-              _liveChip(),
+              _liveChip(context, state),
               const Spacer(),
-              _iconBtn(Icons.zoom_in, () => _controller.zoomIn(), 'Zoom In'),
-              _iconBtn(Icons.zoom_out, () => _controller.zoomOut(), 'Zoom Out'),
-              _iconBtn(Icons.refresh, () => _controller.reset(), 'Reset'),
+              _iconBtn(
+                Icons.zoom_in,
+                () => _controller.zoomIn(),
+                'Zoom In',
+                state.isDark,
+              ),
+              _iconBtn(
+                Icons.zoom_out,
+                () => _controller.zoomOut(),
+                'Zoom Out',
+                state.isDark,
+              ),
+              _iconBtn(
+                Icons.refresh,
+                () => _controller.reset(),
+                'Reset',
+                state.isDark,
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          _sectionLabel('Main Indicator'),
+          _sectionLabel('Main Indicator', state.isDark),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -1067,38 +918,56 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             children: [
               _chip(
                 'MA',
-                _mainTypes.contains(_MainType.ma),
-                () => _toggleMain(_MainType.ma),
+                state.mainTypes.contains(MainIndicatorType.ma),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.ma),
+                ),
               ),
               _chip(
                 'BOLL',
-                _mainTypes.contains(_MainType.boll),
-                () => _toggleMain(_MainType.boll),
+                state.mainTypes.contains(MainIndicatorType.boll),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.boll),
+                ),
               ),
               _chip(
                 'EMA',
-                _mainTypes.contains(_MainType.ema),
-                () => _toggleMain(_MainType.ema),
+                state.mainTypes.contains(MainIndicatorType.ema),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.ema),
+                ),
               ),
               _chip(
                 'SUPER',
-                _mainTypes.contains(_MainType.superTrend),
-                () => _toggleMain(_MainType.superTrend),
+                state.mainTypes.contains(MainIndicatorType.superTrend),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.superTrend),
+                ),
               ),
               _chip(
                 'ZigZag',
-                _mainTypes.contains(_MainType.zigzag),
-                () => _toggleMain(_MainType.zigzag),
+                state.mainTypes.contains(MainIndicatorType.zigzag),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.zigzag),
+                ),
               ),
               _chip(
                 'AVL',
-                _mainTypes.contains(_MainType.avl),
-                () => _toggleMain(_MainType.avl),
+                state.mainTypes.contains(MainIndicatorType.avl),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.avl),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _sectionLabel('Secondary Indicator'),
+          _sectionLabel('Secondary Indicator', state.isDark),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -1106,48 +975,93 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             children: [
               _chip(
                 'MACD',
-                _secondaryTypes.contains(_SecondaryType.macd),
-                () => _toggleSecondary(_SecondaryType.macd),
+                state.secondaryTypes.contains(SecondaryIndicatorType.macd),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.macd,
+                  ),
+                ),
               ),
               _chip(
                 'KDJ',
-                _secondaryTypes.contains(_SecondaryType.kdj),
-                () => _toggleSecondary(_SecondaryType.kdj),
+                state.secondaryTypes.contains(SecondaryIndicatorType.kdj),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.kdj,
+                  ),
+                ),
               ),
               _chip(
                 'RSI',
-                _secondaryTypes.contains(_SecondaryType.rsi),
-                () => _toggleSecondary(_SecondaryType.rsi),
+                state.secondaryTypes.contains(SecondaryIndicatorType.rsi),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.rsi,
+                  ),
+                ),
               ),
               _chip(
                 'WR',
-                _secondaryTypes.contains(_SecondaryType.wr),
-                () => _toggleSecondary(_SecondaryType.wr),
+                state.secondaryTypes.contains(SecondaryIndicatorType.wr),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.wr,
+                  ),
+                ),
               ),
               _chip(
                 'CCI',
-                _secondaryTypes.contains(_SecondaryType.cci),
-                () => _toggleSecondary(_SecondaryType.cci),
+                state.secondaryTypes.contains(SecondaryIndicatorType.cci),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.cci,
+                  ),
+                ),
               ),
               _chip(
                 'OBV',
-                _secondaryTypes.contains(_SecondaryType.obv),
-                () => _toggleSecondary(_SecondaryType.obv),
+                state.secondaryTypes.contains(SecondaryIndicatorType.obv),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.obv,
+                  ),
+                ),
               ),
               _chip(
                 'TRIX',
-                _secondaryTypes.contains(_SecondaryType.trix),
-                () => _toggleSecondary(_SecondaryType.trix),
+                state.secondaryTypes.contains(SecondaryIndicatorType.trix),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.trix,
+                  ),
+                ),
               ),
               _chip(
                 'MTM',
-                _secondaryTypes.contains(_SecondaryType.mtm),
-                () => _toggleSecondary(_SecondaryType.mtm),
+                state.secondaryTypes.contains(SecondaryIndicatorType.mtm),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.mtm,
+                  ),
+                ),
               ),
               _chip(
                 'StochRSI',
-                _secondaryTypes.contains(_SecondaryType.stochRsi),
-                () => _toggleSecondary(_SecondaryType.stochRsi),
+                state.secondaryTypes.contains(SecondaryIndicatorType.stochRsi),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.stochRsi,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1156,19 +1070,19 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  Widget _sectionLabel(String text) {
+  Widget _sectionLabel(String text, bool isDark) {
     return Text(
       text,
       style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w600,
-        color: _isDark ? Colors.white38 : Colors.black38,
+        color: isDark ? Colors.white38 : Colors.black38,
         letterSpacing: 0.5,
       ),
     );
   }
 
-  Widget _chip(String label, bool selected, VoidCallback onTap) {
+  Widget _chip(String label, bool selected, bool isDark, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -1177,7 +1091,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         decoration: BoxDecoration(
           color: selected
               ? const Color(0xFF217AFF)
-              : (_isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F3F5)),
+              : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F3F5)),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -1187,29 +1101,31 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             color: selected
                 ? Colors.white
-                : (_isDark ? Colors.white60 : Colors.black54),
+                : (isDark ? Colors.white60 : Colors.black54),
           ),
         ),
       ),
     );
   }
 
-  Widget _liveChip() {
+  Widget _liveChip(BuildContext context, ChartState state) {
     return GestureDetector(
-      onTap: _toggleLive,
+      onTap: () => context.read<ChartBloc>().add(const ChartLiveToggled()),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: _isLive
+          color: state.isLive
               ? const Color(0xFFD5405D)
-              : (_isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F3F5)),
+              : (state.isDark
+                    ? const Color(0xFF2C2C2E)
+                    : const Color(0xFFF2F3F5)),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_isLive) ...[
+            if (state.isLive) ...[
               // Dot nhấp nháy khi đang live
               TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0.3, end: 1.0),
@@ -1218,18 +1134,20 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                   opacity: v,
                   child: const Icon(Icons.circle, size: 6, color: Colors.white),
                 ),
+                // setState rỗng chỉ để rebuild local widget → TweenAnimationBuilder
+                // dựng lại Tween mới → animation lặp lại. Thuần UI, không liên quan Bloc.
                 onEnd: () => setState(() {}),
               ),
               const SizedBox(width: 4),
             ],
             Text(
-              _isLive ? 'Live' : 'Live',
+              'Live',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: _isLive
+                color: state.isLive
                     ? Colors.white
-                    : (_isDark ? Colors.white60 : Colors.black54),
+                    : (state.isDark ? Colors.white60 : Colors.black54),
               ),
             ),
           ],
@@ -1238,7 +1156,12 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  Widget _iconBtn(IconData icon, VoidCallback onTap, String tooltip) {
+  Widget _iconBtn(
+    IconData icon,
+    VoidCallback onTap,
+    String tooltip,
+    bool isDark,
+  ) {
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -1249,7 +1172,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           child: Icon(
             icon,
             size: 20,
-            color: _isDark ? Colors.white54 : Colors.black45,
+            color: isDark ? Colors.white54 : Colors.black45,
           ),
         ),
       ),

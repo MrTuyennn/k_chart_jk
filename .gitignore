@@ -29,3 +29,13 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 /build/
 /coverage/
+
+# Tài liệu contract nội bộ — không đẩy lên git
+/market-realtime-stomp-integration.md
+
+# File env chứa endpoint thật (mọi môi trường) — chỉ commit template env.example.json
+/example/env.*.json
+!/example/env.example.json
+
+# Claude Code config/skill nội bộ
+/.claude/

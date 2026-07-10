@@ -5,7 +5,7 @@ homepage: https://github.com/MrTuyennn/k_chart_wikex
 repository: https://github.com/MrTuyennn/k_chart_wikex
 
 environment:
-  sdk: ^3.11.5
+  sdk: ^3.11.4
   flutter: ">=3.0.0"
 
 dependencies:

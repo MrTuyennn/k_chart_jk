@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.5
+  sdk: ^3.11.4
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -34,6 +34,12 @@ dependencies:
   k_chart_wikex:
     path: ../
   flutter_svg: ^2.0.0
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.5
+  stomp_dart_client: ^3.0.1
+  decimal: ^3.2.4
+  http: ^1.2.0
+  meta: ^1.16.0
 
 dev_dependencies:
   flutter_test:
