@@ -10,6 +10,12 @@ import 'base_dimension.dart';
 /// BaseChartPainter
 abstract class BaseChartPainter extends CustomPainter {
   static double maxScrollX = 0.0;
+
+  /// Bản sao static của [mStartIndex] sau lần `calculateValue()` gần nhất —
+  /// cho phép `KChartWidget` (gesture handler) đọc "còn cách bao nhiêu nến
+  /// tới mép cũ nhất" ngay lúc scroll, không cần đợi painter instance mới
+  /// (painter bị recreate mỗi build). Cùng pattern với [maxScrollX].
+  static int currentStartIndex = 0;
   List<KLineEntity>? datas; // data of chart
 
   List<MainIndicator> mainIndicators;
@@ -248,6 +254,7 @@ abstract class BaseChartPainter extends CustomPainter {
     setTranslateXFromScrollX(scrollX);
     mStartIndex = indexOfTranslateX(xToTranslateX(0));
     mStopIndex = indexOfTranslateX(xToTranslateX(mWidth));
+    currentStartIndex = mStartIndex;
     for (int i = mStartIndex; i <= mStopIndex; i++) {
       var item = datas![i];
       getMainMaxMinValue(item, i);

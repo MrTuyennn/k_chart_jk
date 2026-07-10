@@ -18,6 +18,30 @@ enum SecondaryIndicatorType {
   stochRsi,
 }
 
+/// Tách khỏi getter để tái dùng được từ isolate compute (DataUtil.calculateAll
+/// chạy trong background isolate — xem [ChartBloc._recalculateState]).
+MainIndicator buildMainIndicator(MainIndicatorType type) => switch (type) {
+  MainIndicatorType.ma => MAIndicator(),
+  MainIndicatorType.boll => BOLLIndicator(),
+  MainIndicatorType.ema => EMAIndicator(),
+  MainIndicatorType.superTrend => SuperTrendIndicator(),
+  MainIndicatorType.zigzag => ZigZagIndicator(),
+  MainIndicatorType.avl => AVLIndicator(),
+};
+
+SecondaryIndicator buildSecondaryIndicator(SecondaryIndicatorType type) =>
+    switch (type) {
+      SecondaryIndicatorType.macd => MACDIndicator(),
+      SecondaryIndicatorType.kdj => KDJIndicator(),
+      SecondaryIndicatorType.rsi => RSIIndicator(),
+      SecondaryIndicatorType.wr => WRIndicator(),
+      SecondaryIndicatorType.cci => CCIIndicator(),
+      SecondaryIndicatorType.obv => OBVIndicator(),
+      SecondaryIndicatorType.trix => TRIXIndicator(),
+      SecondaryIndicatorType.mtm => MTMIndicator(),
+      SecondaryIndicatorType.stochRsi => StochRSIIndicator(),
+    };
+
 enum ChartTimeframe {
   m15('15m', Duration(minutes: 15), '15', '15min'),
   h1('1H', Duration(hours: 1), '60', '1hour'),
@@ -159,35 +183,12 @@ class ChartState extends Equatable {
   /// Instance indicator MỚI mỗi lần gọi — cố ý KHÔNG đưa vào [props], vì
   /// reference đổi mỗi lần dù [mainTypes] không đổi sẽ phá Equatable. Nguồn
   /// sự thật duy nhất cho equality là [mainTypes]/[secondaryTypes].
-  List<MainIndicator> get mainIndicators => _mainOrder
-      .where(mainTypes.contains)
-      .map<MainIndicator>(
-        (t) => switch (t) {
-          MainIndicatorType.ma => MAIndicator(),
-          MainIndicatorType.boll => BOLLIndicator(),
-          MainIndicatorType.ema => EMAIndicator(),
-          MainIndicatorType.superTrend => SuperTrendIndicator(),
-          MainIndicatorType.zigzag => ZigZagIndicator(),
-          MainIndicatorType.avl => AVLIndicator(),
-        },
-      )
-      .toList();
+  List<MainIndicator> get mainIndicators =>
+      _mainOrder.where(mainTypes.contains).map(buildMainIndicator).toList();
 
   List<SecondaryIndicator> get secondaryIndicators => _secondaryOrder
       .where(secondaryTypes.contains)
-      .map<SecondaryIndicator>(
-        (t) => switch (t) {
-          SecondaryIndicatorType.macd => MACDIndicator(),
-          SecondaryIndicatorType.kdj => KDJIndicator(),
-          SecondaryIndicatorType.rsi => RSIIndicator(),
-          SecondaryIndicatorType.wr => WRIndicator(),
-          SecondaryIndicatorType.cci => CCIIndicator(),
-          SecondaryIndicatorType.obv => OBVIndicator(),
-          SecondaryIndicatorType.trix => TRIXIndicator(),
-          SecondaryIndicatorType.mtm => MTMIndicator(),
-          SecondaryIndicatorType.stochRsi => StochRSIIndicator(),
-        },
-      )
+      .map(buildSecondaryIndicator)
       .toList();
 
   KChartColors get colors => isDark

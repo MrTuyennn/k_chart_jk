@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:collection';
+import 'dart:isolate';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:k_chart_wikex/k_chart_plus.dart';
@@ -38,6 +40,45 @@ class _ChartOrderBookUpdated extends ChartEvent {
   List<Object?> get props => [snapshot.version];
 }
 
+/// Tham số gửi sang isolate nền để tính indicator — chỉ gồm dữ liệu thuần
+/// (KLineEntity là các field double/int) và enum loại indicator. KHÔNG gửi
+/// instance MainIndicator/SecondaryIndicator qua isolate vì chúng khởi tạo
+/// sẵn Paint trong constructor — Paint/Shader không đảm bảo an toàn khi
+/// serialize qua isolate boundary.
+class _IndicatorCalcRequest {
+  const _IndicatorCalcRequest(this.data, this.mainTypes, this.secondaryTypes);
+
+  final List<KLineEntity> data;
+  final List<MainIndicatorType> mainTypes;
+  final List<SecondaryIndicatorType> secondaryTypes;
+}
+
+/// Entry point của worker isolate — spawn MỘT LẦN, sống suốt vòng đời
+/// [ChartBloc] (khác với `compute()` spawn isolate mới mỗi lần gọi: với
+/// data nhỏ (~200-500 nến) và tần suất gọi dày (realtime flush mỗi 250ms),
+/// chi phí spawn lặp lại còn tốn hơn chính phép tính, gây jank định kỳ dù
+/// UI đứng yên). Dựng lại indicator instance tại chỗ (Paint tạo trong
+/// isolate này, không bao giờ rời khỏi nó) rồi tính trên bản copy của
+/// `data`, gửi list đã tính về qua [mainSendPort].
+void _indicatorWorkerMain(SendPort mainSendPort) {
+  final commandPort = ReceivePort();
+  mainSendPort.send(commandPort.sendPort);
+  commandPort.listen((message) {
+    final request = message as _IndicatorCalcRequest;
+    try {
+      DataUtil.calculateAll(
+        request.data,
+        request.mainTypes.map(buildMainIndicator).toList(),
+        request.secondaryTypes.map(buildSecondaryIndicator).toList(),
+      );
+    } catch (_) {
+      // Không để lỗi tính indicator treo completer chờ mãi ở phía bloc —
+      // trả data gốc (chưa tính) để chart vẫn hiển thị thay vì đứng hình.
+    }
+    mainSendPort.send(request.data);
+  });
+}
+
 class ChartBloc extends Bloc<ChartEvent, ChartState> {
   ChartBloc({MarketStompTransport? transport})
     : _transport =
@@ -59,10 +100,32 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     on<_ChartLivePriceChanged>(_onLivePriceChanged);
     on<_ChartOrderBookUpdated>(_onOrderBookUpdated);
 
+    _workerResponsePort.listen(_onWorkerMessage);
+    _workerSpawn = Isolate.spawn(
+      _indicatorWorkerMain,
+      _workerResponsePort.sendPort,
+    ).then((isolate) => _workerIsolate = isolate);
+
     add(const ChartStarted());
   }
 
   final MarketStompTransport _transport;
+
+  // Worker isolate thường trú tính indicator — xem [_indicatorWorkerMain].
+  final ReceivePort _workerResponsePort = ReceivePort();
+  final Completer<SendPort> _workerCommandPort = Completer();
+  final Queue<Completer<List<KLineEntity>>> _pendingRecalcs = Queue();
+  Isolate? _workerIsolate;
+  late final Future<void> _workerSpawn;
+
+  void _onWorkerMessage(dynamic message) {
+    if (message is SendPort) {
+      _workerCommandPort.complete(message);
+      return;
+    }
+    if (_pendingRecalcs.isEmpty) return;
+    _pendingRecalcs.removeFirst().complete(message as List<KLineEntity>);
+  }
 
   StreamSubscription<RealtimeFrame>? _klineSub;
   StreamSubscription<RealtimeFrame>? _klineLiveSub;
@@ -101,12 +164,40 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     );
   }
 
-  static void _recalculateState(ChartState state) {
-    DataUtil.calculateAll(
-      state.data,
-      state.mainIndicators,
-      state.secondaryIndicators,
+  /// Tính indicator trong worker isolate thường trú, tránh block UI thread
+  /// khi list nến lớn hoặc tính lại dồn dập (realtime flush mỗi 250ms, toggle
+  /// indicator). Trả về list ĐÃ tính — không mutate [state.data] in-place như
+  /// bản đồng bộ cũ, vì worker chạy trên bản copy ở isolate khác.
+  Future<List<KLineEntity>> _recalculateState(ChartState state) async {
+    final commandPort = await _workerCommandPort.future;
+    final completer = Completer<List<KLineEntity>>();
+    _pendingRecalcs.add(completer);
+    commandPort.send(
+      _IndicatorCalcRequest(
+        state.data,
+        state.mainTypes.toList(),
+        state.secondaryTypes.toList(),
+      ),
     );
+    return completer.future;
+  }
+
+  // Hàng đợi tuần tự hoá các đoạn "đọc state mới nhất → recalc qua worker
+  // isolate → emit". Không có await ở bản đồng bộ cũ nên các handler không
+  // bao giờ chen ngang nhau; giờ có await (chờ worker), nếu 2 handler khác
+  // event type (vd toggle main indicator và realtime flush) cùng chạy, handler
+  // xong sau có thể emit đè lên field mà handler kia vừa cập nhật, làm MẤT
+  // hẳn thay đổi đó (không phải chỉ trễ 1 nhịp). Khoá này đảm bảo tại một thời
+  // điểm chỉ một đoạn recalc+emit chạy, và state đọc bên trong luôn mới nhất.
+  Future<void> _recalcLock = Future.value();
+
+  Future<void> _withRecalcLock(Future<void> Function() action) {
+    final completer = Completer<void>();
+    final result = _recalcLock.then((_) => action()).whenComplete(
+      completer.complete,
+    );
+    _recalcLock = completer.future;
+    return result;
   }
 
   // ── Bootstrap + timeframe ─────────────────────────────────────────────────
@@ -156,14 +247,19 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         toMs: toMs,
       );
       if (isClosed || state.timeframe != timeframe) return; // đã đổi khung khác
-      final next = state.copyWith(
-        data: [for (final b in bars) b.toEntity()],
-        isFetching: false,
-        hasMoreHistory: bars.isNotEmpty,
-        error: null,
-      );
-      _recalculateState(next);
-      emit(next);
+      await _withRecalcLock(() async {
+        if (isClosed || state.timeframe != timeframe) return;
+        var next = state.copyWith(
+          data: [for (final b in bars) b.toEntity()],
+          isFetching: false,
+          hasMoreHistory: bars.isNotEmpty,
+          error: null,
+        );
+        final computed = await _recalculateState(next);
+        if (isClosed || state.timeframe != timeframe) return; // đổi khung lúc chờ isolate
+        next = next.copyWith(data: computed);
+        emit(next);
+      });
     } catch (e) {
       if (isClosed || state.timeframe != timeframe) return;
       emit(state.copyWith(isFetching: false, error: e.toString()));
@@ -197,20 +293,27 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
       );
       if (isClosed) return;
       if (state.timeframe != timeframe) return; // user đã đổi khung trong lúc chờ
-      // state.data đọc lại SAU await — không mất các bar WS merge vào trong
-      // lúc chờ. Dedupe theo time phòng server trả lấn biên.
-      final older = [
-        for (final b in bars)
-          if (b.barCloseTime.millisecondsSinceEpoch < state.data.first.time!)
-            b.toEntity(),
-      ];
-      final next = state.copyWith(
-        data: [...older, ...state.data],
-        isFetching: false,
-        hasMoreHistory: bars.isNotEmpty,
-      );
-      _recalculateState(next);
-      emit(next);
+      await _withRecalcLock(() async {
+        if (isClosed || state.timeframe != timeframe) return;
+        // state.data đọc lại BÊN TRONG khoá, SAU await fetch — không mất các
+        // bar WS merge vào trong lúc chờ. Dedupe theo time phòng server trả
+        // lấn biên.
+        final older = [
+          for (final b in bars)
+            if (b.barCloseTime.millisecondsSinceEpoch <
+                state.data.first.time!)
+              b.toEntity(),
+        ];
+        var next = state.copyWith(
+          data: [...older, ...state.data],
+          isFetching: false,
+          hasMoreHistory: bars.isNotEmpty,
+        );
+        final computed = await _recalculateState(next);
+        if (isClosed || state.timeframe != timeframe) return; // đổi khung lúc chờ isolate
+        next = next.copyWith(data: computed);
+        emit(next);
+      });
     } catch (_) {
       if (isClosed) return;
       // Load-more lỗi không phá chart đang hiển thị — chỉ gỡ cờ fetching
@@ -323,23 +426,31 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     emit(state.copyWith(orderBook: event.snapshot));
   }
 
-  void _onRealtimeFlushed(
+  Future<void> _onRealtimeFlushed(
     _ChartRealtimeFlushed event,
     Emitter<ChartState> emit,
-  ) {
+  ) async {
     _throttle = null;
     if (_pending.isEmpty) return;
-    var data = state.data;
-    for (final k in _pending) {
-      // Re-check period: timeframe có thể đã đổi khi bar còn nằm buffer.
-      if (k.period != state.timeframe.wsPeriod) continue;
-      data = _mergeBar(data, k);
-    }
+    final bars = List<MarketKline>.of(_pending);
     _pending.clear();
-    if (identical(data, state.data)) return;
-    final next = state.copyWith(data: data);
-    _recalculateState(next);
-    emit(next);
+    await _withRecalcLock(() async {
+      if (isClosed) return;
+      // state.data đọc BÊN TRONG khoá — mới nhất tính đến lúc này, không bị
+      // handler khác (toggle indicator, load more...) chen ngang đè mất.
+      var data = state.data;
+      for (final k in bars) {
+        // Re-check period: timeframe có thể đã đổi khi bar còn nằm buffer.
+        if (k.period != state.timeframe.wsPeriod) continue;
+        data = _mergeBar(data, k);
+      }
+      if (identical(data, state.data)) return;
+      var next = state.copyWith(data: data);
+      final computed = await _recalculateState(next);
+      if (isClosed) return; // bloc đóng lúc chờ isolate
+      next = next.copyWith(data: computed);
+      emit(next);
+    });
   }
 
   /// Merge 1 bar WS vào series theo barCloseTime tăng dần: trùng time →
@@ -385,26 +496,36 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   // ── UI toggles ────────────────────────────────────────────────────────────
 
-  void _onMainIndicatorToggled(
+  Future<void> _onMainIndicatorToggled(
     ChartMainIndicatorToggled event,
     Emitter<ChartState> emit,
   ) {
-    final types = Set<MainIndicatorType>.of(state.mainTypes);
-    if (!types.remove(event.type)) types.add(event.type);
-    final next = state.copyWith(mainTypes: types);
-    _recalculateState(next);
-    emit(next);
+    return _withRecalcLock(() async {
+      if (isClosed) return;
+      final types = Set<MainIndicatorType>.of(state.mainTypes);
+      if (!types.remove(event.type)) types.add(event.type);
+      var next = state.copyWith(mainTypes: types);
+      final computed = await _recalculateState(next);
+      if (isClosed) return;
+      next = next.copyWith(data: computed);
+      emit(next);
+    });
   }
 
-  void _onSecondaryIndicatorToggled(
+  Future<void> _onSecondaryIndicatorToggled(
     ChartSecondaryIndicatorToggled event,
     Emitter<ChartState> emit,
   ) {
-    final types = Set<SecondaryIndicatorType>.of(state.secondaryTypes);
-    if (!types.remove(event.type)) types.add(event.type);
-    final next = state.copyWith(secondaryTypes: types);
-    _recalculateState(next);
-    emit(next);
+    return _withRecalcLock(() async {
+      if (isClosed) return;
+      final types = Set<SecondaryIndicatorType>.of(state.secondaryTypes);
+      if (!types.remove(event.type)) types.add(event.type);
+      var next = state.copyWith(secondaryTypes: types);
+      final computed = await _recalculateState(next);
+      if (isClosed) return;
+      next = next.copyWith(data: computed);
+      emit(next);
+    });
   }
 
   void _onLineModeChanged(
@@ -447,6 +568,9 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
   Future<void> close() async {
     await _unsubscribeRealtime();
     await _transport.shutdown();
+    await _workerSpawn;
+    _workerIsolate?.kill(priority: Isolate.immediate);
+    _workerResponsePort.close();
     return super.close();
   }
 }
