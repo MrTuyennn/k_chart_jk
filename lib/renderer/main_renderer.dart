@@ -60,7 +60,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
       ..strokeWidth = mLineStrokeWidth
-      ..color = chartColors.kLineColor;
+      ..color = chartColors.candleStyle.kLineColor;
     _contentRect = Rect.fromLTRB(
       chartRect.left,
       chartRect.top + _contentPadding,
@@ -171,7 +171,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           tileMode: TileMode.clamp,
-          colors: chartColors.kLineFillColors,
+          colors: chartColors.candleStyle.kLineFillColors,
         ).createShader(
           Rect.fromLTRB(
             chartRect.left,
@@ -219,7 +219,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
       if (open - close < mCandleLineWidth) {
         open = close + mCandleLineWidth;
       }
-      chartPaint.color = chartColors.upColor;
+      chartPaint.color = chartColors.candleStyle.upColor;
       canvas.drawRect(
         Rect.fromLTRB(curX - r, close, curX + r, open),
         chartPaint,
@@ -233,7 +233,7 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
       if (close - open < mCandleLineWidth) {
         open = close - mCandleLineWidth;
       }
-      chartPaint.color = chartColors.dnColor;
+      chartPaint.color = chartColors.candleStyle.dnColor;
       canvas.drawRect(
         Rect.fromLTRB(curX - r, open, curX + r, close),
         chartPaint,

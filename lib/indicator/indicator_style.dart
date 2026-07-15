@@ -1,4 +1,4 @@
-part of 'indicator_template.dart';
+import 'package:flutter/material.dart' show Color;
 
 class IndicatorStyle {
   final double lineWidth;

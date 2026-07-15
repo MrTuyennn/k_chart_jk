@@ -47,9 +47,9 @@ class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
     if (sar == halfHL) {
       color = chartColors.defaultTextColor;
     } else if (sar < halfHL) {
-      color = chartColors.upColor;
+      color = chartColors.candleStyle.upColor;
     } else {
-      color = chartColors.dnColor;
+      color = chartColors.candleStyle.dnColor;
     }
     canvas.drawCircle(
       Offset(curX, getY(sar)),

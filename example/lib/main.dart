@@ -659,11 +659,96 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
+  /// Palette "random" để demo CandleStyle/VolumeStyle/indicator style mới —
+  /// cố tình chọn màu chói, khác hẳn default để thấy rõ sự khác biệt.
+  /// bg/text/grid vẫn lấy từ `state.colors` (theo dark/light mode thật),
+  /// chỉ đổi màu vẽ (nến/volume/indicator).
+  KChartColors _demoColors(ChartState state) {
+    final base = state.colors;
+    return KChartColors(
+      bgColor: base.bgColor,
+      defaultTextColor: base.defaultTextColor,
+      gridColor: base.gridColor,
+      selectFillColor: base.selectFillColor,
+      selectBorderColor: base.selectBorderColor,
+      crossColor: base.crossColor,
+      crossTextColor: base.crossTextColor,
+      maxColor: base.maxColor,
+      minColor: base.minColor,
+      candleStyle: const CandleStyle(
+        upColor: Color(0xFF00E5FF),
+        dnColor: Color(0xFFFF3D00),
+        kLineColor: Color(0xFFAA00FF),
+        kLineFillColors: [Color(0x80AA00FF), Color(0x00AA00FF)],
+        textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w100),
+      ),
+      volumeStyle: const VolumeStyle(
+        upColor: Color(0xFF76FF03),
+        dnColor: Color(0xFFFF1744),
+        ma5Color: Color(0xFFFFEA00),
+        ma10Color: Color(0xFFFF6D00),
+        textStyle: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+      ),
+      avlStyle: const AVLStyle(avlColor: Color(0xFFEA80FC)), // hồng tím
+      maStyle: const MAStyle(
+        maColors: [
+          Color(0xFFFFAB00),
+          Color(0xFF00B8D4),
+          Color(0xFFD500F9),
+          Color(0xFF64DD17),
+        ],
+      ),
+      emaStyle: const MAStyle(
+        maColors: [Color(0xFF00E5FF), Color(0xFFFF4081), Color(0xFFFFEB3B)],
+      ),
+      bollStyle: const BOLLStyle(
+        bollColor: Color(0xFF6200EA),
+        ubColor: Color(0xFF00BFA5),
+        lbColor: Color(0xFFFF6D00),
+      ),
+      sarStyle: const SARStyle(sarColor: Color(0xFF00BFA5)),
+      zigzagStyle: const ZigZagStyle(zigzagColor: Color(0xFFFF6E40)),
+      superTrendStyle: const SuperTrendStyle(
+        upColor: Color(0xFF00E676),
+        dnColor: Color(0xFFFF1744),
+      ),
+      rsiStyle: const RSIStyle(rsiColor: Color(0xFFFF4081)),
+      macdStyle: const MACDStyle(
+        macdColor: Color(0xFF00E676),
+        difColor: Color(0xFFFFD600),
+        deaColor: Color(0xFF2979FF),
+      ),
+      kdjStyle: const KDJStyle(
+        kColor: Color(0xFFFFD600),
+        dColor: Color(0xFF00E5FF),
+        jColor: Color(0xFFD500F9),
+      ),
+      wrStyle: const WRStyle(wrColor: Color(0xFF64DD17)),
+      cciStyle: const CCIStyle(cciColor: Color(0xFFFF6D00)),
+      obvStyle: const OBVStyle(
+        obvColor: Color(0xFF2979FF),
+        signalColor: Color(0xFFFF4081),
+      ),
+      trixStyle: const TRIXStyle(
+        trixColor: Color(0xFF00E5FF),
+        trixMaColor: Color(0xFFFFAB00),
+      ),
+      mtmStyle: const MTMStyle(
+        mtmColor: Color(0xFFD500F9),
+        mtmMaColor: Color(0xFF76FF03),
+      ),
+      stochRsiStyle: const StochRSIStyle(
+        kColor: Color(0xFFFF3D00),
+        dColor: Color(0xFF00BFA5),
+      ),
+    );
+  }
+
   Widget _buildKChart(BuildContext context, ChartState state) {
     return KChartWidget(
       state.data,
       const KChartStyle(),
-      state.colors,
+      _demoColors(state),
       key: ValueKey(state.timeframe),
       isTrendLine: false,
       isLine: state.isLine,
@@ -674,8 +759,6 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       chartScale: state.savedChartScale,
       onChartScaleChanged: (scale) =>
           context.read<ChartBloc>().add(ChartScaleSaved(scale)),
-      // Giá tick WS tách khỏi datas — chỉ repaint đường now-price,
-      // không rebuild list nến mỗi tick.
       livePrice: state.livePrice,
       showNowPrice: true,
       showInfoDialog: true,

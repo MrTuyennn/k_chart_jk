@@ -4,7 +4,8 @@ import 'package:k_chart_wikex/entity/index.dart';
 import 'package:k_chart_wikex/renderer/index.dart';
 import 'package:k_chart_wikex/utils/index.dart';
 
-part 'indicator_style.dart';
+import 'indicator_style.dart';
+export 'indicator_style.dart';
 
 part 'main/sar_indicator.dart';
 part 'main/ma_indicator.dart';
@@ -33,7 +34,9 @@ abstract class IndicatorTemplate<T, K> {
 
   final List<int> calcParams;
 
-  final K indicatorStyle;
+  /// Không `final` — cho phép [applyIndicatorColorStyles] override bằng style
+  /// khai báo trong `KChartColors` khi instance vẫn còn dùng default `const`.
+  K indicatorStyle;
 
   IndicatorTemplate({
     required this.name,
@@ -100,4 +103,94 @@ abstract class SecondaryIndicator<T, K> extends IndicatorTemplate<T, K> {
     required int fixedLength,
     required Rect chartRect,
   });
+}
+
+/// Áp style theo `KChartColors` (vd `colors.avlStyle`, `colors.maStyle`...) cho
+/// những indicator instance vẫn còn dùng style mặc định — tức caller khởi tạo
+/// kiểu `AVLIndicator()` mà không tự truyền `indicatorStyle` riêng. Cho phép
+/// cấu hình màu toàn bộ indicator từ một chỗ duy nhất (`KChartColors`) khi build
+/// `KChartWidget`, thay vì phải set rời `indicatorStyle` ở từng instance.
+///
+/// Instance nào đã tự truyền `indicatorStyle` khác `const` mặc định (vd
+/// `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.purple))`) thì GIỮ
+/// NGUYÊN — không bị `KChartColors` ghi đè. Phát hiện qua `identical()` vì các
+/// class Style đều `const` — hai lần gọi `const AVLStyle()` cho cùng 1 object
+/// đã được Dart canonical hoá.
+void applyIndicatorColorStyles(
+  List<MainIndicator> mainIndicators,
+  List<SecondaryIndicator> secondaryIndicators,
+  KChartColors colors,
+) {
+  for (final ind in mainIndicators) {
+    switch (ind) {
+      case MAIndicator m:
+        if (identical(m.indicatorStyle, const MAStyle())) {
+          m.indicatorStyle = colors.maStyle;
+        }
+      case EMAIndicator m:
+        if (identical(m.indicatorStyle, const MAStyle())) {
+          m.indicatorStyle = colors.emaStyle;
+        }
+      case BOLLIndicator m:
+        if (identical(m.indicatorStyle, const BOLLStyle())) {
+          m.indicatorStyle = colors.bollStyle;
+        }
+      case SARIndicator m:
+        if (identical(m.indicatorStyle, const SARStyle())) {
+          m.indicatorStyle = colors.sarStyle;
+        }
+      case ZigZagIndicator m:
+        if (identical(m.indicatorStyle, const ZigZagStyle())) {
+          m.indicatorStyle = colors.zigzagStyle;
+        }
+      case SuperTrendIndicator m:
+        if (identical(m.indicatorStyle, const SuperTrendStyle())) {
+          m.indicatorStyle = colors.superTrendStyle;
+        }
+      case AVLIndicator m:
+        if (identical(m.indicatorStyle, const AVLStyle())) {
+          m.indicatorStyle = colors.avlStyle;
+        }
+    }
+  }
+  for (final ind in secondaryIndicators) {
+    switch (ind) {
+      case MACDIndicator s:
+        if (identical(s.indicatorStyle, const MACDStyle())) {
+          s.indicatorStyle = colors.macdStyle;
+        }
+      case KDJIndicator s:
+        if (identical(s.indicatorStyle, const KDJStyle())) {
+          s.indicatorStyle = colors.kdjStyle;
+        }
+      case RSIIndicator s:
+        if (identical(s.indicatorStyle, const RSIStyle())) {
+          s.indicatorStyle = colors.rsiStyle;
+        }
+      case WRIndicator s:
+        if (identical(s.indicatorStyle, const WRStyle())) {
+          s.indicatorStyle = colors.wrStyle;
+        }
+      case CCIIndicator s:
+        if (identical(s.indicatorStyle, const CCIStyle())) {
+          s.indicatorStyle = colors.cciStyle;
+        }
+      case OBVIndicator s:
+        if (identical(s.indicatorStyle, const OBVStyle())) {
+          s.indicatorStyle = colors.obvStyle;
+        }
+      case TRIXIndicator s:
+        if (identical(s.indicatorStyle, const TRIXStyle())) {
+          s.indicatorStyle = colors.trixStyle;
+        }
+      case MTMIndicator s:
+        if (identical(s.indicatorStyle, const MTMStyle())) {
+          s.indicatorStyle = colors.mtmStyle;
+        }
+      case StochRSIIndicator s:
+        if (identical(s.indicatorStyle, const StochRSIStyle())) {
+          s.indicatorStyle = colors.stochRsiStyle;
+        }
+    }
+  }
 }

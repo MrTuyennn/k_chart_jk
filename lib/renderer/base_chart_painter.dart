@@ -402,7 +402,8 @@ abstract class BaseChartPainter extends CustomPainter {
   double translateXtoX(double translateX) =>
       (translateX + mTranslateX) * scaleX;
 
-  /// define text style
+  /// define text style — fallback mặc định, `ChartPainter` override để dùng
+  /// `chartColors.candleStyle.textStyle`.
   TextStyle getTextStyle(Color color) {
     return TextStyle(fontSize: 10.0, color: color);
   }

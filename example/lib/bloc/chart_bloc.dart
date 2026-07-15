@@ -150,8 +150,26 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     return const ChartState(
       data: [],
       timeframe: ChartTimeframe.h1,
-      mainTypes: {MainIndicatorType.ma},
-      secondaryTypes: {SecondaryIndicatorType.macd},
+      // Bật hết toàn bộ indicator đã implement — demo xem tất cả cùng lúc.
+      mainTypes: {
+        MainIndicatorType.ma,
+        MainIndicatorType.boll,
+        MainIndicatorType.ema,
+        MainIndicatorType.superTrend,
+        MainIndicatorType.zigzag,
+        MainIndicatorType.avl,
+      },
+      secondaryTypes: {
+        SecondaryIndicatorType.macd,
+        SecondaryIndicatorType.kdj,
+        SecondaryIndicatorType.rsi,
+        SecondaryIndicatorType.wr,
+        SecondaryIndicatorType.cci,
+        SecondaryIndicatorType.obv,
+        SecondaryIndicatorType.trix,
+        SecondaryIndicatorType.mtm,
+        SecondaryIndicatorType.stochRsi,
+      },
       savedChartScale: KChartScaleState(),
       isLine: false,
       volHidden: false,

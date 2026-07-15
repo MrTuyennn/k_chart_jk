@@ -1,6 +1,7 @@
 import 'dart:async' show StreamSink;
 import 'package:flutter/material.dart';
 import 'package:k_chart_wikex/extension/canvas_extension.dart';
+import 'package:k_chart_wikex/indicator/indicator_template.dart';
 import 'package:k_chart_wikex/utils/index.dart';
 import '../entity/info_window_entity.dart';
 import '../entity/k_line_entity.dart';
@@ -117,6 +118,14 @@ class ChartPainter extends BaseChartPainter {
     _trendLineSegmentPaint = Paint()
       ..color = Colors.yellow
       ..strokeWidth = 2;
+
+    // Áp style theo chartColors cho indicator nào chưa tự custom indicatorStyle.
+    applyIndicatorColorStyles(mainIndicators, secondaryIndicators, chartColors);
+  }
+
+  @override
+  TextStyle getTextStyle(Color color) {
+    return chartColors.candleStyle.textStyle.copyWith(color: color);
   }
 
   @override

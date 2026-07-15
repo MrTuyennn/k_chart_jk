@@ -30,6 +30,16 @@
 
 ### Unreleased
 
+- **refactor (breaking):** `KChartColors`/`KChartStyle` tái cấu trúc lại toàn bộ — gom màu/text theo khu vực thay vì field rời rạc, và cho phép cấu hình màu indicator từ 1 chỗ duy nhất. Xem chi tiết [8.2](#82-kchartcolors).
+  - **`CandleStyle`** (main chart) + **`VolumeStyle`** (panel volume) — 2 class mới trong `styles/k_chart_style.dart`, mỗi class tự chứa cả màu LẪN `textStyle` riêng (mặc định fontSize 10). Thay thế các field cũ: `kLineColor`, `kLineFillColors`, `upColor`, `dnColor` → `CandleStyle`; `ma5Color`, `ma10Color`, `volUpColor`, `volDnColor` → `VolumeStyle`.
+  - **Xoá `volColor`** — dead field, không có code nào đọc, không mang sang `VolumeStyle`.
+  - **16 field style indicator** thêm vào `KChartColors` (`maStyle`, `emaStyle`, `bollStyle`, `sarStyle`, `zigzagStyle`, `superTrendStyle`, `avlStyle`, `macdStyle`, `kdjStyle`, `rsiStyle`, `wrStyle`, `cciStyle`, `obvStyle`, `trixStyle`, `mtmStyle`, `stochRsiStyle`) — set màu toàn bộ indicator từ `KChartColors` thay vì phải tự tạo từng instance `AVLIndicator(indicatorStyle: ...)`.
+    - Cơ chế: `applyIndicatorColorStyles()` (`indicator/indicator_template.dart`) chạy 1 lần trong constructor `ChartPainter`, dùng `switch` theo runtime type để gán `colors.xxxStyle` vào `indicator.indicatorStyle` — **chỉ khi** instance đó còn dùng style mặc định (`identical()` với `const XxxStyle()`, tận dụng Dart const-canonicalization). Instance nào tự truyền `indicatorStyle` riêng thì KHÔNG bị ghi đè.
+    - Kéo theo: `IndicatorTemplate.indicatorStyle` đổi từ `final` sang mutable field.
+    - Kéo theo: `indicator/indicator_style.dart` không còn là `part of 'indicator_template.dart'` nữa mà là file độc lập (`import`/`export`) — để `k_chart_style.dart` import thẳng các class `XxxStyle` mà không tạo vòng lặp import.
+  - Text style **không** còn nằm ở `KChartStyle` (`textStyle`/`volTextStyle` đã bị xoá khỏi đó) — dời hẳn vào `CandleStyle.textStyle`/`VolumeStyle.textStyle` để mỗi khu vực tự chứa đủ cả màu lẫn font trong 1 object.
+  - `example/lib/main.dart` (`_buildKChart`/`_demoColors`) và `example/lib/bloc/chart_bloc.dart` (`_initialState`) cập nhật theo API mới — state mặc định giờ bật sẵn TOÀN BỘ 6 main + 9 secondary indicator (trước chỉ MA + MACD) kèm palette màu riêng cho từng cái, để demo xem hết 1 lượt.
+  - Test `example/test/persistent_isolate_test.dart` phải sửa theo: vì default giờ bật sẵn mọi indicator, toggle trong test nghĩa là TẮT (trước đây default rỗng nên toggle nghĩa là BẬT) — assertion đổi từ `contains` sang `isNot(contains(...))`.
 - **feat:** `StochRSIIndicator` — secondary indicator Stochastic RSI. Xem chi tiết [9.2](#92-built-in-indicators).
   - `calcParams: [14, 14, 3, 3]` — (N1: RSI length, N2: Stoch length, M1: smooth %K, M2: smooth %D), chuẩn Binance/TradingView.
   - Công thức: RSI Wilder tính **nội bộ** trong `calc()` (không dùng lại `entity.rsi` — RSIIndicator có thể không được bật, period có thể khác), `StochRSI = (RSI − MIN(RSI,N2)) / (MAX(RSI,N2) − MIN(RSI,N2)) × 100`, `%K = SMA(StochRSI, M1)`, `%D = SMA(%K, M2)`. Pipeline 4 tầng chạy 1 vòng lặp O(n).
@@ -206,6 +216,191 @@ KChartWidget(
   secondaryIndicators: [MACDIndicator()],
 )
 ```
+
+### Ví dụ đầy đủ
+
+Widget tự chứa (copy-paste chạy được, chỉ cần cắm nguồn data thật vào `_fetchInitialCandles`/`_loadMoreHistory`) — bật **toàn bộ** 6 main + 9 secondary indicator, custom màu qua `CandleStyle`/`VolumeStyle`/style riêng từng indicator (xem [8.2](#82-kchartcolors)), toggle dark mode / line-vs-candlestick, zoom qua `KChartController`, và `DepthChart` đi kèm. Đây gần như nguyên bản cách `example/lib/main.dart` + `example/lib/bloc/chart_bloc.dart` trong repo demo dựng lên (repo demo tách phần data/network ra `ChartBloc` — ở đây gộp thẳng vào `State` cho gọn).
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:k_chart_wikex/k_chart_plus.dart';
+
+class FullChartDemo extends StatefulWidget {
+  const FullChartDemo({super.key});
+
+  @override
+  State<FullChartDemo> createState() => _FullChartDemoState();
+}
+
+class _FullChartDemoState extends State<FullChartDemo> {
+  final KChartController _controller = KChartController();
+  bool _isDark = false;
+  bool _isLine = false;
+  bool _volHidden = false;
+  late List<KLineEntity> _data;
+
+  // Bật hết indicator sẵn có trong package — 6 main + 9 secondary.
+  final List<MainIndicator> _mainIndicators = [
+    MAIndicator(),
+    BOLLIndicator(),
+    EMAIndicator(),
+    SuperTrendIndicator(),
+    ZigZagIndicator(),
+    AVLIndicator(),
+  ];
+  final List<SecondaryIndicator> _secondaryIndicators = [
+    MACDIndicator(),
+    KDJIndicator(),
+    RSIIndicator(),
+    WRIndicator(),
+    CCIIndicator(),
+    OBVIndicator(),
+    TRIXIndicator(),
+    MTMIndicator(),
+    StochRSIIndicator(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _data = _fetchInitialCandles(); // TODO: REST/WS/mock — nguồn data thật
+    // Bắt buộc gọi lại calculateAll mỗi khi _data thay đổi (thêm nến mới,
+    // load more, đổi timeframe...) — indicator phụ thuộc toàn bộ historical data.
+    DataUtil.calculateAll(_data, _mainIndicators, _secondaryIndicators);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  // Không cần tự truyền `indicatorStyle` cho từng indicator ở trên — set màu
+  // tập trung ở đây, KChartWidget tự áp cho instance nào còn dùng default.
+  KChartColors get _colors => KChartColors(
+    bgColor: _isDark ? const Color(0xFF1C1C1E) : Colors.white,
+    defaultTextColor: _isDark
+        ? const Color(0xFF8E8E93)
+        : const Color(0xFF909196),
+    gridColor: _isDark ? const Color(0xFF2C2C2E) : const Color(0xFFEDEDED),
+    candleStyle: const CandleStyle(
+      upColor: Color(0xFF14AD8F),
+      dnColor: Color(0xFFD5405D),
+      kLineColor: Color(0xFF217AFF),
+      textStyle: TextStyle(fontSize: 11),
+    ),
+    volumeStyle: const VolumeStyle(
+      ma5Color: Color(0xFFFFC634),
+      ma10Color: Color(0xff35cdac),
+      textStyle: TextStyle(fontSize: 10),
+    ),
+    avlStyle: const AVLStyle(avlColor: Color(0xFFEA80FC)),
+    bollStyle: const BOLLStyle(bollColor: Color(0xFF6200EA)),
+    rsiStyle: const RSIStyle(rsiColor: Color(0xFFFF4081)),
+    macdStyle: const MACDStyle(macdColor: Color(0xFF00E676)),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.zoom_in),
+              onPressed: _controller.zoomIn,
+            ),
+            IconButton(
+              icon: const Icon(Icons.zoom_out),
+              onPressed: _controller.zoomOut,
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _controller.reset,
+            ),
+            IconButton(
+              icon: Icon(_isDark ? Icons.light_mode : Icons.dark_mode),
+              onPressed: () => setState(() => _isDark = !_isDark),
+            ),
+            IconButton(
+              icon: Icon(_isLine ? Icons.candlestick_chart : Icons.show_chart),
+              onPressed: () => setState(() => _isLine = !_isLine),
+            ),
+            IconButton(
+              icon: Icon(_volHidden ? Icons.bar_chart : Icons.bar_chart_outlined),
+              onPressed: () => setState(() => _volHidden = !_volHidden),
+            ),
+          ],
+        ),
+        SizedBox(
+          height: 420,
+          child: KChartWidget(
+            _data,
+            const KChartStyle(),
+            _colors,
+            isTrendLine: false,
+            isLine: _isLine,
+            volHidden: _volHidden,
+            mainIndicators: _mainIndicators,
+            secondaryIndicators: _secondaryIndicators,
+            controller: _controller,
+            fixedLength: 2,
+            detailBuilder: (entity) => _InfoCard(entity: entity),
+            onLoadMore: (isLeft) {
+              // true = kéo tới mép TRÁI (nến cũ hơn) — false = kéo phải, thường bỏ qua.
+              if (isLeft) _loadMoreHistory();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<KLineEntity> _fetchInitialCandles() => []; // TODO: nguồn data thật
+
+  void _loadMoreHistory() {
+    // TODO: gọi REST lấy nến cũ hơn, prepend vào _data, rồi:
+    // setState(() {
+    //   _data = [...olderCandles, ..._data];
+    //   DataUtil.calculateAll(_data, _mainIndicators, _secondaryIndicators);
+    // });
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  final KLineEntity entity;
+  const _InfoCard({required this.entity});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      color: Colors.black87,
+      child: Text(
+        'O:${entity.open} H:${entity.high} L:${entity.low} C:${entity.close}',
+        style: const TextStyle(color: Colors.white, fontSize: 11),
+      ),
+    );
+  }
+}
+```
+
+**Kèm `DepthChart`** (order book — widget độc lập, không phụ thuộc `KChartWidget`, xem [11](#11-depthchart--orderbook-depth)):
+
+```dart
+DepthChart(
+  bids,  // List<DepthEntity>, giá tốt→xa (desc), vol CUMULATIVE
+  asks,  // List<DepthEntity>, giá tốt→xa (asc), vol CUMULATIVE
+  const DepthChartColors(
+    upColor: Color(0xFF14AD8F),
+    dnColor: Color(0xFFD5405D),
+  ),
+  chartStyle: const DepthChartStyle(dotRadius: 5.0, crossWidth: 0.5),
+  bottomLabelCount: 5, // số mốc giá ở trục dưới, >= 2
+)
+```
+
+`DepthChartStyle` hiện KHÔNG có field `textStyle`/`fontSize` — nhãn trục và popup annotation của `DepthChart` vẫn hard-code `fontSize: 10`/`9` trong `depth_chart.dart` (chưa được tách ra như `CandleStyle.textStyle`/`VolumeStyle.textStyle` ở [8.2](#82-kchartcolors)); nói nếu muốn mình bổ sung tương tự.
 
 ---
 
@@ -446,20 +641,41 @@ void dispose() { ctrl.dispose(); super.dispose(); }
 
 Constructor: `const KChartStyle([List<String>? dateTimeFormat, double volBarOpacity = 1.0])`.
 
+**Lưu ý:** chỉ **2 field** trong bảng trên thực sự truyền được từ ngoài vào — `dateTimeFormat` và `volBarOpacity` (2 tham số duy nhất của constructor). Toàn bộ field còn lại (`topPadding`, `bottomPadding`, `childPadding`, `space`, `pointWidth`, `candleWidth`, `candleLineWidth`, `volWidth`, `crossWidth`, `nowPriceLineWidth`, `borderWidth`, `gridRows`, `gridColumns`) được gán cứng ngay tại khai báo field (không có `this.` trong constructor) — muốn đổi kích thước nến/padding/lưới phải sửa trực tiếp trong `k_chart_style.dart`, không cấu hình được qua constructor.
+
 ### 8.2 `KChartColors`
+
+#### `CandleStyle` — main chart (nến hoặc line chart)
+
+| Field              | Default             | Ý nghĩa                                                          |
+| ------------------ | -------------------- | ----------------------------------------------------------------- |
+| `upColor`          | `0xFF14AD8F`         | Nến tăng (`MainRenderer`); cũng dùng lại cho chấm SAR khi trend tăng. |
+| `dnColor`          | `0xFFD5405D`         | Nến giảm (`MainRenderer`); cũng dùng lại cho chấm SAR khi trend giảm. |
+| `kLineColor`       | `0xFF217AFF`         | Đường line chart (`isLine = true`).                              |
+| `kLineFillColors`  | gradient blue        | Gradient tô dưới đường line chart.                               |
+| `textStyle`        | `fontSize: 10`       | Text main chart: trục giá/thời gian, crosshair, label indicator, max/min, now-price. |
+
+#### `VolumeStyle` — panel volume
+
+| Field        | Default        | Ý nghĩa                                    |
+| ------------ | -------------- | -------------------------------------------- |
+| `upColor`    | `0xFF14AD8F`   | Cột volume khi nến tăng.                    |
+| `dnColor`    | `0xFFD5405D`   | Cột volume khi nến giảm.                    |
+| `ma5Color`   | vàng           | Đường + label MA5 của volume.               |
+| `ma10Color`  | xanh           | Đường + label MA10 của volume.              |
+| `textStyle`  | `fontSize: 10` | Text riêng panel volume (`VOL`/`MA5`/`MA10` + trục phải) — tách khỏi `CandleStyle.textStyle`. |
+
+`volColor` (field cũ, không có code nào đọc) đã bị xoá khi tách sang `VolumeStyle` — không mang sang.
+
+#### Field còn lại của `KChartColors`
 
 | Field                                 | Default       | Vùng dùng                               |
 | ------------------------------------- | ------------- | --------------------------------------- |
 | `bgColor`                             | `0xFFFFFFFF`  | Background toàn chart.                  |
-| `kLineColor`                          | `0xFF217AFF`  | Line chart.                             |
-| `kLineFillColors`                     | gradient blue | Fill bên dưới line.                     |
-| `ma5Color`, `ma10Color`               | vàng / xanh   | MA (override qua `MAStyle.maColors`).   |
-| `upColor`                             | `0xFF14AD8F`  | Nến tăng.                               |
-| `dnColor`                             | `0xFFD5405D`  | Nến giảm.                               |
-| `volColor`                            | `0xFF2F8FD5`  | Cột volume.                             |
-| `volUpColor` / `volDnColor`           | xanh / đỏ     | Cột volume theo trend.                  |
-| `defaultTextColor`                    | xám           | Text mặc định (axis, label indicator).  |
-| `nowPriceUpColor` / `nowPriceDnColor` | xanh / đỏ     | Đường + label giá hiện tại.             |
+| `candleStyle`                         | `CandleStyle()` | Xem bảng trên.                        |
+| `volumeStyle`                         | `VolumeStyle()` | Xem bảng trên.                        |
+| `defaultTextColor`                    | xám           | Text mặc định — trục giá/thời gian + cross text (`ChartPainter`), đường tham chiếu secondary (`SecondaryRenderer`), popup axis label (`DepthChart`), và 6 indicator: SAR (chấm khi giá = trung điểm H/L), KDJ, MACD, MTM, OBV, TRIX, StochRSI (prefix label kiểu `"MACD(12,26,9) "`). |
+| `nowPriceUpColor` / `nowPriceDnColor` | xanh / đỏ     | Đường + label giá hiện tại (`ChartPainter.drawNowPrice`) — so `livePrice ?? datas.last.close` với `open` nến cuối để chọn màu; xem [livePrice](#livePrice--cập-nhật-giá-real-time). |
 | `trendLineColor`                      | cam           | Trend line.                             |
 | `selectBorderColor`                   | đen           | Border của crosshair label box.         |
 | `selectFillColor`                     | trắng         | Fill của crosshair label box.           |
@@ -467,6 +683,52 @@ Constructor: `const KChartStyle([List<String>? dateTimeFormat, double volBarOpac
 | `crossColor`                          | đen           | Crosshair lines.                        |
 | `crossTextColor`                      | đen           | Text trong crosshair label.             |
 | `maxColor` / `minColor`               | đen           | Label giá max/min trong khung hiển thị. |
+
+#### Style riêng từng indicator (16 field)
+
+`KChartColors` gom style của **mọi** main + secondary indicator vào 1 chỗ, để cấu hình màu toàn bộ chart mà không cần tự tạo từng instance indicator với `indicatorStyle` riêng:
+
+| Field           | Type              | Indicator      |
+| --------------- | ----------------- | -------------- |
+| `maStyle`       | `MAStyle`          | MA             |
+| `emaStyle`      | `MAStyle`          | EMA (field riêng với `maStyle` dù cùng type — để MA/EMA tô màu khác nhau) |
+| `bollStyle`     | `BOLLStyle`        | BOLL           |
+| `sarStyle`      | `SARStyle`         | SAR            |
+| `zigzagStyle`   | `ZigZagStyle`      | ZigZag         |
+| `superTrendStyle` | `SuperTrendStyle` | SuperTrend   |
+| `avlStyle`      | `AVLStyle`         | AVL            |
+| `macdStyle`     | `MACDStyle`        | MACD           |
+| `kdjStyle`      | `KDJStyle`         | KDJ            |
+| `rsiStyle`      | `RSIStyle`         | RSI            |
+| `wrStyle`       | `WRStyle`          | WR             |
+| `cciStyle`      | `CCIStyle`         | CCI            |
+| `obvStyle`      | `OBVStyle`         | OBV            |
+| `trixStyle`     | `TRIXStyle`        | TRIX           |
+| `mtmStyle`      | `MTMStyle`         | MTM            |
+| `stochRsiStyle` | `StochRSIStyle`    | StochRSI       |
+
+**Cơ chế áp dụng — `applyIndicatorColorStyles()`** (`lib/indicator/indicator_template.dart`):
+
+- Chạy 1 lần trong constructor của `ChartPainter`, nhận `mainIndicators`, `secondaryIndicators`, `chartColors`.
+- Dùng Dart 3 pattern-matching `switch` theo runtime type (vd `case AVLIndicator m:`) để biết field `KChartColors` nào tương ứng.
+- **Chỉ ghi đè** `indicator.indicatorStyle` khi instance đó còn dùng đúng style `const` mặc định — phát hiện qua `identical(ind.indicatorStyle, const AVLStyle())`, tận dụng việc Dart canonical hoá mọi `const` instantiation giống hệt nhau về cùng 1 object. Nếu instance tự truyền `indicatorStyle` khác mặc định (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) thì **giữ nguyên**, không bị `KChartColors` ghi đè — instance-level luôn thắng.
+- Kéo theo: `IndicatorTemplate.indicatorStyle` không còn `final` (mutable field), để cho phép gán lại.
+
+```dart
+KChartWidget(
+  data,
+  const KChartStyle(),
+  const KChartColors(
+    candleStyle: CandleStyle(upColor: Colors.cyan, dnColor: Colors.deepOrange),
+    volumeStyle: VolumeStyle(ma5Color: Colors.amber),
+    avlStyle: AVLStyle(avlColor: Colors.purple),
+    rsiStyle: RSIStyle(rsiColor: Colors.pink),
+  ),
+  mainIndicators: [AVLIndicator(), MAIndicator()], // không cần tự truyền indicatorStyle
+  secondaryIndicators: [RSIIndicator()],
+  ...
+)
+```
 
 **Dark mode example:**
 

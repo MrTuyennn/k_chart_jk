@@ -54,8 +54,8 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
       final top = getY(curPoint.vol);
       final bottom = chartRect.bottom;
       final base = curPoint.close > curPoint.open
-          ? chartColors.volUpColor
-          : chartColors.volDnColor;
+          ? chartColors.volumeStyle.upColor
+          : chartColors.volumeStyle.dnColor;
       canvas.drawRect(
         Rect.fromLTRB(curX - r, top, curX + r, bottom),
         chartPaint
@@ -71,7 +71,7 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         canvas,
         lastX,
         curX,
-        chartColors.ma5Color,
+        chartColors.volumeStyle.ma5Color,
       );
     }
     if (lastPoint.MA10Volume != null &&
@@ -83,7 +83,7 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         canvas,
         lastX,
         curX,
-        chartColors.ma10Color,
+        chartColors.volumeStyle.ma10Color,
       );
     }
   }
@@ -92,6 +92,11 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
   @override
   double getY(double y) =>
       (maxValue - y) * (chartRect.height / maxValue) + chartRect.top;
+
+  @override
+  TextStyle getTextStyle(Color color) {
+    return chartColors.volumeStyle.textStyle.copyWith(color: color);
+  }
 
   @override
   void drawText(Canvas canvas, VolumeEntity data, double x) {
@@ -104,12 +109,12 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         if (NumberUtil.checkNotNullOrZero(data.MA5Volume))
           TextSpan(
             text: 'MA5:${NumberUtil.formatCompact(data.MA5Volume!)}  ',
-            style: getTextStyle(chartColors.ma5Color),
+            style: getTextStyle(chartColors.volumeStyle.ma5Color),
           ),
         if (NumberUtil.checkNotNullOrZero(data.MA10Volume))
           TextSpan(
             text: 'MA10:${NumberUtil.formatCompact(data.MA10Volume!)}',
-            style: getTextStyle(chartColors.ma10Color),
+            style: getTextStyle(chartColors.volumeStyle.ma10Color),
           ),
       ],
     );
