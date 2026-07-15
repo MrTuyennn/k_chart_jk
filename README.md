@@ -12,14 +12,15 @@ A Flutter candlestick chart package with support for multiple technical indicato
 - **Tap-to-toggle crosshair:** tap hiện crosshair, tap lại ẩn; kéo khi crosshair đang hiện sẽ di chuyển crosshair thay vì scroll
 - **Price labels đồng bộ scaleY + offsetY:** labels trục Y luôn hiển thị đúng giá theo vị trí visual của nến
 - Fling (quán tính) khi scroll, không fling khi đang kéo crosshair
-- **Main indicators:** MA, EMA, BOLL, SAR, ZigZag
-- **Secondary indicators:** MACD, KDJ, RSI, WR, CCI, OBV
+- **Main indicators:** MA, EMA, BOLL, SAR, ZigZag, SuperTrend, AVL
+- **Secondary indicators:** MACD, KDJ, RSI, WR, CCI, OBV, TRIX, MTM, StochRSI
 - Volume bar chart with MA5 / MA10 overlay
 - Long-press info dialog with custom `detailBuilder`
 - Programmatic control via `KChartController` (zoom in/out, reset)
 - Save & restore zoom state across timeframe changes via `KChartScaleState`
 - Real-time price ticker via `livePrice` (no full repaint needed)
 - Dark / light theme support via `KChartColors`
+- **Per-area & per-indicator styling:** `CandleStyle`/`VolumeStyle` (color + text riêng cho main chart/volume panel) và 16 style field riêng từng indicator (`avlStyle`, `maStyle`, `rsiStyle`, `macdStyle`...) — set màu toàn bộ chart từ 1 `KChartColors` duy nhất, không cần tự tạo từng instance indicator
 - Background watermark support via `backgroundLogo`
 - Depth chart widget for order book visualization
 
@@ -117,6 +118,8 @@ KChartWidget(
 | `BOLLIndicator()`   | Bollinger Bands            | 20, 2           |
 | `SARIndicator()`    | Parabolic SAR              | 2, 2, 20        |
 | `ZigZagIndicator()` | ZigZag                     | 12, 2, 5        |
+| `SuperTrendIndicator()` | SuperTrend             | 10, 30          |
+| `AVLIndicator()`    | Average Value Line (Binance-style) | — (no period) |
 
 ### Secondary indicators (panel below chart)
 
@@ -128,6 +131,9 @@ KChartWidget(
 | `WRIndicator()`   | Williams %R             | 26, 6          |
 | `CCIIndicator()`  | Commodity Channel Index | 20             |
 | `OBVIndicator()`  | On-Balance Volume       | 5              |
+| `TRIXIndicator()` | Triple Exponential Average | 12, 20      |
+| `MTMIndicator()`  | Momentum                | 12, 6          |
+| `StochRSIIndicator()` | Stochastic RSI      | 14, 14, 3, 3   |
 
 Volume hiển thị trong panel riêng giữa main chart và date axis. Toggle bằng `volHidden`.
 
@@ -383,6 +389,50 @@ const KChartColors(
 )
 ```
 
+### Per-area color/text style: `CandleStyle` & `VolumeStyle`
+
+Main chart (candles/line) và panel volume mỗi khu vực có 1 style riêng — gồm cả màu lẫn `TextStyle` (mặc định fontSize 10), tách khỏi các field chung của `KChartColors`:
+
+```dart
+const KChartColors(
+  candleStyle: CandleStyle(
+    upColor: Color(0xFF14AD8F),
+    dnColor: Color(0xFFD5405D),
+    kLineColor: Color(0xFF217AFF),   // line-chart mode (isLine: true)
+    kLineFillColors: [Color(0x80217aff), Color(0x00217AFF)],
+    textStyle: TextStyle(fontSize: 11), // trục giá/thời gian, crosshair, max/min, now-price
+  ),
+  volumeStyle: VolumeStyle(
+    upColor: Color(0xFF14AD8F),
+    dnColor: Color(0xFFD5405D),
+    ma5Color: Color(0xFFFFC634),
+    ma10Color: Color(0xff35cdac),
+    textStyle: TextStyle(fontSize: 10), // riêng panel volume
+  ),
+)
+```
+
+### Per-indicator color: 16 style fields
+
+Thay vì tự tạo từng indicator instance với `indicatorStyle` riêng, set màu tập trung ngay trong `KChartColors` — field nào đặt tên trùng loại indicator (`avlStyle`, `maStyle`, `emaStyle`, `bollStyle`, `sarStyle`, `zigzagStyle`, `superTrendStyle`, `macdStyle`, `kdjStyle`, `rsiStyle`, `wrStyle`, `cciStyle`, `obvStyle`, `trixStyle`, `mtmStyle`, `stochRsiStyle`):
+
+```dart
+KChartWidget(
+  data,
+  const KChartStyle(),
+  const KChartColors(
+    avlStyle: AVLStyle(avlColor: Colors.purple),
+    rsiStyle: RSIStyle(rsiColor: Colors.pink),
+    macdStyle: MACDStyle(macdColor: Colors.green),
+  ),
+  mainIndicators: [AVLIndicator()],       // không cần tự truyền indicatorStyle
+  secondaryIndicators: [RSIIndicator(), MACDIndicator()],
+  ...
+)
+```
+
+> Instance nào tự truyền `indicatorStyle` riêng (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) sẽ **không** bị `KChartColors` ghi đè — style ở instance luôn thắng. Chi tiết cơ chế + bảng đầy đủ 16 field: xem [`chart_wikex_arch.md` §8.2](chart_wikex_arch.md#82-kchartcolors).
+
 ---
 
 ## KChartController
@@ -478,13 +528,20 @@ KChartWidget(
 
 ## Example
 
-See the full working demo in the [`example/`](example/lib/main.dart) folder.
+See the full working demo in the [`example/`](example/lib/main.dart) folder — bloc-based, kết nối REST + WebSocket thật (kline lịch sử, live tick, order book), toggle theme/indicator, tất cả 7 main + 9 secondary indicator có sẵn để bật thử.
+
+Demo cần file env chứa endpoint thật (git-ignored — không commit trong repo). Tạo từ template rồi điền giá trị:
 
 ```bash
 cd example
 flutter pub get
-flutter run
+cp env.example.json env.dev.json   # điền MARKET_API_BASE, MARKET_STOMP_URL... giá trị thật
+flutter run --dart-define-from-file=env.dev.json
 ```
+
+Thiếu file/thiếu giá trị → app hiển thị màn "Chưa cấu hình endpoint API" thay vì crash.
+
+Muốn 1 ví dụ tự chứa, không cần bloc/network, copy-paste chạy ngay (mock data) — xem [**Ví dụ đầy đủ** trong `chart_wikex_arch.md`](chart_wikex_arch.md#ví-dụ-đầy-đủ).
 
 ---
 
