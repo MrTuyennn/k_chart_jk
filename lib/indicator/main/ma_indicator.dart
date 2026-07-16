@@ -39,7 +39,7 @@ class MAIndicator extends MainIndicator<CandleEntity, MAStyle> {
           text: "MA${calcParams[i]}:${formatNumber(entity.maValueList![i], precision)}  ",
           style: getTextStyle(
             indicatorStyle.getMAColor(i),
-            chartColors.candleStyle.textStyle,
+            indicatorStyle.textStyle,
           ),
         );
         result.add(item);

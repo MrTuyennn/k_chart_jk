@@ -38,22 +38,22 @@ class KDJIndicator extends SecondaryIndicator<MACDEntity, KDJStyle> {
       children: [
         TextSpan(
           text: "KDJ(9,1,3) ",
-          style: getTextStyle(chartColors.defaultTextColor, chartColors.candleStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
         ),
         if (entity.k != null && entity.k != 0)
           TextSpan(
             text: "K:${formatNumber(entity.k!, precision)}  ",
-            style: getTextStyle(indicatorStyle.kColor, chartColors.candleStyle.textStyle),
+            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle),
           ),
         if (entity.d != null && entity.d != 0)
           TextSpan(
             text: "D:${formatNumber(entity.d!, precision)}  ",
-            style: getTextStyle(indicatorStyle.dColor, chartColors.candleStyle.textStyle),
+            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle),
           ),
         if (entity.j != null && entity.j != 0)
           TextSpan(
             text: "J:${formatNumber(entity.j!, precision)}",
-            style: getTextStyle(indicatorStyle.jColor, chartColors.candleStyle.textStyle),
+            style: getTextStyle(indicatorStyle.jColor, indicatorStyle.textStyle),
           ),
       ],
     );

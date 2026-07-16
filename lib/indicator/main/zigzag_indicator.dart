@@ -34,7 +34,7 @@ class ZigZagIndicator extends MainIndicator<CandleEntity, ZigZagStyle> {
     return TextSpan(
       text:
           "$shortName(${calcParams[0]},${calcParams[1]},${calcParams[2]}): ${formatNumber(zEntity.zigzag!, precision)}    ",
-      style: getTextStyle(indicatorStyle.zigzagColor, chartColors.candleStyle.textStyle),
+      style: getTextStyle(indicatorStyle.zigzagColor, indicatorStyle.textStyle),
     );
   }
 

@@ -69,8 +69,10 @@ abstract class IndicatorTemplate<T, K> {
 
   void calc(List<KLineEntity> dataList);
 
-  /// text format — [base] mặc định fontSize 10; truyền `chartColors.candleStyle.textStyle`
-  /// từ `drawFigure` để label indicator theo đúng textStyle cấu hình ở `KChartColors`.
+  /// text format — [base] mặc định fontSize 10; `drawFigure` truyền
+  /// `indicatorStyle.textStyle` (mỗi indicator tự có `textStyle` riêng trong
+  /// `XxxStyle`, đặt trong `IndicatorStyle` base class) để label theo đúng
+  /// font đã cấu hình cho indicator đó.
   TextStyle getTextStyle(
     Color? color, [
     TextStyle base = const TextStyle(fontSize: 10),

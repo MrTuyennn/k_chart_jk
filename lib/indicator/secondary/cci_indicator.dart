@@ -38,7 +38,7 @@ class CCIIndicator extends SecondaryIndicator<MACDEntity, CCIStyle> {
     if (entity.cci == null) return null;
     return TextSpan(
       text: "CCI(${calcParams.first}):${formatNumber(entity.cci!, precision)}",
-      style: getTextStyle(indicatorStyle.cciColor, chartColors.candleStyle.textStyle),
+      style: getTextStyle(indicatorStyle.cciColor, indicatorStyle.textStyle),
     );
   }
 

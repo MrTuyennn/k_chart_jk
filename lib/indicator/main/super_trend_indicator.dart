@@ -39,7 +39,7 @@ class SuperTrendIndicator extends MainIndicator<CandleEntity, SuperTrendStyle> {
     final color = st!.isUp == true ? indicatorStyle.upColor : indicatorStyle.dnColor;
     return TextSpan(
       text: "SUPER: ${formatNumber(st.value!, precision)}",
-      style: getTextStyle(color, chartColors.candleStyle.textStyle),
+      style: getTextStyle(color, indicatorStyle.textStyle),
     );
   }
 

@@ -39,7 +39,7 @@ class AVLIndicator extends MainIndicator<CandleEntity, AVLStyle> {
     if (aEntity.avl == null) return null;
     return TextSpan(
       text: "$shortName: ${formatNumber(aEntity.avl!, precision)}    ",
-      style: getTextStyle(indicatorStyle.avlColor, chartColors.candleStyle.textStyle),
+      style: getTextStyle(indicatorStyle.avlColor, indicatorStyle.textStyle),
     );
   }
 

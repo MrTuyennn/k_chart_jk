@@ -46,17 +46,17 @@ class StochRSIIndicator extends SecondaryIndicator<MACDEntity, StochRSIStyle> {
       children: [
         TextSpan(
           text: "StochRSI(${calcParams[0]},${calcParams[1]},${calcParams[2]},${calcParams[3]}) ",
-          style: getTextStyle(chartColors.defaultTextColor, chartColors.candleStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
         ),
         if (entity.stochRsiK != null)
           TextSpan(
             text: "K:${formatNumber(entity.stochRsiK!, precision)}  ",
-            style: getTextStyle(indicatorStyle.kColor, chartColors.candleStyle.textStyle),
+            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle),
           ),
         if (entity.stochRsiD != null)
           TextSpan(
             text: "D:${formatNumber(entity.stochRsiD!, precision)}",
-            style: getTextStyle(indicatorStyle.dColor, chartColors.candleStyle.textStyle),
+            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle),
           ),
       ],
     );

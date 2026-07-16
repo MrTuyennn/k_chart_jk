@@ -1,10 +1,18 @@
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/material.dart' show Color, TextStyle;
 
 class IndicatorStyle {
   final double lineWidth;
   final double strokeWidth;
 
-  const IndicatorStyle({this.lineWidth = 1.0, this.strokeWidth = 0.8});
+  /// text style cho label indicator (vẽ qua `drawFigure`). Mặc định fontSize
+  /// 10 — cùng convention với `CandleStyle.textStyle`/`VolumeStyle.textStyle`.
+  final TextStyle textStyle;
+
+  const IndicatorStyle({
+    this.lineWidth = 1.0,
+    this.strokeWidth = 0.8,
+    this.textStyle = const TextStyle(fontSize: 10),
+  });
 }
 
 class MAStyle extends IndicatorStyle {
@@ -18,6 +26,7 @@ class MAStyle extends IndicatorStyle {
       Color(0xFFF7931A),
       Color(0xFF127ECC),
     ],
+    super.textStyle,
   });
 
   /// get MA color via index
@@ -40,6 +49,7 @@ class BOLLStyle extends IndicatorStyle {
     this.ubColor = const Color(0xFFFFC634),
     this.lbColor = const Color(0xFFFFC634),
     this.fillColor = const Color(0x12FFC634),
+    super.textStyle,
   });
 }
 
@@ -52,6 +62,7 @@ class SARStyle extends IndicatorStyle {
     this.sarColor = const Color(0xFFFFC634),
     this.radius = 2.0,
     super.strokeWidth = 0.8,
+    super.textStyle,
   });
 }
 
@@ -67,25 +78,26 @@ class SuperTrendStyle extends IndicatorStyle {
     this.upFillColor = const Color(0x2614AD8F),
     this.dnFillColor = const Color(0x26D5405D),
     super.lineWidth = 1.5,
+    super.textStyle,
   });
 }
 
 class CCIStyle extends IndicatorStyle {
   final Color cciColor;
 
-  const CCIStyle({this.cciColor = const Color(0xFFFFC634)});
+  const CCIStyle({this.cciColor = const Color(0xFFFFC634), super.textStyle});
 }
 
 class RSIStyle extends IndicatorStyle {
   final Color rsiColor;
 
-  const RSIStyle({this.rsiColor = const Color(0xFFFFC634)});
+  const RSIStyle({this.rsiColor = const Color(0xFFFFC634), super.textStyle});
 }
 
 class WRStyle extends IndicatorStyle {
   final Color wrColor;
 
-  const WRStyle({this.wrColor = const Color(0xFFFFC634)});
+  const WRStyle({this.wrColor = const Color(0xFFFFC634), super.textStyle});
 }
 
 class KDJStyle extends IndicatorStyle {
@@ -97,6 +109,7 @@ class KDJStyle extends IndicatorStyle {
     this.kColor = const Color(0xFFFFC634),
     this.dColor = const Color(0xff35cdac),
     this.jColor = const Color(0xffb48ee3),
+    super.textStyle,
   });
 }
 
@@ -117,6 +130,7 @@ class MACDStyle extends IndicatorStyle {
     this.difColor = const Color(0xff35cdac),
     this.deaColor = const Color(0xffb48ee3),
     this.macdWidth = 8.5,
+    super.textStyle,
   });
 }
 
@@ -126,6 +140,7 @@ class ZigZagStyle extends IndicatorStyle {
   const ZigZagStyle({
     this.zigzagColor = const Color(0xFFFFC634),
     super.lineWidth = 1.0,
+    super.textStyle,
   });
 }
 
@@ -135,6 +150,7 @@ class AVLStyle extends IndicatorStyle {
   const AVLStyle({
     this.avlColor = const Color(0xFFFFC634),
     super.lineWidth = 1.0,
+    super.textStyle,
   });
 }
 
@@ -145,6 +161,7 @@ class TRIXStyle extends IndicatorStyle {
   const TRIXStyle({
     this.trixColor = const Color(0xFFFFC634),
     this.trixMaColor = const Color(0xff35cdac),
+    super.textStyle,
   });
 }
 
@@ -155,6 +172,7 @@ class StochRSIStyle extends IndicatorStyle {
   const StochRSIStyle({
     this.kColor = const Color(0xFFFFC634),
     this.dColor = const Color(0xff35cdac),
+    super.textStyle,
   });
 }
 
@@ -165,6 +183,7 @@ class MTMStyle extends IndicatorStyle {
   const MTMStyle({
     this.mtmColor = const Color(0xFFFFC634),
     this.mtmMaColor = const Color(0xff35cdac),
+    super.textStyle,
   });
 }
 
@@ -175,5 +194,6 @@ class OBVStyle extends IndicatorStyle {
   const OBVStyle({
     this.obvColor = const Color(0xFF217AFF),
     this.signalColor = const Color(0xFFFFC634),
+    super.textStyle,
   });
 }
