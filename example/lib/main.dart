@@ -696,6 +696,15 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   /// chỉ đổi màu vẽ (nến/volume/indicator).
   KChartColors _demoColors(ChartState state) {
     return state.colors.copyWith(
+      livePriceStyle: const LivePriceStyle(
+        upColor: Colors.blueAccent,
+        dnColor: Colors.red,
+        textStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
       candleStyle: const CandleStyle(
         upColor: Color(0xFF00E5FF),
         dnColor: Color(0xFFFF3D00),

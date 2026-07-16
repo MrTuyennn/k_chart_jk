@@ -11,7 +11,10 @@ import 'package:k_chart_wikex/renderer/index.dart';
 /// cờ `volHidden` ở `KChartWidget`.
 ///
 /// Render:
-///   - Cột vol xanh/đỏ theo `close > open`, opacity tuỳ `chartStyle.volBarOpacity`.
+///   - Cột vol xanh/đỏ theo `close > open`, alpha = alpha sẵn có của
+///     `volumeStyle.upColor`/`dnColor` NHÂN với `chartStyle.volBarOpacity`
+///     (không ghi đè) — set opacity thẳng trong `Color` hoặc qua
+///     `volBarOpacity` đều dùng được, kết hợp được cả hai.
 ///   - 2 đường MA5/MA10 (lấy từ `MA5Volume`/`MA10Volume` đã tính trong
 ///     `DataUtil.calcVolumeMA`).
 ///   - Label `VOL : … MA5 : … MA10 : …` ở đầu panel.
@@ -30,13 +33,13 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
     this.chartStyle,
     this.chartColors,
   ) : super(
-          chartRect: volRect,
-          maxValue: maxValue,
-          minValue: minValue,
-          topPadding: topPadding,
-          fixedLength: fixedLength,
-          gridColor: chartColors.gridColor,
-        ) {
+        chartRect: volRect,
+        maxValue: maxValue,
+        minValue: minValue,
+        topPadding: topPadding,
+        fixedLength: fixedLength,
+        gridColor: chartColors.gridColor,
+      ) {
     _volWidth = chartStyle.volWidth;
   }
 
@@ -59,7 +62,7 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
       canvas.drawRect(
         Rect.fromLTRB(curX - r, top, curX + r, bottom),
         chartPaint
-          ..color = base.withValues(alpha: chartStyle.volBarOpacity),
+          ..color = base.withValues(alpha: base.a * chartStyle.volBarOpacity),
       );
     }
     if (lastPoint.MA5Volume != null &&

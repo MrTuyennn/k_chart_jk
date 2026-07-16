@@ -2,6 +2,63 @@
 
 Tổng hợp toàn bộ thay đổi/fix của package: nội dung từ `CHANGELOG.md` (theo version publish), các commit `fix:` lẻ chưa lên CHANGELOG, và các thay đổi đang làm việc (chưa commit) trong session gần đây.
 
+## 2026-07-16
+
+### Feat — `LivePriceStyle` + `LivePriceBadgePainter` (now-price badge)
+
+Tách `nowPriceUpColor`/`nowPriceDnColor` khỏi `KChartColors` thành model riêng `LivePriceStyle` (`lib/styles/live_price_style.dart`), cùng convention `CandleStyle`/`VolumeStyle` dựng hôm 07-15. `upColor`/`dnColor` CHỈ tô nền badge + đường kẻ ngang — màu CHỮ luôn lấy từ `textStyle.color` riêng (mặc định `Colors.white`), không dùng chung màu nền cho chữ (nền đặc + chữ cùng màu sẽ vô hình — bug phát hiện ngay khi wiring).
+
+Badge "flag" (nền bo góc + mũi tên nhỏ trỏ trái) — convert từ `assets/Number.svg` (`viewBox="0 0 54 14"`) — gắn thẳng vào `ChartPainter.drawNowPrice()` thay `RRect + border` phẳng cũ (gọi trực tiếp `LivePriceBadgePainter(...).paint(canvas, size)`, không qua widget `CustomPaint`). Nền và mũi tên cùng nhân 1 cặp tỉ lệ `scaleX = size.width/54`, `scaleY = size.height/14` — bug ban đầu: chỉ nền được scale theo tỉ lệ SVG, mũi tên để nguyên toạ độ tuyệt đối copy từ path SVG → lệch khi badge không đúng 54×14 (phát hiện khi so trực tiếp với `assets/Number.svg` gốc, biết viewBox thật mới tính đúng hệ số quy đổi). Badge tự co giãn đúng tỉ lệ theo độ dài số giá. Mũi tên trỏ trái khớp đúng ngữ nghĩa khi badge ở mép PHẢI chart (`VerticalTextAlignment.right`, mặc định); dùng `left` thì mũi tên trỏ ra ngoài thay vì vào chart (hạn chế asset gốc — chỉ 1 chiều, chưa có bản mirror).
+
+Padding badge (`drawNowPrice`) đổi `(paddingX: 3, paddingY: 1.5)` → `(3, 3)` — đều 2 chiều. Kéo theo xoá 2 field thừa `nowPriceSelectorPaint`/`nowPriceSelectorBorderPaint` trên `ChartPainter`.
+
+- File: `lib/styles/live_price_style.dart` (mới), `lib/renderer/chart_painter.dart`
+
+### Feat — `textStyle` riêng từng indicator style
+
+Thêm field `textStyle` (default `fontSize: 10`) vào base class `IndicatorStyle`, forward qua `super.textStyle` ở cả 15 subclass (`MAStyle`, `BOLLStyle`, `SARStyle`, `SuperTrendStyle`, `AVLStyle`, `ZigZagStyle`, `MACDStyle`, `KDJStyle`, `RSIStyle`, `WRStyle`, `CCIStyle`, `OBVStyle`, `TRIXStyle`, `MTMStyle`, `StochRSIStyle`). Label mỗi indicator giờ chỉnh font độc lập nhau qua `KChartColors.xxxStyle.textStyle`, thay vì dùng chung `candleStyle.textStyle` như bản fix hôm 07-15.
+
+- File: `lib/indicator/indicator_style.dart`, `lib/indicator/indicator_template.dart` + 16 file `lib/indicator/{main,secondary}/*.dart`
+
+### Fixed — volume bar opacity bị ghi đè thay vì nhân dồn
+
+`VolRenderer.drawChart` dùng `base.withValues(alpha: chartStyle.volBarOpacity)` — **ghi đè hoàn toàn** alpha sẵn có của `volumeStyle.upColor`/`dnColor`. Set alpha thẳng trong `Color` (vd `Color(0x8076FF03)`) bị bỏ qua nếu `volBarOpacity` giữ default `1.0`. Sửa: `base.withValues(alpha: base.a * chartStyle.volBarOpacity)` — nhân dồn, set qua `Color` hoặc `volBarOpacity` đều dùng được, kết hợp được cả hai.
+
+- File: `lib/renderer/vol_renderer.dart`
+
+---
+
+## 2026-07-15
+
+### Breaking — `KChartColors`/`KChartStyle` refactor toàn bộ
+
+Gom màu/text rời rạc thành style theo khu vực, cho phép cấu hình màu indicator từ 1 chỗ duy nhất. Chi tiết đầy đủ: `chart_wikex_arch.md` §1 Unreleased + §8.2.
+
+- **`CandleStyle`/`VolumeStyle`** thay `kLineColor`, `kLineFillColors`, `upColor`, `dnColor`, `volColor` (xoá — dead field), `volUpColor`, `volDnColor`, `ma5Color`, `ma10Color` — mỗi class tự chứa cả màu lẫn `textStyle` riêng.
+- **16 field style indicator** (`avlStyle`, `maStyle`, `rsiStyle`, `macdStyle`...) thêm vào `KChartColors` — set màu toàn bộ indicator từ 1 nơi, cơ chế `applyIndicatorColorStyles()` tự áp cho instance nào chưa tự custom `indicatorStyle`.
+- `KChartColors.copyWith()` — method mới.
+- File: `lib/styles/k_chart_style.dart`, `lib/indicator/indicator_style.dart`, `lib/indicator/indicator_template.dart`, `lib/renderer/*.dart`.
+
+### Fixed — 5 bug correctness (phát hiện qua `/code-review` high effort)
+
+- **`AVLIndicator`/`ZigZagIndicator`/`BOLLIndicator._fillPaint`**: Paint màu bake 1 lần trong constructor từ `indicatorStyle`, không đọc lại khi vẽ → set màu qua `KChartColors` không có tác dụng lên đường/vùng tô (chỉ đổi được label). Sửa: đọc lại `indicatorStyle.xxxColor` ngay trước mỗi lần vẽ.
+  - File: `lib/indicator/main/avl_indicator.dart`, `zigzag_indicator.dart`, `boll_indicator.dart`
+- **`applyIndicatorColorStyles()` "đơ" màu sau lần áp đầu tiên**: dùng `identical(indicatorStyle, const XxxStyle())` để biết "còn default không" — sau khi tự gán 1 lần, field không còn `identical` với default → các lần build sau (vd đổi theme runtime) không bao giờ áp lại màu mới nếu app giữ indicator instance ổn định qua nhiều build. Sửa: thêm `_originalIndicatorStyle` (snapshot bất biến chụp lúc khởi tạo), so `identical()` với snapshot thay vì giá trị hiện tại.
+  - File: `lib/indicator/indicator_template.dart`
+- **`VolumeStyle.textStyle` không áp cho label trục volume**: `ChartPainter.drawVerticalText` tính chung 1 `textStyle` (từ `candleStyle.textStyle`) rồi truyền cho cả main lẫn volume renderer. Sửa: gọi riêng `mVolRenderer.getTextStyle(...)`.
+  - File: `lib/renderer/chart_painter.dart`
+- **Label indicator không đổi font theo `KChartColors`**: `IndicatorTemplate.getTextStyle` hard-code `fontSize: 10`. Sửa: nhận thêm param `base`, mọi `drawFigure()` (16 file) truyền `chartColors.candleStyle.textStyle` vào (sau nâng cấp tiếp thành `indicatorStyle.textStyle` riêng từng indicator, xem mục 07-16).
+  - File: `lib/indicator/indicator_template.dart` + 16 file `lib/indicator/{main,secondary}/*.dart`
+
+### Improved (cleanup — non-correctness, cùng đợt code review)
+
+- `KChartColors.copyWith()` — override 1-2 field giữ nguyên phần còn lại.
+- `applyIndicatorColorStyles()` gộp switch 16 case lặp code thành 1 helper generic `_applyDefaultStyle<K>()` — rút từ ~90 dòng còn ~45.
+- `DepthChartStyle` thêm `textStyle`/`annotationTextStyle` (default fontSize 10/9) — cùng convention `CandleStyle`/`VolumeStyle`, thay hard-code fontSize trong `depth_chart.dart`.
+- `example/lib/main.dart`: cache `_mainIndicatorsFor`/`_secondaryIndicatorsFor` theo nội dung `Set` — trước đó mỗi tick `livePrice` (WS, không throttle) kéo theo rebuild lại toàn bộ 15 indicator + Paint dù `mainTypes`/`secondaryTypes` không đổi.
+
+---
+
 ## 2026-07-09
 
 ### Fixed

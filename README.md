@@ -433,6 +433,41 @@ KChartWidget(
 
 > Instance nào tự truyền `indicatorStyle` riêng (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) sẽ **không** bị `KChartColors` ghi đè — style ở instance luôn thắng. Chi tiết cơ chế + bảng đầy đủ 16 field: xem [`chart_wikex_arch.md` §8.2](chart_wikex_arch.md#82-kchartcolors).
 
+Mỗi `XxxStyle` (`AVLStyle`, `RSIStyle`, `MACDStyle`...) còn có `textStyle` riêng (mặc định fontSize 10) — chỉnh font label từng indicator độc lập nhau, không dùng chung `CandleStyle.textStyle`:
+
+```dart
+avlStyle: AVLStyle(avlColor: Colors.purple, textStyle: TextStyle(fontSize: 12)),
+```
+
+### Now-price badge: `LivePriceStyle`
+
+Đường + badge giá hiện tại (`ChartPainter.drawNowPrice`, dùng `livePrice ?? datas.last.close` so với `open` nến cuối để chọn màu) cấu hình qua `livePriceStyle`. **`upColor`/`dnColor` chỉ tô nền badge + đường kẻ — màu chữ luôn lấy từ `textStyle.color`** (mặc định trắng), không dùng chung với `upColor`/`dnColor` (nền đặc + chữ cùng màu sẽ vô hình):
+
+```dart
+const KChartColors(
+  livePriceStyle: LivePriceStyle(
+    upColor: Colors.blueAccent,
+    dnColor: Colors.red,
+    textStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+  ),
+)
+```
+
+Badge vẽ qua `LivePriceBadgePainter` (convert từ `assets/Number.svg`) — nền bo góc + mũi tên nhỏ trỏ vào chart, tự co giãn theo độ dài số giá.
+
+### Volume bar opacity
+
+`KChartStyle.volBarOpacity` (0.0–1.0) **nhân dồn** với alpha sẵn có trong `volumeStyle.upColor`/`dnColor` — không ghi đè. Set alpha thẳng trong `Color` (vd `Color(0x8076FF03)`) hoặc qua `volBarOpacity` đều dùng được, kết hợp được cả hai:
+
+```dart
+KChartWidget(
+  data,
+  const KChartStyle(null, 0.6), // volBarOpacity = 0.6, nhân thêm vào alpha của Color
+  const KChartColors(volumeStyle: VolumeStyle(upColor: Color(0x8076FF03))),
+  ...
+)
+```
+
 ---
 
 ## KChartController

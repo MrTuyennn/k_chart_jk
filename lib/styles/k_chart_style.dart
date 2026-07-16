@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart' show Color, TextStyle;
 import '../indicator/indicator_style.dart';
+import 'live_price_style.dart';
+
+export 'live_price_style.dart';
 
 /// Màu cho main chart (nến hoặc line chart — 2 cách vẽ khác nhau của cùng
 /// 1 chuỗi giá, `isLine` chọn cái nào). Tách khỏi `KChartColors` để dễ custom
@@ -81,9 +84,8 @@ class KChartColors {
   /// default text color: apply for text at grid
   final Color defaultTextColor;
 
-  /// color of the current price
-  final Color nowPriceUpColor;
-  final Color nowPriceDnColor;
+  /// màu now-price (đường + label giá hiện tại) — xem [LivePriceStyle].
+  final LivePriceStyle livePriceStyle;
 
   /// trend color
   final Color trendLineColor;
@@ -167,8 +169,7 @@ class KChartColors {
     this.candleStyle = const CandleStyle(),
     this.volumeStyle = const VolumeStyle(),
     this.defaultTextColor = const Color(0xFF909196),
-    this.nowPriceUpColor = const Color(0xFF14AD8F),
-    this.nowPriceDnColor = const Color(0xFFD5405D),
+    this.livePriceStyle = const LivePriceStyle(),
 
     /// trend color
     this.trendLineColor = const Color(0xFFF89215),
@@ -217,8 +218,7 @@ class KChartColors {
     CandleStyle? candleStyle,
     VolumeStyle? volumeStyle,
     Color? defaultTextColor,
-    Color? nowPriceUpColor,
-    Color? nowPriceDnColor,
+    LivePriceStyle? livePriceStyle,
     Color? trendLineColor,
     Color? selectBorderColor,
     Color? selectFillColor,
@@ -249,8 +249,7 @@ class KChartColors {
       candleStyle: candleStyle ?? this.candleStyle,
       volumeStyle: volumeStyle ?? this.volumeStyle,
       defaultTextColor: defaultTextColor ?? this.defaultTextColor,
-      nowPriceUpColor: nowPriceUpColor ?? this.nowPriceUpColor,
-      nowPriceDnColor: nowPriceDnColor ?? this.nowPriceDnColor,
+      livePriceStyle: livePriceStyle ?? this.livePriceStyle,
       trendLineColor: trendLineColor ?? this.trendLineColor,
       selectBorderColor: selectBorderColor ?? this.selectBorderColor,
       selectFillColor: selectFillColor ?? this.selectFillColor,
