@@ -97,11 +97,10 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
       (maxValue - y) * (chartRect.height / maxValue) + chartRect.top;
 
   @override
-  TextStyle getTextStyle(Color color) {
+  TextStyle getTextStyle(Color color, {bool forceColor = false}) {
     final textStyle = chartColors.volumeStyle.textStyle;
-    return textStyle.color != null
-        ? textStyle
-        : textStyle.copyWith(color: color);
+    if (!forceColor && textStyle.color != null) return textStyle;
+    return textStyle.copyWith(color: color);
   }
 
   @override
@@ -115,12 +114,18 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         if (NumberUtil.checkNotNullOrZero(data.MA5Volume))
           TextSpan(
             text: 'MA5:${NumberUtil.formatCompact(data.MA5Volume!)}  ',
-            style: getTextStyle(chartColors.volumeStyle.ma5Color),
+            style: getTextStyle(
+              chartColors.volumeStyle.ma5Color,
+              forceColor: true,
+            ),
           ),
         if (NumberUtil.checkNotNullOrZero(data.MA10Volume))
           TextSpan(
             text: 'MA10:${NumberUtil.formatCompact(data.MA10Volume!)}',
-            style: getTextStyle(chartColors.volumeStyle.ma10Color),
+            style: getTextStyle(
+              chartColors.volumeStyle.ma10Color,
+              forceColor: true,
+            ),
           ),
       ],
     );
