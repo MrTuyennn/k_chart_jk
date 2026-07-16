@@ -118,7 +118,10 @@ class ChartPainter extends BaseChartPainter {
 
   @override
   TextStyle getTextStyle(Color color) {
-    return chartColors.candleStyle.textStyle.copyWith(color: color);
+    final textStyle = chartColors.candleStyle.textStyle;
+    return textStyle.color != null
+        ? textStyle
+        : textStyle.copyWith(color: color);
   }
 
   @override

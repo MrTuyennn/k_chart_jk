@@ -98,7 +98,10 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
 
   @override
   TextStyle getTextStyle(Color color) {
-    return chartColors.volumeStyle.textStyle.copyWith(color: color);
+    final textStyle = chartColors.volumeStyle.textStyle;
+    return textStyle.color != null
+        ? textStyle
+        : textStyle.copyWith(color: color);
   }
 
   @override

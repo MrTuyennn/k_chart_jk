@@ -412,6 +412,8 @@ const KChartColors(
 )
 ```
 
+> `textStyle.color` nếu tự set (vd `TextStyle(fontSize: 11, color: Colors.amber)`) sẽ **luôn thắng** — không bị `defaultTextColor`/`crossTextColor`/`maxColor`/... ghi đè. Không set `color` (mặc định `null`) thì mỗi chỗ vẽ tự chọn màu ngữ nghĩa của nó như trước giờ (trục dùng `defaultTextColor`, crosshair dùng `crossTextColor`, v.v.). Cùng quy tắc áp dụng cho `textStyle` của mọi indicator style (`avlStyle.textStyle`, `rsiStyle.textStyle`...) và `livePriceStyle.textStyle`.
+
 ### Per-indicator color: 16 style fields
 
 Thay vì tự tạo từng indicator instance với `indicatorStyle` riêng, set màu tập trung ngay trong `KChartColors` — field nào đặt tên trùng loại indicator (`avlStyle`, `maStyle`, `emaStyle`, `bollStyle`, `sarStyle`, `zigzagStyle`, `superTrendStyle`, `macdStyle`, `kdjStyle`, `rsiStyle`, `wrStyle`, `cciStyle`, `obvStyle`, `trixStyle`, `mtmStyle`, `stochRsiStyle`):

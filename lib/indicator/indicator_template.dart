@@ -73,11 +73,12 @@ abstract class IndicatorTemplate<T, K> {
   /// `indicatorStyle.textStyle` (mỗi indicator tự có `textStyle` riêng trong
   /// `XxxStyle`, đặt trong `IndicatorStyle` base class) để label theo đúng
   /// font đã cấu hình cho indicator đó.
+
   TextStyle getTextStyle(
     Color? color, [
     TextStyle base = const TextStyle(fontSize: 10),
   ]) {
-    return base.copyWith(color: color);
+    return base.color != null ? base : base.copyWith(color: color);
   }
 
   String formatNumber(double value, int precision) {

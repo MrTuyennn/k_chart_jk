@@ -213,7 +213,8 @@ class DepthChartPainter extends CustomPainter {
   }
 
   void drawBuy(Canvas canvas) {
-    mBuyPointWidth = mDrawWidth / (mBuyData!.length <= 1 ? 1 : mBuyData!.length - 1);
+    mBuyPointWidth =
+        mDrawWidth / (mBuyData!.length <= 1 ? 1 : mBuyData!.length - 1);
     mBuyPath!.reset();
     double prevX = 0, prevY = 0;
     for (int i = 0; i < mBuyData!.length; i++) {
@@ -225,7 +226,12 @@ class DepthChartPainter extends CustomPainter {
         canvas.drawLine(Offset(prevX, prevY), Offset(x, y), mBuyLinePaint!);
       }
       if (i != mBuyData!.length - 1) {
-        mBuyPath!.quadraticBezierTo(x, y, mBuyPointWidth! * (i + 1), getY(mBuyData![i + 1].vol));
+        mBuyPath!.quadraticBezierTo(
+          x,
+          y,
+          mBuyPointWidth! * (i + 1),
+          getY(mBuyData![i + 1].vol),
+        );
       } else {
         if (i == 0) {
           mBuyPath!.lineTo(mDrawWidth, y);
@@ -244,7 +250,8 @@ class DepthChartPainter extends CustomPainter {
   }
 
   void drawSell(Canvas canvas) {
-    mSellPointWidth = mDrawWidth / (mSellData!.length <= 1 ? 1 : mSellData!.length - 1);
+    mSellPointWidth =
+        mDrawWidth / (mSellData!.length <= 1 ? 1 : mSellData!.length - 1);
     mSellPath!.reset();
     double prevX = 0, prevY = 0;
     for (int i = 0; i < mSellData!.length; i++) {
@@ -256,7 +263,12 @@ class DepthChartPainter extends CustomPainter {
         canvas.drawLine(Offset(prevX, prevY), Offset(x, y), mSellLinePaint!);
       }
       if (i != mSellData!.length - 1) {
-        mSellPath!.quadraticBezierTo(x, y, mSellPointWidth! * (i + 1) + mDrawWidth, getY(mSellData![i + 1].vol));
+        mSellPath!.quadraticBezierTo(
+          x,
+          y,
+          mSellPointWidth! * (i + 1) + mDrawWidth,
+          getY(mSellData![i + 1].vol),
+        );
       } else {
         if (i == 0) {
           mSellPath!.lineTo(mWidth, y);
@@ -457,7 +469,12 @@ class DepthChartPainter extends CustomPainter {
     popupPainter.paint(canvas, rect.topLeft);
   }
 
-  int _indexOfTranslateX(double translateX, int start, int end, double Function(int) getX) {
+  int _indexOfTranslateX(
+    double translateX,
+    int start,
+    int end,
+    double Function(int) getX,
+  ) {
     if (end == start || end == -1) {
       return start;
     }
@@ -486,7 +503,9 @@ class DepthChartPainter extends CustomPainter {
   TextPainter getTextPainter(String text) => TextPainter(
     text: TextSpan(
       text: text,
-      style: chartStyle.textStyle.copyWith(color: chartColors.defaultTextColor),
+      style: chartStyle.textStyle.color != null
+          ? chartStyle.textStyle
+          : chartStyle.textStyle.copyWith(color: chartColors.defaultTextColor),
     ),
     textDirection: TextDirection.ltr,
   );
@@ -552,11 +571,13 @@ class _PopupPainter {
   }
 
   TextPainter _getTextPainter(String label, String content) {
+    final style = chartStyle.annotationTextStyle.color != null
+        ? chartStyle.annotationTextStyle
+        : chartStyle.annotationTextStyle.copyWith(
+            color: chartColors.annotationColor,
+          );
     return TextPainter(
-      text: TextSpan(
-        text: '$label $content',
-        style: chartStyle.annotationTextStyle.copyWith(color: chartColors.annotationColor),
-      ),
+      text: TextSpan(text: '$label $content', style: style),
       textAlign: TextAlign.start,
       textDirection: TextDirection.ltr,
     );

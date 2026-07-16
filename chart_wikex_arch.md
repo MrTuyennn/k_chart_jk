@@ -30,6 +30,8 @@
 
 ### Unreleased
 
+- **fix:** `textStyle.color` do người dùng tự set (vd `CandleStyle(textStyle: TextStyle(color: Colors.amber))`) bị **ghi đè vô điều kiện** ở 5 nơi — `getTextStyle()`/`getTextPainter()` luôn gọi `.copyWith(color: mauNguQuNghia)` (`defaultTextColor`/`crossTextColor`/`maxColor`/`indicatorStyle.xxxColor`/`annotationColor`...), nên set `color` trong `textStyle` không có tác dụng gì. Sửa: chỉ `copyWith(color: ...)` khi `textStyle.color == null` (chưa tự set); nếu đã set thì dùng nguyên `textStyle`, bỏ qua màu ngữ nghĩa truyền vào. Mặc định (không set `color`) hành vi giữ nguyên như cũ, không breaking.
+  - File: `lib/renderer/chart_painter.dart` (`candleStyle.textStyle`), `lib/renderer/vol_renderer.dart` (`volumeStyle.textStyle`), `lib/indicator/indicator_template.dart` (`indicatorStyle.textStyle`, dùng chung 16 indicator), `lib/depth_chart.dart` (`chartStyle.textStyle` + `annotationTextStyle`).
 - **refactor (breaking):** `KChartColors`/`KChartStyle` tái cấu trúc lại toàn bộ — gom màu/text theo khu vực thay vì field rời rạc, và cho phép cấu hình màu indicator từ 1 chỗ duy nhất. Xem chi tiết [8.2](#82-kchartcolors).
   - **`CandleStyle`** (main chart) + **`VolumeStyle`** (panel volume) — 2 class mới trong `styles/k_chart_style.dart`, mỗi class tự chứa cả màu LẪN `textStyle` riêng (mặc định fontSize 10). Thay thế các field cũ: `kLineColor`, `kLineFillColors`, `upColor`, `dnColor` → `CandleStyle`; `ma5Color`, `ma10Color`, `volUpColor`, `volDnColor` → `VolumeStyle`.
   - **Xoá `volColor`** — dead field, không có code nào đọc, không mang sang `VolumeStyle`.

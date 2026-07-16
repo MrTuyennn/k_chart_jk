@@ -26,6 +26,12 @@ Thêm field `textStyle` (default `fontSize: 10`) vào base class `IndicatorStyle
 
 - File: `lib/renderer/vol_renderer.dart`
 
+### Fixed — `textStyle.color` tự set bị ghi đè vô điều kiện (5 chỗ)
+
+Set `color` trong `textStyle` (vd `CandleStyle(textStyle: TextStyle(color: Colors.amber))`) không có tác dụng — `getTextStyle()`/`getTextPainter()` ở cả 5 nơi đều gọi `.copyWith(color: mauNguQuNghia)` **vô điều kiện**, ghi đè `textStyle.color` bằng `defaultTextColor`/`crossTextColor`/`maxColor`/`indicatorStyle.xxxColor`/`annotationColor` tuỳ chỗ gọi. Sửa: chỉ `copyWith(color: ...)` khi `textStyle.color == null` (chưa tự set); nếu người dùng đã set thì dùng nguyên `textStyle`, bỏ qua màu ngữ nghĩa truyền vào. Không set `color` (mặc định) → hành vi giữ nguyên như cũ, không breaking.
+
+- File: `lib/renderer/chart_painter.dart` (`candleStyle.textStyle`), `lib/renderer/vol_renderer.dart` (`volumeStyle.textStyle`), `lib/indicator/indicator_template.dart` (`indicatorStyle.textStyle`, dùng chung cho cả 16 indicator), `lib/depth_chart.dart` (`chartStyle.textStyle` + `annotationTextStyle`)
+
 ---
 
 ## 2026-07-15

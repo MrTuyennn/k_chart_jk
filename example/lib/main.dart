@@ -710,7 +710,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         dnColor: Color(0xFFFF3D00),
         kLineColor: Color(0xFFAA00FF),
         kLineFillColors: [Color(0x80AA00FF), Color(0x00AA00FF)],
-        textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w100),
+        textStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w100,
+          color: Colors.black,
+        ),
       ),
       volumeStyle: const VolumeStyle(
         upColor: Color(0xFF76FF03),
@@ -770,6 +774,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       stochRsiStyle: const StochRSIStyle(
         kColor: Color(0xFFFF3D00),
         dColor: Color(0xFF00BFA5),
+        textStyle: TextStyle(color: Colors.red),
       ),
     );
   }
