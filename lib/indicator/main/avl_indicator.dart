@@ -20,8 +20,7 @@ class AVLIndicator extends MainIndicator<CandleEntity, AVLStyle> {
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
       ..style = PaintingStyle.stroke
-      ..strokeWidth = indicatorStyle.lineWidth
-      ..color = indicatorStyle.avlColor;
+      ..strokeWidth = indicatorStyle.lineWidth;
   }
 
   @override
@@ -40,7 +39,7 @@ class AVLIndicator extends MainIndicator<CandleEntity, AVLStyle> {
     if (aEntity.avl == null) return null;
     return TextSpan(
       text: "$shortName: ${formatNumber(aEntity.avl!, precision)}    ",
-      style: getTextStyle(indicatorStyle.avlColor),
+      style: getTextStyle(indicatorStyle.avlColor, chartColors.candleStyle.textStyle),
     );
   }
 
@@ -56,7 +55,7 @@ class AVLIndicator extends MainIndicator<CandleEntity, AVLStyle> {
     canvas.drawLine(
       Offset(lastX, getY(lastA.avl!)),
       Offset(curX, getY(curA.avl!)),
-      _linePaint,
+      _linePaint..color = indicatorStyle.avlColor,
     );
   }
 

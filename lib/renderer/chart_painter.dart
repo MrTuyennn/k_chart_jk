@@ -276,7 +276,12 @@ class ChartPainter extends BaseChartPainter {
     if (!hideGrid) {
       mMainRenderer.drawVerticalText(canvas, textStyle, mGridRows);
     }
-    mVolRenderer?.drawVerticalText(canvas, textStyle, mGridRows);
+    // Panel volume dùng textStyle riêng (chartColors.volumeStyle.textStyle) —
+    // không tái dùng textStyle của main chart ở trên.
+    final volTextStyle = mVolRenderer?.getTextStyle(chartColors.defaultTextColor);
+    if (volTextStyle != null) {
+      mVolRenderer?.drawVerticalText(canvas, volTextStyle, mGridRows);
+    }
     for (final element in mSecondaryRendererList) {
       element.drawVerticalText(canvas, textStyle, mGridRows);
     }

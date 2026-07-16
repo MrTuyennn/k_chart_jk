@@ -484,7 +484,10 @@ class DepthChartPainter extends CustomPainter {
   double getSellX(int position) => position * mSellPointWidth! + mDrawWidth;
 
   TextPainter getTextPainter(String text) => TextPainter(
-    text: TextSpan(text: text, style: TextStyle(color: chartColors.defaultTextColor, fontSize: 10)),
+    text: TextSpan(
+      text: text,
+      style: chartStyle.textStyle.copyWith(color: chartColors.defaultTextColor),
+    ),
     textDirection: TextDirection.ltr,
   );
 
@@ -552,7 +555,7 @@ class _PopupPainter {
     return TextPainter(
       text: TextSpan(
         text: '$label $content',
-        style: TextStyle(color: chartColors.annotationColor, fontSize: 9),
+        style: chartStyle.annotationTextStyle.copyWith(color: chartColors.annotationColor),
       ),
       textAlign: TextAlign.start,
       textDirection: TextDirection.ltr,

@@ -39,17 +39,17 @@ class TRIXIndicator extends SecondaryIndicator<MACDEntity, TRIXStyle> {
       children: [
         TextSpan(
           text: "TRIX(${calcParams[0]},${calcParams[1]}) ",
-          style: getTextStyle(chartColors.defaultTextColor),
+          style: getTextStyle(chartColors.defaultTextColor, chartColors.candleStyle.textStyle),
         ),
         if (entity.trix != null)
           TextSpan(
             text: "TRIX:${formatNumber(entity.trix!, precision)}  ",
-            style: getTextStyle(indicatorStyle.trixColor),
+            style: getTextStyle(indicatorStyle.trixColor, chartColors.candleStyle.textStyle),
           ),
         if (entity.trixMa != null)
           TextSpan(
             text: "MATRIX:${formatNumber(entity.trixMa!, precision)}",
-            style: getTextStyle(indicatorStyle.trixMaColor),
+            style: getTextStyle(indicatorStyle.trixMaColor, chartColors.candleStyle.textStyle),
           ),
       ],
     );

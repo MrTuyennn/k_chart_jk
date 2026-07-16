@@ -85,6 +85,37 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   static const Duration _doubleTapMaxGap = Duration(milliseconds: 300);
   static const double _doubleTapMaxDistance = 20.0;
 
+  // Cache indicator instance list — ChartState.mainIndicators/secondaryIndicators
+  // là getter tạo instance (+ Paint) mới mỗi lần gọi. BlocBuilder rebuild trên
+  // MỌI thay đổi state (kể cả livePrice, cập nhật mỗi tick WS không throttle),
+  // nên nếu gọi thẳng getter mỗi build sẽ tạo lại toàn bộ indicator dù
+  // mainTypes/secondaryTypes không đổi. Cache theo nội dung Set để tái dùng.
+  Set<MainIndicatorType>? _cachedMainTypes;
+  List<MainIndicator>? _cachedMainIndicators;
+  Set<SecondaryIndicatorType>? _cachedSecondaryTypes;
+  List<SecondaryIndicator>? _cachedSecondaryIndicators;
+
+  List<MainIndicator> _mainIndicatorsFor(ChartState state) {
+    if (_cachedMainIndicators == null ||
+        !_setEquals(_cachedMainTypes!, state.mainTypes)) {
+      _cachedMainTypes = state.mainTypes;
+      _cachedMainIndicators = state.mainIndicators;
+    }
+    return _cachedMainIndicators!;
+  }
+
+  List<SecondaryIndicator> _secondaryIndicatorsFor(ChartState state) {
+    if (_cachedSecondaryIndicators == null ||
+        !_setEquals(_cachedSecondaryTypes!, state.secondaryTypes)) {
+      _cachedSecondaryTypes = state.secondaryTypes;
+      _cachedSecondaryIndicators = state.secondaryIndicators;
+    }
+    return _cachedSecondaryIndicators!;
+  }
+
+  static bool _setEquals<T>(Set<T> a, Set<T> b) =>
+      a.length == b.length && a.containsAll(b);
+
   @override
   void dispose() {
     _controller.dispose();
@@ -664,17 +695,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   /// bg/text/grid vẫn lấy từ `state.colors` (theo dark/light mode thật),
   /// chỉ đổi màu vẽ (nến/volume/indicator).
   KChartColors _demoColors(ChartState state) {
-    final base = state.colors;
-    return KChartColors(
-      bgColor: base.bgColor,
-      defaultTextColor: base.defaultTextColor,
-      gridColor: base.gridColor,
-      selectFillColor: base.selectFillColor,
-      selectBorderColor: base.selectBorderColor,
-      crossColor: base.crossColor,
-      crossTextColor: base.crossTextColor,
-      maxColor: base.maxColor,
-      minColor: base.minColor,
+    return state.colors.copyWith(
       candleStyle: const CandleStyle(
         upColor: Color(0xFF00E5FF),
         dnColor: Color(0xFFFF3D00),
@@ -753,8 +774,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       isTrendLine: false,
       isLine: state.isLine,
       volHidden: state.volHidden,
-      mainIndicators: state.mainIndicators,
-      secondaryIndicators: state.secondaryIndicators,
+      mainIndicators: _mainIndicatorsFor(state),
+      secondaryIndicators: _secondaryIndicatorsFor(state),
       controller: _controller,
       chartScale: state.savedChartScale,
       onChartScaleChanged: (scale) =>

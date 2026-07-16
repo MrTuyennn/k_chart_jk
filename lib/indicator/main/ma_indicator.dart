@@ -37,9 +37,9 @@ class MAIndicator extends MainIndicator<CandleEntity, MAStyle> {
       if (entity.maValueList?[i] != 0) {
         var item = TextSpan(
           text: "MA${calcParams[i]}:${formatNumber(entity.maValueList![i], precision)}  ",
-          style: TextStyle(
-            fontSize: 10,
-            color: indicatorStyle.getMAColor(i),
+          style: getTextStyle(
+            indicatorStyle.getMAColor(i),
+            chartColors.candleStyle.textStyle,
           ),
         );
         result.add(item);

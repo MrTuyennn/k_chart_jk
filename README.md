@@ -111,29 +111,29 @@ KChartWidget(
 
 ### Main indicators (overlay on candles)
 
-| Class               | Description                | Default params  |
-| ------------------- | -------------------------- | --------------- |
-| `MAIndicator()`     | Moving Average             | 5, 10, 30, 60   |
-| `EMAIndicator()`    | Exponential Moving Average | 5, 10, 30, 60   |
-| `BOLLIndicator()`   | Bollinger Bands            | 20, 2           |
-| `SARIndicator()`    | Parabolic SAR              | 2, 2, 20        |
-| `ZigZagIndicator()` | ZigZag                     | 12, 2, 5        |
-| `SuperTrendIndicator()` | SuperTrend             | 10, 30          |
-| `AVLIndicator()`    | Average Value Line (Binance-style) | — (no period) |
+| Class                   | Description                        | Default params |
+| ----------------------- | ---------------------------------- | -------------- |
+| `MAIndicator()`         | Moving Average                     | 5, 10, 30, 60  |
+| `EMAIndicator()`        | Exponential Moving Average         | 5, 10, 30, 60  |
+| `BOLLIndicator()`       | Bollinger Bands                    | 20, 2          |
+| `SARIndicator()`        | Parabolic SAR                      | 2, 2, 20       |
+| `ZigZagIndicator()`     | ZigZag                             | 12, 2, 5       |
+| `SuperTrendIndicator()` | SuperTrend                         | 10, 30         |
+| `AVLIndicator()`        | Average Value Line (Binance-style) | — (no period)  |
 
 ### Secondary indicators (panel below chart)
 
-| Class             | Description             | Default params |
-| ----------------- | ----------------------- | -------------- |
-| `MACDIndicator()` | MACD                    | 12, 26, 9      |
-| `KDJIndicator()`  | KDJ                     | —              |
-| `RSIIndicator()`  | Relative Strength Index | 6, 12, 24      |
-| `WRIndicator()`   | Williams %R             | 26, 6          |
-| `CCIIndicator()`  | Commodity Channel Index | 20             |
-| `OBVIndicator()`  | On-Balance Volume       | 5              |
-| `TRIXIndicator()` | Triple Exponential Average | 12, 20      |
-| `MTMIndicator()`  | Momentum                | 12, 6          |
-| `StochRSIIndicator()` | Stochastic RSI      | 14, 14, 3, 3   |
+| Class                 | Description                | Default params |
+| --------------------- | -------------------------- | -------------- |
+| `MACDIndicator()`     | MACD                       | 12, 26, 9      |
+| `KDJIndicator()`      | KDJ                        | —              |
+| `RSIIndicator()`      | Relative Strength Index    | 6, 12, 24      |
+| `WRIndicator()`       | Williams %R                | 26, 6          |
+| `CCIIndicator()`      | Commodity Channel Index    | 20             |
+| `OBVIndicator()`      | On-Balance Volume          | 5              |
+| `TRIXIndicator()`     | Triple Exponential Average | 12, 20         |
+| `MTMIndicator()`      | Momentum                   | 12, 6          |
+| `StochRSIIndicator()` | Stochastic RSI             | 14, 14, 3, 3   |
 
 Volume hiển thị trong panel riêng giữa main chart và date axis. Toggle bằng `volHidden`.
 
@@ -156,68 +156,68 @@ DataUtil.calculateAll(data, mainIndicators, secondaryIndicators);
 
 ### Required / core
 
-| Parameter             | Type                       | Default                    | Description                    |
-| --------------------- | -------------------------- | -------------------------- | ------------------------------ |
-| `datas`               | `List<KLineEntity>?`       | —                          | Candle data list               |
-| `chartStyle`          | `KChartStyle`              | —                          | Style config (spacing, widths) |
-| `chartColors`         | `KChartColors`             | —                          | Color config                   |
-| `isTrendLine`         | `bool`                     | —                          | Enable trend line drawing      |
-| `detailBuilder`       | `WidgetDetailBuilder`      | —                          | Custom info card widget        |
+| Parameter       | Type                  | Default | Description                    |
+| --------------- | --------------------- | ------- | ------------------------------ |
+| `datas`         | `List<KLineEntity>?`  | —       | Candle data list               |
+| `chartStyle`    | `KChartStyle`         | —       | Style config (spacing, widths) |
+| `chartColors`   | `KChartColors`        | —       | Color config                   |
+| `isTrendLine`   | `bool`                | —       | Enable trend line drawing      |
+| `detailBuilder` | `WidgetDetailBuilder` | —       | Custom info card widget        |
 
 ### Display
 
-| Parameter             | Type                       | Default                    | Description                         |
-| --------------------- | -------------------------- | -------------------------- | ----------------------------------- |
-| `mainIndicators`      | `List<MainIndicator>`      | `[]`                       | Main overlay indicators             |
-| `secondaryIndicators` | `List<SecondaryIndicator>` | `[]`                       | Secondary panel indicators          |
-| `isLine`              | `bool`                     | `false`                    | Line chart mode                     |
-| `volHidden`           | `bool`                     | `false`                    | Hide volume panel                   |
-| `showNowPrice`        | `bool`                     | `true`                     | Show current price line             |
-| `showInfoDialog`      | `bool`                     | `true`                     | Show info on long-press/tap         |
-| `isTapShowInfoDialog` | `bool`                     | `false`                    | Single tap shows crosshair + dialog |
-| `materialInfoDialog`  | `bool`                     | `true`                     | Material vs Cupertino dialog style  |
-| `timeFormat`          | `List<String>`             | `TimeFormat.yearMonthDay`  | Time label format on X axis         |
-| `fixedLength`         | `int`                      | `2`                        | Decimal places for price labels     |
-| `verticalTextAlignment` | `VerticalTextAlignment`  | `right`                    | Price label side (`left`/`right`)   |
-| `hideGrid`            | `bool`                     | `false`                    | Hide grid lines                     |
+| Parameter               | Type                       | Default                   | Description                         |
+| ----------------------- | -------------------------- | ------------------------- | ----------------------------------- |
+| `mainIndicators`        | `List<MainIndicator>`      | `[]`                      | Main overlay indicators             |
+| `secondaryIndicators`   | `List<SecondaryIndicator>` | `[]`                      | Secondary panel indicators          |
+| `isLine`                | `bool`                     | `false`                   | Line chart mode                     |
+| `volHidden`             | `bool`                     | `false`                   | Hide volume panel                   |
+| `showNowPrice`          | `bool`                     | `true`                    | Show current price line             |
+| `showInfoDialog`        | `bool`                     | `true`                    | Show info on long-press/tap         |
+| `isTapShowInfoDialog`   | `bool`                     | `false`                   | Single tap shows crosshair + dialog |
+| `materialInfoDialog`    | `bool`                     | `true`                    | Material vs Cupertino dialog style  |
+| `timeFormat`            | `List<String>`             | `TimeFormat.yearMonthDay` | Time label format on X axis         |
+| `fixedLength`           | `int`                      | `2`                       | Decimal places for price labels     |
+| `verticalTextAlignment` | `VerticalTextAlignment`    | `right`                   | Price label side (`left`/`right`)   |
+| `hideGrid`              | `bool`                     | `false`                   | Hide grid lines                     |
 
 ### Layout & sizing
 
-| Parameter             | Type       | Default              | Description                        |
-| --------------------- | ---------- | -------------------- | ---------------------------------- |
-| `mBaseHeight`         | `double`   | `360`                | Main chart height (px)             |
-| `mSecondaryHeight`    | `double?`  | 20% of `mBaseHeight` | Secondary panel height (px)        |
-| `xFrontPadding`       | `double`   | `100`                | Right padding after last candle (px at ≥375px chart; scales down on narrower screens) |
+| Parameter          | Type      | Default              | Description                                                                           |
+| ------------------ | --------- | -------------------- | ------------------------------------------------------------------------------------- |
+| `mBaseHeight`      | `double`  | `360`                | Main chart height (px)                                                                |
+| `mSecondaryHeight` | `double?` | 20% of `mBaseHeight` | Secondary panel height (px)                                                           |
+| `xFrontPadding`    | `double`  | `100`                | Right padding after last candle (px at ≥375px chart; scales down on narrower screens) |
 
 ### Zoom / scroll
 
-| Parameter     | Type     | Default             | Description                          |
-| ------------- | -------- | ------------------- | ------------------------------------ |
-| `minScale`    | `double` | `0.5`               | Minimum zoom scale X                 |
-| `maxScale`    | `double` | `2.2`               | Maximum zoom scale X                 |
-| `flingTime`   | `int`    | `600`               | Fling animation duration (ms)        |
-| `flingRatio`  | `double` | `0.5`               | Fling velocity multiplier            |
-| `flingCurve`  | `Curve`  | `Curves.decelerate` | Fling animation curve                |
-| `chartScale`  | `KChartScaleState?` | `null`   | Saved scale to restore on mount      |
+| Parameter    | Type                | Default             | Description                     |
+| ------------ | ------------------- | ------------------- | ------------------------------- |
+| `minScale`   | `double`            | `0.5`               | Minimum zoom scale X            |
+| `maxScale`   | `double`            | `2.2`               | Maximum zoom scale X            |
+| `flingTime`  | `int`               | `600`               | Fling animation duration (ms)   |
+| `flingRatio` | `double`            | `0.5`               | Fling velocity multiplier       |
+| `flingCurve` | `Curve`             | `Curves.decelerate` | Fling animation curve           |
+| `chartScale` | `KChartScaleState?` | `null`              | Saved scale to restore on mount |
 
 ### Data loading & callbacks
 
-| Parameter              | Type                        | Description                                      |
-| ---------------------- | --------------------------- | ------------------------------------------------ |
-| `onLoadMore`           | `void Function(bool)?`      | Called when scrolled to edge; `true` = load left |
-| `isLoadingMore`        | `bool`                      | Lock flag to prevent duplicate load requests     |
-| `isOnDrag`             | `void Function(bool)?`      | Called on drag start/stop                        |
-| `controller`           | `KChartController?`         | Programmatic zoom/reset control                  |
-| `onChartScaleChanged`  | `OnChartScaleChanged?`      | Emitted after pinch / scaleY / zoom / reset ends |
-| `onVerticalOverscroll` | `ValueChanged<double>?`     | Fired when pan Y hits clamp (for outer scroll handoff) |
+| Parameter              | Type                    | Description                                            |
+| ---------------------- | ----------------------- | ------------------------------------------------------ |
+| `onLoadMore`           | `void Function(bool)?`  | Called when scrolled to edge; `true` = load left       |
+| `isLoadingMore`        | `bool`                  | Lock flag to prevent duplicate load requests           |
+| `isOnDrag`             | `void Function(bool)?`  | Called on drag start/stop                              |
+| `controller`           | `KChartController?`     | Programmatic zoom/reset control                        |
+| `onChartScaleChanged`  | `OnChartScaleChanged?`  | Emitted after pinch / scaleY / zoom / reset ends       |
+| `onVerticalOverscroll` | `ValueChanged<double>?` | Fired when pan Y hits clamp (for outer scroll handoff) |
 
 ### Real-time & decorative
 
-| Parameter               | Type      | Default | Description                                    |
-| ----------------------- | --------- | ------- | ---------------------------------------------- |
-| `livePrice`             | `double?` | `null`  | Real-time price for now-price line             |
-| `backgroundLogo`        | `Widget?` | `null`  | Watermark widget centered in main chart area   |
-| `backgroundLogoOpacity` | `double`  | `1.0`   | Watermark opacity (0.0–1.0)                    |
+| Parameter               | Type      | Default | Description                                  |
+| ----------------------- | --------- | ------- | -------------------------------------------- |
+| `livePrice`             | `double?` | `null`  | Real-time price for now-price line           |
+| `backgroundLogo`        | `Widget?` | `null`  | Watermark widget centered in main chart area |
+| `backgroundLogoOpacity` | `double`  | `1.0`   | Watermark opacity (0.0–1.0)                  |
 
 ---
 
@@ -324,18 +324,18 @@ KChartWidget(
 
 ## Gesture interaction
 
-| Gesture | Hành động |
-|---|---|
-| 1 ngón kéo ngang | Scroll qua các nến (X) |
-| 1 ngón kéo dọc | Pan vùng giá lên/xuống (Y) |
-| 1 ngón kéo tự do | Scroll X + pan Y đồng thời |
-| Pinch 2 ngón | Zoom scaleX (thu phóng số nến hiển thị) |
-| Kéo dọc vùng phải chart | Zoom scaleY (thu phóng vùng giá; width ∝ `xFrontPadding`) |
-| Double tap vùng phải | Reset scaleY và offsetY về mặc định |
-| Tap vào nến | Hiện crosshair + info dialog |
-| Tap lại | Ẩn crosshair |
-| Kéo khi crosshair đang hiện | Di chuyển crosshair theo ngón tay |
-| Long press + kéo | Di chuyển crosshair |
+| Gesture                     | Hành động                                                 |
+| --------------------------- | --------------------------------------------------------- |
+| 1 ngón kéo ngang            | Scroll qua các nến (X)                                    |
+| 1 ngón kéo dọc              | Pan vùng giá lên/xuống (Y)                                |
+| 1 ngón kéo tự do            | Scroll X + pan Y đồng thời                                |
+| Pinch 2 ngón                | Zoom scaleX (thu phóng số nến hiển thị)                   |
+| Kéo dọc vùng phải chart     | Zoom scaleY (thu phóng vùng giá; width ∝ `xFrontPadding`) |
+| Double tap vùng phải        | Reset scaleY và offsetY về mặc định                       |
+| Tap vào nến                 | Hiện crosshair + info dialog                              |
+| Tap lại                     | Ẩn crosshair                                              |
+| Kéo khi crosshair đang hiện | Di chuyển crosshair theo ngón tay                         |
+| Long press + kéo            | Di chuyển crosshair                                       |
 
 ---
 

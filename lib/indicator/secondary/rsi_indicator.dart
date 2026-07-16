@@ -31,7 +31,7 @@ class RSIIndicator extends SecondaryIndicator<MACDEntity, RSIStyle> {
     if (entity.rsi == null) return null;
     return TextSpan(
       text: "RSI(14):${formatNumber(entity.rsi!, precision)}",
-      style: getTextStyle(indicatorStyle.rsiColor),
+      style: getTextStyle(indicatorStyle.rsiColor, chartColors.candleStyle.textStyle),
     );
   }
 

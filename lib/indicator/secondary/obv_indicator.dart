@@ -70,17 +70,17 @@ class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> {
       children: [
         TextSpan(
           text: 'OBV(${calcParams[0]}) ',
-          style: getTextStyle(chartColors.defaultTextColor),
+          style: getTextStyle(chartColors.defaultTextColor, chartColors.candleStyle.textStyle),
         ),
         if (entity.obv != null)
           TextSpan(
             text: 'OBV:${NumberUtil.formatCompact(entity.obv!)}  ',
-            style: getTextStyle(indicatorStyle.obvColor),
+            style: getTextStyle(indicatorStyle.obvColor, chartColors.candleStyle.textStyle),
           ),
         if (entity.obvSignal != null)
           TextSpan(
             text: 'MA${calcParams[0]}:${NumberUtil.formatCompact(entity.obvSignal!)}',
-            style: getTextStyle(indicatorStyle.signalColor),
+            style: getTextStyle(indicatorStyle.signalColor, chartColors.candleStyle.textStyle),
           ),
       ],
     );
