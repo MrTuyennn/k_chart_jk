@@ -73,12 +73,18 @@ abstract class IndicatorTemplate<T, K> {
   /// `indicatorStyle.textStyle` (mỗi indicator tự có `textStyle` riêng trong
   /// `XxxStyle`, đặt trong `IndicatorStyle` base class) để label theo đúng
   /// font đã cấu hình cho indicator đó.
-
+  ///
+  /// [forceColor] = true: LUÔN dùng [color] truyền vào, bỏ qua `base.color`
+  /// dù đã set — dùng cho label mà màu mang ý nghĩa riêng (khớp màu đường
+  /// tương ứng, vd K/D/J của KDJ, MACD/DIF/DEA) — không được đồng loạt bị
+  /// `textStyle.color` ghi đè như prefix tên indicator (`"KDJ(9,1,3) "`...).
   TextStyle getTextStyle(
     Color? color, [
     TextStyle base = const TextStyle(fontSize: 10),
+    bool forceColor = false,
   ]) {
-    return base.color != null ? base : base.copyWith(color: color);
+    if (!forceColor && base.color != null) return base;
+    return base.copyWith(color: color);
   }
 
   String formatNumber(double value, int precision) {

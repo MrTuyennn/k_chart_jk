@@ -721,9 +721,21 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         dnColor: Color(0xFFFF1744),
         ma5Color: Color(0xFFFFEA00),
         ma10Color: Color(0xFFFF6D00),
-        textStyle: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+        // forceColor bảo vệ ma5Color/ma10Color — chỉ "VOL:" prefix đổi màu.
+        textStyle: TextStyle(
+          fontSize: 11,
+          fontStyle: FontStyle.italic,
+          color: Colors.red,
+        ),
       ),
-      avlStyle: const AVLStyle(avlColor: Color(0xFFEA80FC)), // hồng tím
+      // Mọi indicator dưới đây: textStyle.color = trắng đồng nhất — chỉ áp
+      // cho prefix/label chung (vd "KDJ(9,1,3) "); các màu riêng từng giá trị
+      // (kColor/dColor/macdColor/...) LUÔN giữ nguyên nhờ forceColor, không
+      // bị textStyle.color đè — xem indicator_template.dart getTextStyle().
+      avlStyle: const AVLStyle(
+        avlColor: Color(0xFFEA80FC), // hồng tím
+        textStyle: TextStyle(color: Colors.white),
+      ),
       maStyle: const MAStyle(
         maColors: [
           Color(0xFFFFAB00),
@@ -731,50 +743,74 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
           Color(0xFFD500F9),
           Color(0xFF64DD17),
         ],
+        textStyle: TextStyle(color: Colors.white),
       ),
       emaStyle: const MAStyle(
         maColors: [Color(0xFF00E5FF), Color(0xFFFF4081), Color(0xFFFFEB3B)],
+        textStyle: TextStyle(color: Colors.red),
       ),
       bollStyle: const BOLLStyle(
         bollColor: Color(0xFF6200EA),
         ubColor: Color(0xFF00BFA5),
         lbColor: Color(0xFFFF6D00),
+        textStyle: TextStyle(color: Colors.white),
       ),
-      sarStyle: const SARStyle(sarColor: Color(0xFF00BFA5)),
-      zigzagStyle: const ZigZagStyle(zigzagColor: Color(0xFFFF6E40)),
+      sarStyle: const SARStyle(
+        sarColor: Color(0xFF00BFA5),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      zigzagStyle: const ZigZagStyle(
+        zigzagColor: Color(0xFFFF6E40),
+        textStyle: TextStyle(color: Colors.white),
+      ),
       superTrendStyle: const SuperTrendStyle(
         upColor: Color(0xFF00E676),
         dnColor: Color(0xFFFF1744),
+        textStyle: TextStyle(color: Colors.white),
       ),
-      rsiStyle: const RSIStyle(rsiColor: Color(0xFFFF4081)),
+      rsiStyle: const RSIStyle(
+        rsiColor: Color(0xFFFF4081),
+        textStyle: TextStyle(color: Colors.green),
+      ),
       macdStyle: const MACDStyle(
         macdColor: Color(0xFF00E676),
         difColor: Color(0xFFFFD600),
         deaColor: Color(0xFF2979FF),
+        textStyle: TextStyle(color: Colors.white),
       ),
       kdjStyle: const KDJStyle(
         kColor: Color(0xFFFFD600),
         dColor: Color(0xFF00E5FF),
         jColor: Color(0xFFD500F9),
+        textStyle: TextStyle(color: Colors.white),
       ),
-      wrStyle: const WRStyle(wrColor: Color(0xFF64DD17)),
-      cciStyle: const CCIStyle(cciColor: Color(0xFFFF6D00)),
+      wrStyle: const WRStyle(
+        wrColor: Color(0xFF64DD17),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      cciStyle: const CCIStyle(
+        cciColor: Color(0xFFFF6D00),
+        textStyle: TextStyle(color: Colors.white),
+      ),
       obvStyle: const OBVStyle(
         obvColor: Color(0xFF2979FF),
         signalColor: Color(0xFFFF4081),
+        textStyle: TextStyle(color: Colors.white),
       ),
       trixStyle: const TRIXStyle(
         trixColor: Color(0xFF00E5FF),
         trixMaColor: Color(0xFFFFAB00),
+        textStyle: TextStyle(color: Colors.white),
       ),
       mtmStyle: const MTMStyle(
         mtmColor: Color(0xFFD500F9),
         mtmMaColor: Color(0xFF76FF03),
+        textStyle: TextStyle(color: Colors.white),
       ),
       stochRsiStyle: const StochRSIStyle(
         kColor: Color(0xFFFF3D00),
         dColor: Color(0xFF00BFA5),
-        textStyle: TextStyle(color: Colors.red),
+        textStyle: TextStyle(color: Colors.green),
       ),
     );
   }

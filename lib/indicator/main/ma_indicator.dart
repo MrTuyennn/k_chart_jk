@@ -40,6 +40,7 @@ class MAIndicator extends MainIndicator<CandleEntity, MAStyle> {
           style: getTextStyle(
             indicatorStyle.getMAColor(i),
             indicatorStyle.textStyle,
+            true, // forceColor — mỗi đường MA phải giữ đúng màu riêng
           ),
         );
         result.add(item);

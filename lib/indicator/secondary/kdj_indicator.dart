@@ -43,17 +43,17 @@ class KDJIndicator extends SecondaryIndicator<MACDEntity, KDJStyle> {
         if (entity.k != null && entity.k != 0)
           TextSpan(
             text: "K:${formatNumber(entity.k!, precision)}  ",
-            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle, true),
           ),
         if (entity.d != null && entity.d != 0)
           TextSpan(
             text: "D:${formatNumber(entity.d!, precision)}  ",
-            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle, true),
           ),
         if (entity.j != null && entity.j != 0)
           TextSpan(
             text: "J:${formatNumber(entity.j!, precision)}",
-            style: getTextStyle(indicatorStyle.jColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.jColor, indicatorStyle.textStyle, true),
           ),
       ],
     );

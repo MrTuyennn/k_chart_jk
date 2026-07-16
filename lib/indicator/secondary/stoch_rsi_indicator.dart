@@ -51,12 +51,12 @@ class StochRSIIndicator extends SecondaryIndicator<MACDEntity, StochRSIStyle> {
         if (entity.stochRsiK != null)
           TextSpan(
             text: "K:${formatNumber(entity.stochRsiK!, precision)}  ",
-            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle, true),
           ),
         if (entity.stochRsiD != null)
           TextSpan(
             text: "D:${formatNumber(entity.stochRsiD!, precision)}",
-            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle, true),
           ),
       ],
     );

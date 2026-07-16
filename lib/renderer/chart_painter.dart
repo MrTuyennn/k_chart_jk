@@ -285,8 +285,13 @@ class ChartPainter extends BaseChartPainter {
     if (volTextStyle != null) {
       mVolRenderer?.drawVerticalText(canvas, volTextStyle, mGridRows);
     }
+
     for (final element in mSecondaryRendererList) {
-      element.drawVerticalText(canvas, textStyle, mGridRows);
+      element.drawVerticalText(
+        canvas,
+        element.getTextStyle(chartColors.defaultTextColor),
+        mGridRows,
+      );
     }
   }
 

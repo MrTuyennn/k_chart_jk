@@ -57,17 +57,17 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
         if (value.mid != null && value.mid != 0)
           TextSpan(
             text: "BOLL:${formatNumber(value.mid!, precision)}  ",
-            style: getTextStyle(indicatorStyle.bollColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.bollColor, indicatorStyle.textStyle, true),
           ),
         if (value.up != null && value.up != 0)
           TextSpan(
             text: "UB:${formatNumber(value.up!, precision)}  ",
-            style: getTextStyle(indicatorStyle.ubColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.ubColor, indicatorStyle.textStyle, true),
           ),
         if (value.dn != null && value.dn != 0)
           TextSpan(
             text: "LB:${formatNumber(value.dn!, precision)}",
-            style: getTextStyle(indicatorStyle.lbColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.lbColor, indicatorStyle.textStyle, true),
           ),
       ],
     );

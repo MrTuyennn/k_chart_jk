@@ -75,12 +75,12 @@ class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> {
         if (entity.obv != null)
           TextSpan(
             text: 'OBV:${NumberUtil.formatCompact(entity.obv!)}  ',
-            style: getTextStyle(indicatorStyle.obvColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.obvColor, indicatorStyle.textStyle, true),
           ),
         if (entity.obvSignal != null)
           TextSpan(
             text: 'MA${calcParams[0]}:${NumberUtil.formatCompact(entity.obvSignal!)}',
-            style: getTextStyle(indicatorStyle.signalColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.signalColor, indicatorStyle.textStyle, true),
           ),
       ],
     );

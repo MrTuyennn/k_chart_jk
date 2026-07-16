@@ -44,12 +44,12 @@ class TRIXIndicator extends SecondaryIndicator<MACDEntity, TRIXStyle> {
         if (entity.trix != null)
           TextSpan(
             text: "TRIX:${formatNumber(entity.trix!, precision)}  ",
-            style: getTextStyle(indicatorStyle.trixColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.trixColor, indicatorStyle.textStyle, true),
           ),
         if (entity.trixMa != null)
           TextSpan(
             text: "MATRIX:${formatNumber(entity.trixMa!, precision)}",
-            style: getTextStyle(indicatorStyle.trixMaColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.trixMaColor, indicatorStyle.textStyle, true),
           ),
       ],
     );

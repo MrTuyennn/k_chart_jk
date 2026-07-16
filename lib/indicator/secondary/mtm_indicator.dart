@@ -43,12 +43,12 @@ class MTMIndicator extends SecondaryIndicator<MACDEntity, MTMStyle> {
         if (entity.mtm != null)
           TextSpan(
             text: "MTM:${formatNumber(entity.mtm!, precision)}  ",
-            style: getTextStyle(indicatorStyle.mtmColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.mtmColor, indicatorStyle.textStyle, true),
           ),
         if (entity.mtmMa != null)
           TextSpan(
             text: "MTMMA:${formatNumber(entity.mtmMa!, precision)}",
-            style: getTextStyle(indicatorStyle.mtmMaColor, indicatorStyle.textStyle),
+            style: getTextStyle(indicatorStyle.mtmMaColor, indicatorStyle.textStyle, true),
           ),
       ],
     );
