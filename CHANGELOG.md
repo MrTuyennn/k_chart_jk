@@ -22,7 +22,7 @@
 
 ## 0.0.1
 
-* Initial release of k_chart_wikex — a Flutter candlestick chart package.
+* Initial release of k_chart_jk — a Flutter candlestick chart package.
 * Candlestick and line chart rendering with smooth gesture support (pan, zoom, fling).
 * Main indicators: MA, EMA, BOLL, SAR, ZigZag.
 * Secondary indicators: MACD, KDJ, RSI, WR, CCI.

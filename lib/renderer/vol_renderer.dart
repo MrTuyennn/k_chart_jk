@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/entity/index.dart';
-import 'package:k_chart_wikex/utils/index.dart';
-import 'package:k_chart_wikex/renderer/index.dart';
+import 'package:k_chart_jk/entity/index.dart';
+import 'package:k_chart_jk/utils/index.dart';
+import 'package:k_chart_jk/renderer/index.dart';
 
 /// VolRenderer
 ///
@@ -11,7 +11,10 @@ import 'package:k_chart_wikex/renderer/index.dart';
 /// cờ `volHidden` ở `KChartWidget`.
 ///
 /// Render:
-///   - Cột vol xanh/đỏ theo `close > open`, opacity tuỳ `chartStyle.volBarOpacity`.
+///   - Cột vol xanh/đỏ theo `close > open`, alpha = alpha sẵn có của
+///     `volumeStyle.upColor`/`dnColor` NHÂN với `chartStyle.volBarOpacity`
+///     (không ghi đè) — set opacity thẳng trong `Color` hoặc qua
+///     `volBarOpacity` đều dùng được, kết hợp được cả hai.
 ///   - 2 đường MA5/MA10 (lấy từ `MA5Volume`/`MA10Volume` đã tính trong
 ///     `DataUtil.calcVolumeMA`).
 ///   - Label `VOL : … MA5 : … MA10 : …` ở đầu panel.
@@ -30,13 +33,13 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
     this.chartStyle,
     this.chartColors,
   ) : super(
-          chartRect: volRect,
-          maxValue: maxValue,
-          minValue: minValue,
-          topPadding: topPadding,
-          fixedLength: fixedLength,
-          gridColor: chartColors.gridColor,
-        ) {
+        chartRect: volRect,
+        maxValue: maxValue,
+        minValue: minValue,
+        topPadding: topPadding,
+        fixedLength: fixedLength,
+        gridColor: chartColors.gridColor,
+      ) {
     _volWidth = chartStyle.volWidth;
   }
 
@@ -54,12 +57,12 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
       final top = getY(curPoint.vol);
       final bottom = chartRect.bottom;
       final base = curPoint.close > curPoint.open
-          ? chartColors.volUpColor
-          : chartColors.volDnColor;
+          ? chartColors.volumeStyle.upColor
+          : chartColors.volumeStyle.dnColor;
       canvas.drawRect(
         Rect.fromLTRB(curX - r, top, curX + r, bottom),
         chartPaint
-          ..color = base.withValues(alpha: chartStyle.volBarOpacity),
+          ..color = base.withValues(alpha: base.a * chartStyle.volBarOpacity),
       );
     }
     if (lastPoint.MA5Volume != null &&
@@ -71,7 +74,7 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         canvas,
         lastX,
         curX,
-        chartColors.ma5Color,
+        chartColors.volumeStyle.ma5Color,
       );
     }
     if (lastPoint.MA10Volume != null &&
@@ -83,7 +86,7 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         canvas,
         lastX,
         curX,
-        chartColors.ma10Color,
+        chartColors.volumeStyle.ma10Color,
       );
     }
   }
@@ -92,6 +95,13 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
   @override
   double getY(double y) =>
       (maxValue - y) * (chartRect.height / maxValue) + chartRect.top;
+
+  @override
+  TextStyle getTextStyle(Color color, {bool forceColor = false}) {
+    final textStyle = chartColors.volumeStyle.textStyle;
+    if (!forceColor && textStyle.color != null) return textStyle;
+    return textStyle.copyWith(color: color);
+  }
 
   @override
   void drawText(Canvas canvas, VolumeEntity data, double x) {
@@ -104,12 +114,18 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
         if (NumberUtil.checkNotNullOrZero(data.MA5Volume))
           TextSpan(
             text: 'MA5:${NumberUtil.formatCompact(data.MA5Volume!)}  ',
-            style: getTextStyle(chartColors.ma5Color),
+            style: getTextStyle(
+              chartColors.volumeStyle.ma5Color,
+              forceColor: true,
+            ),
           ),
         if (NumberUtil.checkNotNullOrZero(data.MA10Volume))
           TextSpan(
             text: 'MA10:${NumberUtil.formatCompact(data.MA10Volume!)}',
-            style: getTextStyle(chartColors.ma10Color),
+            style: getTextStyle(
+              chartColors.volumeStyle.ma10Color,
+              forceColor: true,
+            ),
           ),
       ],
     );

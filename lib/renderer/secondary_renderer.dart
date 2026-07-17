@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/indicator/indicator_template.dart';
+import 'package:k_chart_jk/indicator/indicator_template.dart';
 import '../entity/macd_entity.dart';
 import 'base_chart_renderer.dart';
 
@@ -72,6 +72,17 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
       }
       canvas.drawPath(path, _referencePaint);
     }
+  }
+
+  /// Panel secondary dùng textStyle riêng của chính indicator đó
+  /// (`indicator.indicatorStyle.textStyle`) — KHÔNG dùng chung `candleStyle.textStyle`
+  /// của main chart, để mỗi panel (StochRSI/KDJ/MACD/...) tự chỉnh font/màu độc lập.
+  @override
+  TextStyle getTextStyle(Color color) {
+    final TextStyle textStyle = indicator.indicatorStyle.textStyle;
+    return textStyle.color != null
+        ? textStyle
+        : textStyle.copyWith(color: color);
   }
 
   @override

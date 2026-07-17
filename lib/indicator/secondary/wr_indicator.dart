@@ -25,7 +25,7 @@ class WRIndicator extends SecondaryIndicator<MACDEntity, WRStyle> {
     if (entity.r == null) return null;
     return TextSpan(
       text: "WR(14):${formatNumber(entity.r!, precision)}",
-      style: getTextStyle(indicatorStyle.wrColor),
+      style: getTextStyle(indicatorStyle.wrColor, indicatorStyle.textStyle),
     );
   }
 

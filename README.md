@@ -1,4 +1,4 @@
-# k_chart_wikex
+# k_chart_jk
 
 A Flutter candlestick chart package with support for multiple technical indicators, smooth gesture interactions, and customizable themes.
 
@@ -12,14 +12,15 @@ A Flutter candlestick chart package with support for multiple technical indicato
 - **Tap-to-toggle crosshair:** tap hiện crosshair, tap lại ẩn; kéo khi crosshair đang hiện sẽ di chuyển crosshair thay vì scroll
 - **Price labels đồng bộ scaleY + offsetY:** labels trục Y luôn hiển thị đúng giá theo vị trí visual của nến
 - Fling (quán tính) khi scroll, không fling khi đang kéo crosshair
-- **Main indicators:** MA, EMA, BOLL, SAR, ZigZag
-- **Secondary indicators:** MACD, KDJ, RSI, WR, CCI, OBV
+- **Main indicators:** MA, EMA, BOLL, SAR, ZigZag, SuperTrend, AVL
+- **Secondary indicators:** MACD, KDJ, RSI, WR, CCI, OBV, TRIX, MTM, StochRSI
 - Volume bar chart with MA5 / MA10 overlay
 - Long-press info dialog with custom `detailBuilder`
 - Programmatic control via `KChartController` (zoom in/out, reset)
 - Save & restore zoom state across timeframe changes via `KChartScaleState`
 - Real-time price ticker via `livePrice` (no full repaint needed)
 - Dark / light theme support via `KChartColors`
+- **Per-area & per-indicator styling:** `CandleStyle`/`VolumeStyle` (color + text riêng cho main chart/volume panel) và 16 style field riêng từng indicator (`avlStyle`, `maStyle`, `rsiStyle`, `macdStyle`...) — set màu toàn bộ chart từ 1 `KChartColors` duy nhất, không cần tự tạo từng instance indicator
 - Background watermark support via `backgroundLogo`
 - Depth chart widget for order book visualization
 
@@ -31,9 +32,9 @@ In your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  k_chart_wikex:
+  k_chart_jk:
     git:
-      url: https://github.com/MrTuyennn/k_chart_wikex.git
+      url: https://github.com/MrTuyennn/k_chart_jk.git
 ```
 
 Then run:
@@ -49,7 +50,7 @@ flutter pub get
 ### 1. Import
 
 ```dart
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 ```
 
 ### 2. Prepare data
@@ -110,24 +111,29 @@ KChartWidget(
 
 ### Main indicators (overlay on candles)
 
-| Class               | Description                | Default params  |
-| ------------------- | -------------------------- | --------------- |
-| `MAIndicator()`     | Moving Average             | 5, 10, 30, 60   |
-| `EMAIndicator()`    | Exponential Moving Average | 5, 10, 30, 60   |
-| `BOLLIndicator()`   | Bollinger Bands            | 20, 2           |
-| `SARIndicator()`    | Parabolic SAR              | 2, 2, 20        |
-| `ZigZagIndicator()` | ZigZag                     | 12, 2, 5        |
+| Class                   | Description                        | Default params |
+| ----------------------- | ---------------------------------- | -------------- |
+| `MAIndicator()`         | Moving Average                     | 5, 10, 30, 60  |
+| `EMAIndicator()`        | Exponential Moving Average         | 5, 10, 30, 60  |
+| `BOLLIndicator()`       | Bollinger Bands                    | 20, 2          |
+| `SARIndicator()`        | Parabolic SAR                      | 2, 2, 20       |
+| `ZigZagIndicator()`     | ZigZag                             | 12, 2, 5       |
+| `SuperTrendIndicator()` | SuperTrend                         | 10, 30         |
+| `AVLIndicator()`        | Average Value Line (Binance-style) | — (no period)  |
 
 ### Secondary indicators (panel below chart)
 
-| Class             | Description             | Default params |
-| ----------------- | ----------------------- | -------------- |
-| `MACDIndicator()` | MACD                    | 12, 26, 9      |
-| `KDJIndicator()`  | KDJ                     | —              |
-| `RSIIndicator()`  | Relative Strength Index | 6, 12, 24      |
-| `WRIndicator()`   | Williams %R             | 26, 6          |
-| `CCIIndicator()`  | Commodity Channel Index | 20             |
-| `OBVIndicator()`  | On-Balance Volume       | 5              |
+| Class                 | Description                | Default params |
+| --------------------- | -------------------------- | -------------- |
+| `MACDIndicator()`     | MACD                       | 12, 26, 9      |
+| `KDJIndicator()`      | KDJ                        | —              |
+| `RSIIndicator()`      | Relative Strength Index    | 6, 12, 24      |
+| `WRIndicator()`       | Williams %R                | 26, 6          |
+| `CCIIndicator()`      | Commodity Channel Index    | 20             |
+| `OBVIndicator()`      | On-Balance Volume          | 5              |
+| `TRIXIndicator()`     | Triple Exponential Average | 12, 20         |
+| `MTMIndicator()`      | Momentum                   | 12, 6          |
+| `StochRSIIndicator()` | Stochastic RSI             | 14, 14, 3, 3   |
 
 Volume hiển thị trong panel riêng giữa main chart và date axis. Toggle bằng `volHidden`.
 
@@ -150,68 +156,68 @@ DataUtil.calculateAll(data, mainIndicators, secondaryIndicators);
 
 ### Required / core
 
-| Parameter             | Type                       | Default                    | Description                    |
-| --------------------- | -------------------------- | -------------------------- | ------------------------------ |
-| `datas`               | `List<KLineEntity>?`       | —                          | Candle data list               |
-| `chartStyle`          | `KChartStyle`              | —                          | Style config (spacing, widths) |
-| `chartColors`         | `KChartColors`             | —                          | Color config                   |
-| `isTrendLine`         | `bool`                     | —                          | Enable trend line drawing      |
-| `detailBuilder`       | `WidgetDetailBuilder`      | —                          | Custom info card widget        |
+| Parameter       | Type                  | Default | Description                    |
+| --------------- | --------------------- | ------- | ------------------------------ |
+| `datas`         | `List<KLineEntity>?`  | —       | Candle data list               |
+| `chartStyle`    | `KChartStyle`         | —       | Style config (spacing, widths) |
+| `chartColors`   | `KChartColors`        | —       | Color config                   |
+| `isTrendLine`   | `bool`                | —       | Enable trend line drawing      |
+| `detailBuilder` | `WidgetDetailBuilder` | —       | Custom info card widget        |
 
 ### Display
 
-| Parameter             | Type                       | Default                    | Description                         |
-| --------------------- | -------------------------- | -------------------------- | ----------------------------------- |
-| `mainIndicators`      | `List<MainIndicator>`      | `[]`                       | Main overlay indicators             |
-| `secondaryIndicators` | `List<SecondaryIndicator>` | `[]`                       | Secondary panel indicators          |
-| `isLine`              | `bool`                     | `false`                    | Line chart mode                     |
-| `volHidden`           | `bool`                     | `false`                    | Hide volume panel                   |
-| `showNowPrice`        | `bool`                     | `true`                     | Show current price line             |
-| `showInfoDialog`      | `bool`                     | `true`                     | Show info on long-press/tap         |
-| `isTapShowInfoDialog` | `bool`                     | `false`                    | Single tap shows crosshair + dialog |
-| `materialInfoDialog`  | `bool`                     | `true`                     | Material vs Cupertino dialog style  |
-| `timeFormat`          | `List<String>`             | `TimeFormat.yearMonthDay`  | Time label format on X axis         |
-| `fixedLength`         | `int`                      | `2`                        | Decimal places for price labels     |
-| `verticalTextAlignment` | `VerticalTextAlignment`  | `right`                    | Price label side (`left`/`right`)   |
-| `hideGrid`            | `bool`                     | `false`                    | Hide grid lines                     |
+| Parameter               | Type                       | Default                   | Description                         |
+| ----------------------- | -------------------------- | ------------------------- | ----------------------------------- |
+| `mainIndicators`        | `List<MainIndicator>`      | `[]`                      | Main overlay indicators             |
+| `secondaryIndicators`   | `List<SecondaryIndicator>` | `[]`                      | Secondary panel indicators          |
+| `isLine`                | `bool`                     | `false`                   | Line chart mode                     |
+| `volHidden`             | `bool`                     | `false`                   | Hide volume panel                   |
+| `showNowPrice`          | `bool`                     | `true`                    | Show current price line             |
+| `showInfoDialog`        | `bool`                     | `true`                    | Show info on long-press/tap         |
+| `isTapShowInfoDialog`   | `bool`                     | `false`                   | Single tap shows crosshair + dialog |
+| `materialInfoDialog`    | `bool`                     | `true`                    | Material vs Cupertino dialog style  |
+| `timeFormat`            | `List<String>`             | `TimeFormat.yearMonthDay` | Time label format on X axis         |
+| `fixedLength`           | `int`                      | `2`                       | Decimal places for price labels     |
+| `verticalTextAlignment` | `VerticalTextAlignment`    | `right`                   | Price label side (`left`/`right`)   |
+| `hideGrid`              | `bool`                     | `false`                   | Hide grid lines                     |
 
 ### Layout & sizing
 
-| Parameter             | Type       | Default              | Description                        |
-| --------------------- | ---------- | -------------------- | ---------------------------------- |
-| `mBaseHeight`         | `double`   | `360`                | Main chart height (px)             |
-| `mSecondaryHeight`    | `double?`  | 20% of `mBaseHeight` | Secondary panel height (px)        |
-| `xFrontPadding`       | `double`   | `100`                | Right padding after last candle (px at ≥375px chart; scales down on narrower screens) |
+| Parameter          | Type      | Default              | Description                                                                           |
+| ------------------ | --------- | -------------------- | ------------------------------------------------------------------------------------- |
+| `mBaseHeight`      | `double`  | `360`                | Main chart height (px)                                                                |
+| `mSecondaryHeight` | `double?` | 20% of `mBaseHeight` | Secondary panel height (px)                                                           |
+| `xFrontPadding`    | `double`  | `100`                | Right padding after last candle (px at ≥375px chart; scales down on narrower screens) |
 
 ### Zoom / scroll
 
-| Parameter     | Type     | Default             | Description                          |
-| ------------- | -------- | ------------------- | ------------------------------------ |
-| `minScale`    | `double` | `0.5`               | Minimum zoom scale X                 |
-| `maxScale`    | `double` | `2.2`               | Maximum zoom scale X                 |
-| `flingTime`   | `int`    | `600`               | Fling animation duration (ms)        |
-| `flingRatio`  | `double` | `0.5`               | Fling velocity multiplier            |
-| `flingCurve`  | `Curve`  | `Curves.decelerate` | Fling animation curve                |
-| `chartScale`  | `KChartScaleState?` | `null`   | Saved scale to restore on mount      |
+| Parameter    | Type                | Default             | Description                     |
+| ------------ | ------------------- | ------------------- | ------------------------------- |
+| `minScale`   | `double`            | `0.5`               | Minimum zoom scale X            |
+| `maxScale`   | `double`            | `2.2`               | Maximum zoom scale X            |
+| `flingTime`  | `int`               | `600`               | Fling animation duration (ms)   |
+| `flingRatio` | `double`            | `0.5`               | Fling velocity multiplier       |
+| `flingCurve` | `Curve`             | `Curves.decelerate` | Fling animation curve           |
+| `chartScale` | `KChartScaleState?` | `null`              | Saved scale to restore on mount |
 
 ### Data loading & callbacks
 
-| Parameter              | Type                        | Description                                      |
-| ---------------------- | --------------------------- | ------------------------------------------------ |
-| `onLoadMore`           | `void Function(bool)?`      | Called when scrolled to edge; `true` = load left |
-| `isLoadingMore`        | `bool`                      | Lock flag to prevent duplicate load requests     |
-| `isOnDrag`             | `void Function(bool)?`      | Called on drag start/stop                        |
-| `controller`           | `KChartController?`         | Programmatic zoom/reset control                  |
-| `onChartScaleChanged`  | `OnChartScaleChanged?`      | Emitted after pinch / scaleY / zoom / reset ends |
-| `onVerticalOverscroll` | `ValueChanged<double>?`     | Fired when pan Y hits clamp (for outer scroll handoff) |
+| Parameter              | Type                    | Description                                            |
+| ---------------------- | ----------------------- | ------------------------------------------------------ |
+| `onLoadMore`           | `void Function(bool)?`  | Called when scrolled to edge; `true` = load left       |
+| `isLoadingMore`        | `bool`                  | Lock flag to prevent duplicate load requests           |
+| `isOnDrag`             | `void Function(bool)?`  | Called on drag start/stop                              |
+| `controller`           | `KChartController?`     | Programmatic zoom/reset control                        |
+| `onChartScaleChanged`  | `OnChartScaleChanged?`  | Emitted after pinch / scaleY / zoom / reset ends       |
+| `onVerticalOverscroll` | `ValueChanged<double>?` | Fired when pan Y hits clamp (for outer scroll handoff) |
 
 ### Real-time & decorative
 
-| Parameter               | Type      | Default | Description                                    |
-| ----------------------- | --------- | ------- | ---------------------------------------------- |
-| `livePrice`             | `double?` | `null`  | Real-time price for now-price line             |
-| `backgroundLogo`        | `Widget?` | `null`  | Watermark widget centered in main chart area   |
-| `backgroundLogoOpacity` | `double`  | `1.0`   | Watermark opacity (0.0–1.0)                    |
+| Parameter               | Type      | Default | Description                                  |
+| ----------------------- | --------- | ------- | -------------------------------------------- |
+| `livePrice`             | `double?` | `null`  | Real-time price for now-price line           |
+| `backgroundLogo`        | `Widget?` | `null`  | Watermark widget centered in main chart area |
+| `backgroundLogoOpacity` | `double`  | `1.0`   | Watermark opacity (0.0–1.0)                  |
 
 ---
 
@@ -318,18 +324,18 @@ KChartWidget(
 
 ## Gesture interaction
 
-| Gesture | Hành động |
-|---|---|
-| 1 ngón kéo ngang | Scroll qua các nến (X) |
-| 1 ngón kéo dọc | Pan vùng giá lên/xuống (Y) |
-| 1 ngón kéo tự do | Scroll X + pan Y đồng thời |
-| Pinch 2 ngón | Zoom scaleX (thu phóng số nến hiển thị) |
-| Kéo dọc vùng phải chart | Zoom scaleY (thu phóng vùng giá; width ∝ `xFrontPadding`) |
-| Double tap vùng phải | Reset scaleY và offsetY về mặc định |
-| Tap vào nến | Hiện crosshair + info dialog |
-| Tap lại | Ẩn crosshair |
-| Kéo khi crosshair đang hiện | Di chuyển crosshair theo ngón tay |
-| Long press + kéo | Di chuyển crosshair |
+| Gesture                     | Hành động                                                 |
+| --------------------------- | --------------------------------------------------------- |
+| 1 ngón kéo ngang            | Scroll qua các nến (X)                                    |
+| 1 ngón kéo dọc              | Pan vùng giá lên/xuống (Y)                                |
+| 1 ngón kéo tự do            | Scroll X + pan Y đồng thời                                |
+| Pinch 2 ngón                | Zoom scaleX (thu phóng số nến hiển thị)                   |
+| Kéo dọc vùng phải chart     | Zoom scaleY (thu phóng vùng giá; width ∝ `xFrontPadding`) |
+| Double tap vùng phải        | Reset scaleY và offsetY về mặc định                       |
+| Tap vào nến                 | Hiện crosshair + info dialog                              |
+| Tap lại                     | Ẩn crosshair                                              |
+| Kéo khi crosshair đang hiện | Di chuyển crosshair theo ngón tay                         |
+| Long press + kéo            | Di chuyển crosshair                                       |
 
 ---
 
@@ -380,6 +386,87 @@ const KChartColors(
   crossTextColor: Color(0xFFEBEBF5),
   maxColor: Color(0xFFEBEBF5),
   minColor: Color(0xFFEBEBF5),
+)
+```
+
+### Per-area color/text style: `CandleStyle` & `VolumeStyle`
+
+Main chart (candles/line) và panel volume mỗi khu vực có 1 style riêng — gồm cả màu lẫn `TextStyle` (mặc định fontSize 10), tách khỏi các field chung của `KChartColors`:
+
+```dart
+const KChartColors(
+  candleStyle: CandleStyle(
+    upColor: Color(0xFF14AD8F),
+    dnColor: Color(0xFFD5405D),
+    kLineColor: Color(0xFF217AFF),   // line-chart mode (isLine: true)
+    kLineFillColors: [Color(0x80217aff), Color(0x00217AFF)],
+    textStyle: TextStyle(fontSize: 11), // trục giá/thời gian, crosshair, max/min, now-price
+  ),
+  volumeStyle: VolumeStyle(
+    upColor: Color(0xFF14AD8F),
+    dnColor: Color(0xFFD5405D),
+    ma5Color: Color(0xFFFFC634),
+    ma10Color: Color(0xff35cdac),
+    textStyle: TextStyle(fontSize: 10), // riêng panel volume
+  ),
+)
+```
+
+> `textStyle.color` nếu tự set (vd `TextStyle(fontSize: 11, color: Colors.amber)`) sẽ **luôn thắng** — không bị `defaultTextColor`/`crossTextColor`/`maxColor`/... ghi đè. Không set `color` (mặc định `null`) thì mỗi chỗ vẽ tự chọn màu ngữ nghĩa của nó như trước giờ (trục dùng `defaultTextColor`, crosshair dùng `crossTextColor`, v.v.). Cùng quy tắc áp dụng cho `textStyle` của mọi indicator style (`avlStyle.textStyle`, `rsiStyle.textStyle`...) và `livePriceStyle.textStyle`.
+
+### Per-indicator color: 16 style fields
+
+Thay vì tự tạo từng indicator instance với `indicatorStyle` riêng, set màu tập trung ngay trong `KChartColors` — field nào đặt tên trùng loại indicator (`avlStyle`, `maStyle`, `emaStyle`, `bollStyle`, `sarStyle`, `zigzagStyle`, `superTrendStyle`, `macdStyle`, `kdjStyle`, `rsiStyle`, `wrStyle`, `cciStyle`, `obvStyle`, `trixStyle`, `mtmStyle`, `stochRsiStyle`):
+
+```dart
+KChartWidget(
+  data,
+  const KChartStyle(),
+  const KChartColors(
+    avlStyle: AVLStyle(avlColor: Colors.purple),
+    rsiStyle: RSIStyle(rsiColor: Colors.pink),
+    macdStyle: MACDStyle(macdColor: Colors.green),
+  ),
+  mainIndicators: [AVLIndicator()],       // không cần tự truyền indicatorStyle
+  secondaryIndicators: [RSIIndicator(), MACDIndicator()],
+  ...
+)
+```
+
+> Instance nào tự truyền `indicatorStyle` riêng (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) sẽ **không** bị `KChartColors` ghi đè — style ở instance luôn thắng. Chi tiết cơ chế + bảng đầy đủ 16 field: xem [`chart_jk_arch.md` §8.2](chart_jk_arch.md#82-kchartcolors).
+
+Mỗi `XxxStyle` (`AVLStyle`, `RSIStyle`, `MACDStyle`...) còn có `textStyle` riêng (mặc định fontSize 10) — chỉnh font label từng indicator độc lập nhau, không dùng chung `CandleStyle.textStyle`:
+
+```dart
+avlStyle: AVLStyle(avlColor: Colors.purple, textStyle: TextStyle(fontSize: 12)),
+```
+
+### Now-price badge: `LivePriceStyle`
+
+Đường + badge giá hiện tại (`ChartPainter.drawNowPrice`, dùng `livePrice ?? datas.last.close` so với `open` nến cuối để chọn màu) cấu hình qua `livePriceStyle`. **`upColor`/`dnColor` chỉ tô nền badge + đường kẻ — màu chữ luôn lấy từ `textStyle.color`** (mặc định trắng), không dùng chung với `upColor`/`dnColor` (nền đặc + chữ cùng màu sẽ vô hình):
+
+```dart
+const KChartColors(
+  livePriceStyle: LivePriceStyle(
+    upColor: Colors.blueAccent,
+    dnColor: Colors.red,
+    textStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+  ),
+)
+```
+
+Badge vẽ qua `LivePriceBadgePainter` (convert từ `assets/Number.svg`) — nền bo góc + mũi tên nhỏ trỏ vào chart, tự co giãn theo độ dài số giá.
+
+### Volume bar opacity
+
+`KChartStyle.volBarOpacity` (0.0–1.0) **nhân dồn** với alpha sẵn có trong `volumeStyle.upColor`/`dnColor` — không ghi đè. Set alpha thẳng trong `Color` (vd `Color(0x8076FF03)`) hoặc qua `volBarOpacity` đều dùng được, kết hợp được cả hai:
+
+```dart
+KChartWidget(
+  data,
+  const KChartStyle(null, 0.6), // volBarOpacity = 0.6, nhân thêm vào alpha của Color
+  const KChartColors(volumeStyle: VolumeStyle(upColor: Color(0x8076FF03))),
+  ...
 )
 ```
 
@@ -478,16 +565,23 @@ KChartWidget(
 
 ## Example
 
-See the full working demo in the [`example/`](example/lib/main.dart) folder.
+See the full working demo in the [`example/`](example/lib/main.dart) folder — bloc-based, kết nối REST + WebSocket thật (kline lịch sử, live tick, order book), toggle theme/indicator, tất cả 7 main + 9 secondary indicator có sẵn để bật thử.
+
+Demo cần file env chứa endpoint thật (git-ignored — không commit trong repo). Tạo từ template rồi điền giá trị:
 
 ```bash
 cd example
 flutter pub get
-flutter run
+cp env.example.json env.dev.json   # điền MARKET_API_BASE, MARKET_STOMP_URL... giá trị thật
+flutter run --dart-define-from-file=env.dev.json
 ```
+
+Thiếu file/thiếu giá trị → app hiển thị màn "Chưa cấu hình endpoint API" thay vì crash.
+
+Muốn 1 ví dụ tự chứa, không cần bloc/network, copy-paste chạy ngay (mock data) — xem [**Ví dụ đầy đủ** trong `chart_jk_arch.md`](chart_jk_arch.md#ví-dụ-đầy-đủ).
 
 ---
 
 ## License
 
-Copyright (c) 2026 Wikex. All rights reserved. See [LICENSE](LICENSE).
+Copyright (c) 2026 JK. All rights reserved. See [LICENSE](LICENSE).

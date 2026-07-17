@@ -1,4 +1,66 @@
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/material.dart' show Color, TextStyle;
+import '../indicator/indicator_style.dart';
+import 'live_price_style.dart';
+
+export 'live_price_style.dart';
+
+/// Màu cho main chart (nến hoặc line chart — 2 cách vẽ khác nhau của cùng
+/// 1 chuỗi giá, `isLine` chọn cái nào). Tách khỏi `KChartColors` để dễ custom
+/// riêng, tương tự các `XxxStyle` của indicator.
+class CandleStyle {
+  /// màu nến tăng (candlestick mode) — cũng dùng lại cho chấm SAR khi trend tăng.
+  final Color upColor;
+
+  /// màu nến giảm (candlestick mode) — cũng dùng lại cho chấm SAR khi trend giảm.
+  final Color dnColor;
+
+  /// màu đường line chart (`isLine = true`).
+  final Color kLineColor;
+
+  /// gradient tô dưới đường line chart (`isLine = true`) — 2 màu, trên đậm dưới trong suốt.
+  final List<Color> kLineFillColors;
+
+  /// text style cho main chart: trục giá/thời gian, crosshair, label indicator,
+  /// max/min, now-price. Mặc định fontSize 10.
+  final TextStyle textStyle;
+
+  const CandleStyle({
+    this.upColor = const Color(0xFF14AD8F),
+    this.dnColor = const Color(0xFFD5405D),
+    this.kLineColor = const Color(0xFF217AFF),
+    this.kLineFillColors = const [Color(0x80217aff), Color(0x00217AFF)],
+    this.textStyle = const TextStyle(fontSize: 10),
+  });
+}
+
+/// Màu cho panel volume (`VolRenderer`). Tách khỏi `KChartColors` để dễ custom
+/// riêng, tương tự các `XxxStyle` của indicator.
+class VolumeStyle {
+  /// màu cột volume khi nến tăng.
+  final Color upColor;
+
+  /// màu cột volume khi nến giảm.
+  final Color dnColor;
+
+  /// màu đường + label MA5 của volume.
+  final Color ma5Color;
+
+  /// màu đường + label MA10 của volume.
+  final Color ma10Color;
+
+  /// text style riêng cho panel volume (nhãn `VOL/MA5/MA10` + trục phải).
+  /// Tách khỏi `CandleStyle.textStyle` vì volume là panel độc lập, có thể
+  /// muốn fontSize khác main chart. Mặc định fontSize 10.
+  final TextStyle textStyle;
+
+  const VolumeStyle({
+    this.upColor = const Color(0xFF14AD8F),
+    this.dnColor = const Color(0xFFD5405D),
+    this.ma5Color = const Color(0xFFFFC634),
+    this.ma10Color = const Color(0xff35cdac),
+    this.textStyle = const TextStyle(fontSize: 10),
+  });
+}
 
 /// KChartColors
 ///
@@ -13,26 +75,17 @@ class KChartColors {
   /// the background color of base chart
   final Color bgColor;
 
-  /// Line chart
-  final Color kLineColor;
-  final List<Color> kLineFillColors;
+  /// màu main chart (nến hoặc line chart) — xem [CandleStyle].
+  final CandleStyle candleStyle;
 
-  final Color ma5Color;
-  final Color ma10Color;
-
-  final Color upColor;
-  final Color dnColor;
-
-  final Color volColor;
-  final Color volUpColor;
-  final Color volDnColor;
+  /// màu panel volume — xem [VolumeStyle].
+  final VolumeStyle volumeStyle;
 
   /// default text color: apply for text at grid
   final Color defaultTextColor;
 
-  /// color of the current price
-  final Color nowPriceUpColor;
-  final Color nowPriceDnColor;
+  /// màu now-price (đường + label giá hiện tại) — xem [LivePriceStyle].
+  final LivePriceStyle livePriceStyle;
 
   /// trend color
   final Color trendLineColor;
@@ -56,26 +109,67 @@ class KChartColors {
   final Color maxColor;
   final Color minColor;
 
+  // ── Style riêng từng indicator — gom lại 1 chỗ để dễ custom màu toàn bộ ──
+  // Instance nào trong mainIndicators/secondaryIndicators tự truyền
+  // `indicatorStyle` riêng (khác const mặc định) thì KHÔNG bị các field này
+  // ghi đè — xem `applyIndicatorColorStyles` trong indicator_template.dart.
+
+  /// Style cho `MAIndicator`.
+  final MAStyle maStyle;
+
+  /// Style cho `EMAIndicator` — cùng type `MAStyle` với [maStyle] nhưng field
+  /// riêng để MA và EMA có thể tô màu khác nhau.
+  final MAStyle emaStyle;
+
+  /// Style cho `BOLLIndicator`.
+  final BOLLStyle bollStyle;
+
+  /// Style cho `SARIndicator`.
+  final SARStyle sarStyle;
+
+  /// Style cho `ZigZagIndicator`.
+  final ZigZagStyle zigzagStyle;
+
+  /// Style cho `SuperTrendIndicator`.
+  final SuperTrendStyle superTrendStyle;
+
+  /// Style cho `AVLIndicator`.
+  final AVLStyle avlStyle;
+
+  /// Style cho `MACDIndicator`.
+  final MACDStyle macdStyle;
+
+  /// Style cho `KDJIndicator`.
+  final KDJStyle kdjStyle;
+
+  /// Style cho `RSIIndicator`.
+  final RSIStyle rsiStyle;
+
+  /// Style cho `WRIndicator`.
+  final WRStyle wrStyle;
+
+  /// Style cho `CCIIndicator`.
+  final CCIStyle cciStyle;
+
+  /// Style cho `OBVIndicator`.
+  final OBVStyle obvStyle;
+
+  /// Style cho `TRIXIndicator`.
+  final TRIXStyle trixStyle;
+
+  /// Style cho `MTMIndicator`.
+  final MTMStyle mtmStyle;
+
+  /// Style cho `StochRSIIndicator`.
+  final StochRSIStyle stochRsiStyle;
+
   /// constructor chart color
   const KChartColors({
     this.bgColor = const Color(0xffffffff),
-    this.kLineColor = const Color(0xff217AFF),
-    this.kLineFillColors = const [
-      Color(0x80217aff),
-      Color(0x00217AFF),
-    ],
-
-    ///
-    this.ma5Color = const Color(0xFFFFC634),
-    this.ma10Color = const Color(0xff35cdac),
-    this.upColor = const Color(0xFF14AD8F),
-    this.dnColor = const Color(0xFFD5405D),
-    this.volColor = const Color(0xff2f8fd5),
-    this.volUpColor = const Color(0xFF14AD8F),
-    this.volDnColor = const Color(0xFFD5405D),
+    this.candleStyle = const CandleStyle(),
+    this.volumeStyle = const VolumeStyle(),
     this.defaultTextColor = const Color(0xFF909196),
-    this.nowPriceUpColor = const Color(0xFF14AD8F),
-    this.nowPriceDnColor = const Color(0xFFD5405D),
+    this.livePriceStyle = const LivePriceStyle(),
 
     /// trend color
     this.trendLineColor = const Color(0xFFF89215),
@@ -96,7 +190,92 @@ class KChartColors {
     ///The color of the maximum and minimum values in the current display
     this.maxColor = const Color(0xFF222223),
     this.minColor = const Color(0xFF222223),
+
+    /// style riêng từng indicator
+    this.maStyle = const MAStyle(),
+    this.emaStyle = const MAStyle(),
+    this.bollStyle = const BOLLStyle(),
+    this.sarStyle = const SARStyle(),
+    this.zigzagStyle = const ZigZagStyle(),
+    this.superTrendStyle = const SuperTrendStyle(),
+    this.avlStyle = const AVLStyle(),
+    this.macdStyle = const MACDStyle(),
+    this.kdjStyle = const KDJStyle(),
+    this.rsiStyle = const RSIStyle(),
+    this.wrStyle = const WRStyle(),
+    this.cciStyle = const CCIStyle(),
+    this.obvStyle = const OBVStyle(),
+    this.trixStyle = const TRIXStyle(),
+    this.mtmStyle = const MTMStyle(),
+    this.stochRsiStyle = const StochRSIStyle(),
   });
+
+  /// Trả về bản sao, override đúng field được truyền vào, giữ nguyên phần
+  /// còn lại — tránh phải liệt kê tay từng field khi chỉ muốn đổi 1-2 field
+  /// (vd giữ theme màu nền/chữ, chỉ đổi màu 1 indicator).
+  KChartColors copyWith({
+    Color? bgColor,
+    CandleStyle? candleStyle,
+    VolumeStyle? volumeStyle,
+    Color? defaultTextColor,
+    LivePriceStyle? livePriceStyle,
+    Color? trendLineColor,
+    Color? selectBorderColor,
+    Color? selectFillColor,
+    Color? gridColor,
+    Color? crossColor,
+    Color? crossTextColor,
+    Color? maxColor,
+    Color? minColor,
+    MAStyle? maStyle,
+    MAStyle? emaStyle,
+    BOLLStyle? bollStyle,
+    SARStyle? sarStyle,
+    ZigZagStyle? zigzagStyle,
+    SuperTrendStyle? superTrendStyle,
+    AVLStyle? avlStyle,
+    MACDStyle? macdStyle,
+    KDJStyle? kdjStyle,
+    RSIStyle? rsiStyle,
+    WRStyle? wrStyle,
+    CCIStyle? cciStyle,
+    OBVStyle? obvStyle,
+    TRIXStyle? trixStyle,
+    MTMStyle? mtmStyle,
+    StochRSIStyle? stochRsiStyle,
+  }) {
+    return KChartColors(
+      bgColor: bgColor ?? this.bgColor,
+      candleStyle: candleStyle ?? this.candleStyle,
+      volumeStyle: volumeStyle ?? this.volumeStyle,
+      defaultTextColor: defaultTextColor ?? this.defaultTextColor,
+      livePriceStyle: livePriceStyle ?? this.livePriceStyle,
+      trendLineColor: trendLineColor ?? this.trendLineColor,
+      selectBorderColor: selectBorderColor ?? this.selectBorderColor,
+      selectFillColor: selectFillColor ?? this.selectFillColor,
+      gridColor: gridColor ?? this.gridColor,
+      crossColor: crossColor ?? this.crossColor,
+      crossTextColor: crossTextColor ?? this.crossTextColor,
+      maxColor: maxColor ?? this.maxColor,
+      minColor: minColor ?? this.minColor,
+      maStyle: maStyle ?? this.maStyle,
+      emaStyle: emaStyle ?? this.emaStyle,
+      bollStyle: bollStyle ?? this.bollStyle,
+      sarStyle: sarStyle ?? this.sarStyle,
+      zigzagStyle: zigzagStyle ?? this.zigzagStyle,
+      superTrendStyle: superTrendStyle ?? this.superTrendStyle,
+      avlStyle: avlStyle ?? this.avlStyle,
+      macdStyle: macdStyle ?? this.macdStyle,
+      kdjStyle: kdjStyle ?? this.kdjStyle,
+      rsiStyle: rsiStyle ?? this.rsiStyle,
+      wrStyle: wrStyle ?? this.wrStyle,
+      cciStyle: cciStyle ?? this.cciStyle,
+      obvStyle: obvStyle ?? this.obvStyle,
+      trixStyle: trixStyle ?? this.trixStyle,
+      mtmStyle: mtmStyle ?? this.mtmStyle,
+      stochRsiStyle: stochRsiStyle ?? this.stochRsiStyle,
+    );
+  }
 }
 
 class KChartStyle {

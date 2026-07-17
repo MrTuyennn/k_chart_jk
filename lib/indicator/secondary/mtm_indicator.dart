@@ -38,17 +38,17 @@ class MTMIndicator extends SecondaryIndicator<MACDEntity, MTMStyle> {
       children: [
         TextSpan(
           text: "MTM(${calcParams[0]},${calcParams[1]}) ",
-          style: getTextStyle(chartColors.defaultTextColor),
+          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
         ),
         if (entity.mtm != null)
           TextSpan(
             text: "MTM:${formatNumber(entity.mtm!, precision)}  ",
-            style: getTextStyle(indicatorStyle.mtmColor),
+            style: getTextStyle(indicatorStyle.mtmColor, indicatorStyle.textStyle, true),
           ),
         if (entity.mtmMa != null)
           TextSpan(
             text: "MTMMA:${formatNumber(entity.mtmMa!, precision)}",
-            style: getTextStyle(indicatorStyle.mtmMaColor),
+            style: getTextStyle(indicatorStyle.mtmMaColor, indicatorStyle.textStyle, true),
           ),
       ],
     );

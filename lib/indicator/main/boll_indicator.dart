@@ -23,7 +23,7 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
       ..filterQuality = FilterQuality.high
       ..strokeWidth = indicatorStyle.lineWidth;
 
-    _fillPaint = Paint()..color = indicatorStyle.fillColor;
+    _fillPaint = Paint();
   }
 
   @override
@@ -57,17 +57,17 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
         if (value.mid != null && value.mid != 0)
           TextSpan(
             text: "BOLL:${formatNumber(value.mid!, precision)}  ",
-            style: TextStyle(fontSize: 10, color: indicatorStyle.bollColor),
+            style: getTextStyle(indicatorStyle.bollColor, indicatorStyle.textStyle, true),
           ),
         if (value.up != null && value.up != 0)
           TextSpan(
             text: "UB:${formatNumber(value.up!, precision)}  ",
-            style: TextStyle(fontSize: 10, color: indicatorStyle.ubColor),
+            style: getTextStyle(indicatorStyle.ubColor, indicatorStyle.textStyle, true),
           ),
         if (value.dn != null && value.dn != 0)
           TextSpan(
             text: "LB:${formatNumber(value.dn!, precision)}",
-            style: TextStyle(fontSize: 10, color: indicatorStyle.lbColor),
+            style: getTextStyle(indicatorStyle.lbColor, indicatorStyle.textStyle, true),
           ),
       ],
     );
@@ -117,7 +117,7 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
         ..lineTo(positionLi[3].dx, positionLi[3].dy)
         ..close();
 
-      canvas.drawPath(fillPath, _fillPaint);
+      canvas.drawPath(fillPath, _fillPaint..color = indicatorStyle.fillColor);
     }
 
     if (curPoint.boll!.mid != null && lastPoint.boll!.mid != null) {

@@ -14,8 +14,7 @@ class ZigZagIndicator extends MainIndicator<CandleEntity, ZigZagStyle> {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
-      ..strokeWidth = indicatorStyle.lineWidth
-      ..color = indicatorStyle.zigzagColor;
+      ..strokeWidth = indicatorStyle.lineWidth;
   }
 
   @override
@@ -35,7 +34,7 @@ class ZigZagIndicator extends MainIndicator<CandleEntity, ZigZagStyle> {
     return TextSpan(
       text:
           "$shortName(${calcParams[0]},${calcParams[1]},${calcParams[2]}): ${formatNumber(zEntity.zigzag!, precision)}    ",
-      style: getTextStyle(indicatorStyle.zigzagColor),
+      style: getTextStyle(indicatorStyle.zigzagColor, indicatorStyle.textStyle),
     );
   }
 
@@ -56,7 +55,7 @@ class ZigZagIndicator extends MainIndicator<CandleEntity, ZigZagStyle> {
     canvas.drawLine(
       Offset(lastX, getY(lastZ.zigzag!)),
       Offset(curX, getY(curZ.zigzag!)),
-      _linePaint,
+      _linePaint..color = indicatorStyle.zigzagColor,
     );
   }
 

@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 
 import 'bloc/chart_bloc.dart';
 import 'bloc/chart_event.dart';
@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'K Chart Wikex Demo',
+      title: 'K Chart JK Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF217AFF)),
@@ -84,6 +84,37 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   static const double _scaleYDragThreshold = 8.0;
   static const Duration _doubleTapMaxGap = Duration(milliseconds: 300);
   static const double _doubleTapMaxDistance = 20.0;
+
+  // Cache indicator instance list — ChartState.mainIndicators/secondaryIndicators
+  // là getter tạo instance (+ Paint) mới mỗi lần gọi. BlocBuilder rebuild trên
+  // MỌI thay đổi state (kể cả livePrice, cập nhật mỗi tick WS không throttle),
+  // nên nếu gọi thẳng getter mỗi build sẽ tạo lại toàn bộ indicator dù
+  // mainTypes/secondaryTypes không đổi. Cache theo nội dung Set để tái dùng.
+  Set<MainIndicatorType>? _cachedMainTypes;
+  List<MainIndicator>? _cachedMainIndicators;
+  Set<SecondaryIndicatorType>? _cachedSecondaryTypes;
+  List<SecondaryIndicator>? _cachedSecondaryIndicators;
+
+  List<MainIndicator> _mainIndicatorsFor(ChartState state) {
+    if (_cachedMainIndicators == null ||
+        !_setEquals(_cachedMainTypes!, state.mainTypes)) {
+      _cachedMainTypes = state.mainTypes;
+      _cachedMainIndicators = state.mainIndicators;
+    }
+    return _cachedMainIndicators!;
+  }
+
+  List<SecondaryIndicator> _secondaryIndicatorsFor(ChartState state) {
+    if (_cachedSecondaryIndicators == null ||
+        !_setEquals(_cachedSecondaryTypes!, state.secondaryTypes)) {
+      _cachedSecondaryTypes = state.secondaryTypes;
+      _cachedSecondaryIndicators = state.secondaryIndicators;
+    }
+    return _cachedSecondaryIndicators!;
+  }
+
+  static bool _setEquals<T>(Set<T> a, Set<T> b) =>
+      a.length == b.length && a.containsAll(b);
 
   @override
   void dispose() {
@@ -659,23 +690,146 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
+  /// Palette "random" để demo CandleStyle/VolumeStyle/indicator style mới —
+  /// cố tình chọn màu chói, khác hẳn default để thấy rõ sự khác biệt.
+  /// bg/text/grid vẫn lấy từ `state.colors` (theo dark/light mode thật),
+  /// chỉ đổi màu vẽ (nến/volume/indicator).
+  KChartColors _demoColors(ChartState state) {
+    return state.colors.copyWith(
+      livePriceStyle: const LivePriceStyle(
+        upColor: Colors.blueAccent,
+        dnColor: Colors.red,
+        textStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      candleStyle: const CandleStyle(
+        upColor: Color(0xFF00E5FF),
+        dnColor: Color(0xFFFF3D00),
+        kLineColor: Color(0xFFAA00FF),
+        kLineFillColors: [Color(0x80AA00FF), Color(0x00AA00FF)],
+        textStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w100,
+          color: Colors.black,
+        ),
+      ),
+      volumeStyle: const VolumeStyle(
+        upColor: Color(0xFF76FF03),
+        dnColor: Color(0xFFFF1744),
+        ma5Color: Color(0xFFFFEA00),
+        ma10Color: Color(0xFFFF6D00),
+        // forceColor bảo vệ ma5Color/ma10Color — chỉ "VOL:" prefix đổi màu.
+        textStyle: TextStyle(
+          fontSize: 11,
+          fontStyle: FontStyle.italic,
+          color: Colors.red,
+        ),
+      ),
+      // Mọi indicator dưới đây: textStyle.color = trắng đồng nhất — chỉ áp
+      // cho prefix/label chung (vd "KDJ(9,1,3) "); các màu riêng từng giá trị
+      // (kColor/dColor/macdColor/...) LUÔN giữ nguyên nhờ forceColor, không
+      // bị textStyle.color đè — xem indicator_template.dart getTextStyle().
+      avlStyle: const AVLStyle(
+        avlColor: Color(0xFFEA80FC), // hồng tím
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      maStyle: const MAStyle(
+        maColors: [
+          Color(0xFFFFAB00),
+          Color(0xFF00B8D4),
+          Color(0xFFD500F9),
+          Color(0xFF64DD17),
+        ],
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      emaStyle: const MAStyle(
+        maColors: [Color(0xFF00E5FF), Color(0xFFFF4081), Color(0xFFFFEB3B)],
+        textStyle: TextStyle(color: Colors.red),
+      ),
+      bollStyle: const BOLLStyle(
+        bollColor: Color(0xFF6200EA),
+        ubColor: Color(0xFF00BFA5),
+        lbColor: Color(0xFFFF6D00),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      sarStyle: const SARStyle(
+        sarColor: Color(0xFF00BFA5),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      zigzagStyle: const ZigZagStyle(
+        zigzagColor: Color(0xFFFF6E40),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      superTrendStyle: const SuperTrendStyle(
+        upColor: Color(0xFF00E676),
+        dnColor: Color(0xFFFF1744),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      rsiStyle: const RSIStyle(
+        rsiColor: Color(0xFFFF4081),
+        textStyle: TextStyle(color: Colors.green),
+      ),
+      macdStyle: const MACDStyle(
+        macdColor: Color(0xFF00E676),
+        difColor: Color(0xFFFFD600),
+        deaColor: Color(0xFF2979FF),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      kdjStyle: const KDJStyle(
+        kColor: Color(0xFFFFD600),
+        dColor: Color(0xFF00E5FF),
+        jColor: Color(0xFFD500F9),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      wrStyle: const WRStyle(
+        wrColor: Color(0xFF64DD17),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      cciStyle: const CCIStyle(
+        cciColor: Color(0xFFFF6D00),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      obvStyle: const OBVStyle(
+        obvColor: Color(0xFF2979FF),
+        signalColor: Color(0xFFFF4081),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      trixStyle: const TRIXStyle(
+        trixColor: Color(0xFF00E5FF),
+        trixMaColor: Color(0xFFFFAB00),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      mtmStyle: const MTMStyle(
+        mtmColor: Color(0xFFD500F9),
+        mtmMaColor: Color(0xFF76FF03),
+        textStyle: TextStyle(color: Colors.white),
+      ),
+      stochRsiStyle: const StochRSIStyle(
+        kColor: Color(0xFFFF3D00),
+        dColor: Color(0xFF00BFA5),
+        textStyle: TextStyle(color: Colors.green),
+      ),
+    );
+  }
+
   Widget _buildKChart(BuildContext context, ChartState state) {
     return KChartWidget(
       state.data,
       const KChartStyle(),
-      state.colors,
+      _demoColors(state),
       key: ValueKey(state.timeframe),
       isTrendLine: false,
       isLine: state.isLine,
       volHidden: state.volHidden,
-      mainIndicators: state.mainIndicators,
-      secondaryIndicators: state.secondaryIndicators,
+      mainIndicators: _mainIndicatorsFor(state),
+      secondaryIndicators: _secondaryIndicatorsFor(state),
       controller: _controller,
       chartScale: state.savedChartScale,
       onChartScaleChanged: (scale) =>
           context.read<ChartBloc>().add(ChartScaleSaved(scale)),
-      // Giá tick WS tách khỏi datas — chỉ repaint đường now-price,
-      // không rebuild list nến mỗi tick.
       livePrice: state.livePrice,
       showNowPrice: true,
       showInfoDialog: true,
@@ -692,7 +846,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         builder: (context) {
           final size = MediaQuery.sizeOf(context).width / 12;
           return SvgPicture.asset(
-            'assets/logo_wikex.svg',
+            'assets/logo_jk.svg',
             width: size,
             height: size,
           );
@@ -779,7 +933,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 builder: (context) {
                   final size = MediaQuery.sizeOf(context).width / 12;
                   return SvgPicture.asset(
-                    'assets/logo_wikex.svg',
+                    'assets/logo_jk.svg',
                     width: size,
                     height: size,
                   );

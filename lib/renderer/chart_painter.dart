@@ -1,7 +1,8 @@
 import 'dart:async' show StreamSink;
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/extension/canvas_extension.dart';
-import 'package:k_chart_wikex/utils/index.dart';
+import 'package:k_chart_jk/extension/canvas_extension.dart';
+import 'package:k_chart_jk/indicator/indicator_template.dart';
+import 'package:k_chart_jk/utils/index.dart';
 import '../entity/info_window_entity.dart';
 import '../entity/k_line_entity.dart';
 import 'base_chart_painter.dart';
@@ -42,7 +43,7 @@ class ChartPainter extends BaseChartPainter {
   int fixedLength;
   final KChartColors chartColors;
   late Paint paintCross, selectPointPaint, selectorBorderPaint;
-  late Paint nowPriceSelectorPaint, nowPriceSelectorBorderPaint, nowPriceLinePaint;
+  late Paint nowPriceLinePaint;
   late Paint _bgPaint;
   late Paint _trendLinePaint, _trendLineStrokePaint, _trendLineSegmentPaint;
   final bool hideGrid;
@@ -94,13 +95,6 @@ class ChartPainter extends BaseChartPainter {
       ..style = PaintingStyle.stroke
       ..color = chartColors.selectBorderColor;
 
-    nowPriceSelectorPaint = Paint()
-      ..color = chartColors.bgColor
-      ..isAntiAlias = true;
-    nowPriceSelectorBorderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = chartStyle.borderWidth
-      ..isAntiAlias = true;
     nowPriceLinePaint = Paint()
       ..strokeWidth = chartStyle.nowPriceLineWidth
       ..isAntiAlias = true;
@@ -117,6 +111,17 @@ class ChartPainter extends BaseChartPainter {
     _trendLineSegmentPaint = Paint()
       ..color = Colors.yellow
       ..strokeWidth = 2;
+
+    // Áp style theo chartColors cho indicator nào chưa tự custom indicatorStyle.
+    applyIndicatorColorStyles(mainIndicators, secondaryIndicators, chartColors);
+  }
+
+  @override
+  TextStyle getTextStyle(Color color) {
+    final textStyle = chartColors.candleStyle.textStyle;
+    return textStyle.color != null
+        ? textStyle
+        : textStyle.copyWith(color: color);
   }
 
   @override
@@ -224,7 +229,12 @@ class ChartPainter extends BaseChartPainter {
     // Clip theo chiều Y vào đúng vùng mMainRect — tránh nội dung tràn ra ngoài
     // đè lên time bar, secondary indicators hoặc top padding khi scaleY thay đổi
     canvas.clipRect(
-      Rect.fromLTRB(-mDataLen - mWidth, mMainRect.top, mDataLen + mWidth, mMainRect.bottom),
+      Rect.fromLTRB(
+        -mDataLen - mWidth,
+        mMainRect.top,
+        mDataLen + mWidth,
+        mMainRect.bottom,
+      ),
     );
     final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
     // offsetY dịch chuyển chart dọc (pan Y), neo tại centerY để scaleY không bị lệch
@@ -267,9 +277,21 @@ class ChartPainter extends BaseChartPainter {
     if (!hideGrid) {
       mMainRenderer.drawVerticalText(canvas, textStyle, mGridRows);
     }
-    mVolRenderer?.drawVerticalText(canvas, textStyle, mGridRows);
+    // Panel volume dùng textStyle riêng (chartColors.volumeStyle.textStyle) —
+    // không tái dùng textStyle của main chart ở trên.
+    final volTextStyle = mVolRenderer?.getTextStyle(
+      chartColors.defaultTextColor,
+    );
+    if (volTextStyle != null) {
+      mVolRenderer?.drawVerticalText(canvas, volTextStyle, mGridRows);
+    }
+
     for (final element in mSecondaryRendererList) {
-      element.drawVerticalText(canvas, textStyle, mGridRows);
+      element.drawVerticalText(
+        canvas,
+        element.getTextStyle(chartColors.defaultTextColor),
+        mGridRows,
+      );
     }
   }
 
@@ -448,15 +470,18 @@ class ChartPainter extends BaseChartPainter {
     double y = _applyScaleY(getMainY(value));
 
     // giữ trong vùng hiển thị (đã tính scaleY)
-    if (y > _applyScaleY(getMainY(mMainLowMinValue))) y = _applyScaleY(getMainY(mMainLowMinValue));
-    if (y < _applyScaleY(getMainY(mMainHighMaxValue))) y = _applyScaleY(getMainY(mMainHighMaxValue));
+    if (y > _applyScaleY(getMainY(mMainLowMinValue))) {
+      y = _applyScaleY(getMainY(mMainLowMinValue));
+    }
+    if (y < _applyScaleY(getMainY(mMainHighMaxValue))) {
+      y = _applyScaleY(getMainY(mMainHighMaxValue));
+    }
 
     // màu dựa theo livePrice so với open của nến cuối
     Color priceColor = value >= datas!.last.open
-        ? chartColors.nowPriceUpColor
-        : chartColors.nowPriceDnColor;
+        ? chartColors.livePriceStyle.upColor
+        : chartColors.livePriceStyle.dnColor;
 
-    nowPriceSelectorBorderPaint.color = priceColor;
     nowPriceLinePaint.color = priceColor;
 
     // vẽ đường kẻ ngang
@@ -466,13 +491,16 @@ class ChartPainter extends BaseChartPainter {
       nowPriceLinePaint,
     );
 
-    // vẽ label giá
-    TextPainter tp = getTextPainter(
-      NumberUtil.formatFixed(value, fixedLength) ?? '',
-      priceColor,
-    );
+    // label vẽ giá
+    TextPainter tp = TextPainter(
+      text: TextSpan(
+        text: NumberUtil.formatFixed(value, fixedLength) ?? '',
+        style: chartColors.livePriceStyle.textStyle,
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
 
-    double paddingX = 3, paddingY = 1.5;
+    double paddingX = 5, paddingY = 3;
     double space = 5.0;
     double offsetX;
     switch (verticalTextAlignment) {
@@ -485,15 +513,18 @@ class ChartPainter extends BaseChartPainter {
     }
 
     double top = y - tp.height / 2;
-    RRect rect = RRect.fromLTRBR(
-      offsetX,
-      top - paddingY,
-      offsetX + tp.width + paddingX * 2,
-      top + tp.height + paddingY * 2,
-      Radius.circular(2.0),
-    );
-    canvas.drawRRect(rect, nowPriceSelectorPaint);
-    canvas.drawRRect(rect, nowPriceSelectorBorderPaint);
+    final badgeWidth = tp.width + paddingX * 2;
+    final badgeHeight = tp.height + paddingY * 2;
+
+    // Nền badge "flag" — width/height tự scale theo độ dài text giá
+    // (LivePriceBadgePainter.paint tự nhân tỉ lệ theo size truyền vào).
+    canvas.save();
+    canvas.translate(offsetX, top - paddingY);
+    LivePriceBadgePainter(
+      color: priceColor,
+    ).paint(canvas, Size(badgeWidth, badgeHeight));
+    canvas.restore();
+
     tp.paint(canvas, Offset(offsetX + paddingX, top));
   }
 
@@ -503,7 +534,11 @@ class ChartPainter extends BaseChartPainter {
     trendLineX = x;
     final double y = selectY;
 
-    canvas.drawLine(Offset(x, mTopPadding), Offset(x, size.height), _trendLinePaint);
+    canvas.drawLine(
+      Offset(x, mTopPadding),
+      Offset(x, size.height),
+      _trendLinePaint,
+    );
     canvas.drawLine(
       Offset(-mTranslateX, y),
       Offset(-mTranslateX + mWidth / scaleX, y),
@@ -511,8 +546,16 @@ class ChartPainter extends BaseChartPainter {
     );
     canvas.drawOval(
       scaleX >= 1
-          ? Rect.fromCenter(center: Offset(x, y), height: 15.0 * scaleX, width: 15.0)
-          : Rect.fromCenter(center: Offset(x, y), height: 10.0, width: 10.0 / scaleX),
+          ? Rect.fromCenter(
+              center: Offset(x, y),
+              height: 15.0 * scaleX,
+              width: 15.0,
+            )
+          : Rect.fromCenter(
+              center: Offset(x, y),
+              height: 10.0,
+              width: 10.0 / scaleX,
+            ),
       _trendLineStrokePaint,
     );
 
@@ -598,8 +641,10 @@ class ChartPainter extends BaseChartPainter {
   // công thức đảo ngược của canvas.translate + canvas.scale, có tính offsetY
   double _applyScaleY(double rawY) {
     final double centerY = (mMainRect.top + mMainRect.bottom) / 2;
-    return (centerY + (rawY - centerY) * scaleY + offsetY)
-        .clamp(mMainRect.top, mMainRect.bottom);
+    return (centerY + (rawY - centerY) * scaleY + offsetY).clamp(
+      mMainRect.top,
+      mMainRect.bottom,
+    );
   }
 
   @override

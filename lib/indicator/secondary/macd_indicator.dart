@@ -50,22 +50,22 @@ class MACDIndicator extends SecondaryIndicator<MACDEntity, MACDStyle> {
       children: [
         TextSpan(
           text: "MACD(12,26,9) ",
-          style: getTextStyle(chartColors.defaultTextColor),
+          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
         ),
         if (entity.macd != null && entity.macd != 0)
           TextSpan(
             text: "MACD:${formatNumber(entity.macd!, precision)}  ",
-            style: getTextStyle(indicatorStyle.macdColor),
+            style: getTextStyle(indicatorStyle.macdColor, indicatorStyle.textStyle, true),
           ),
         if (entity.dif != null && entity.dif != 0)
           TextSpan(
             text: "DIF:${formatNumber(entity.dif!, precision)}  ",
-            style: getTextStyle(indicatorStyle.difColor),
+            style: getTextStyle(indicatorStyle.difColor, indicatorStyle.textStyle, true),
           ),
         if (entity.dea != null && entity.dea != 0)
           TextSpan(
             text: "DEA:${formatNumber(entity.dea!, precision)}",
-            style: getTextStyle(indicatorStyle.deaColor),
+            style: getTextStyle(indicatorStyle.deaColor, indicatorStyle.textStyle, true),
           ),
       ],
     );

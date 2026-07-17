@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/material.dart' show Color, TextStyle;
 
 class DepthChartColors {
   /// depth color
@@ -58,6 +58,14 @@ class DepthChartStyle {
 
   final double crossWidth;
 
+  /// text style cho nhãn trục (volume bên phải, giá bên dưới). Mặc định
+  /// fontSize 10 — cùng convention với `CandleStyle.textStyle`/`VolumeStyle.textStyle`.
+  final TextStyle textStyle;
+
+  /// text style cho popup giá/khối lượng khi long-press. Mặc định fontSize 9
+  /// (nhỏ hơn [textStyle] vì hiển thị trong popup chật).
+  final TextStyle annotationTextStyle;
+
   const DepthChartStyle({
     this.lineWidth = 1.0,
     this.radius = 4.0,
@@ -66,5 +74,7 @@ class DepthChartStyle {
     this.padding = 6.0,
     this.dotRadius = 5.0,
     this.crossWidth = 0.5,
+    this.textStyle = const TextStyle(fontSize: 10),
+    this.annotationTextStyle = const TextStyle(fontSize: 9),
   });
 }

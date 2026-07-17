@@ -31,10 +31,7 @@ class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
     if (value == null) return null;
     return TextSpan(
       text: "SAR: ${formatNumber(value, precision)}",
-      style: TextStyle(
-        fontSize: 10,
-        color: indicatorStyle.sarColor,
-      ),
+      style: getTextStyle(indicatorStyle.sarColor, indicatorStyle.textStyle),
     );
   }
 
@@ -47,9 +44,9 @@ class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
     if (sar == halfHL) {
       color = chartColors.defaultTextColor;
     } else if (sar < halfHL) {
-      color = chartColors.upColor;
+      color = chartColors.candleStyle.upColor;
     } else {
-      color = chartColors.dnColor;
+      color = chartColors.candleStyle.dnColor;
     }
     canvas.drawCircle(
       Offset(curX, getY(sar)),

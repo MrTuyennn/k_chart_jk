@@ -147,7 +147,7 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.20.2"
-  k_chart_wikex:
+  k_chart_jk:
     dependency: "direct main"
     description:
       path: ".."
