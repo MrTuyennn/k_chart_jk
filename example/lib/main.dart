@@ -758,7 +758,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       sarStyle: const SARStyle(
         upColor: Color(0xFF00BFA5),
         dnColor: Color(0xFFFF5252),
-        textStyle: TextStyle(color: Colors.white),
+        textStyle: TextStyle(color: Colors.black),
       ),
       zigzagStyle: const ZigZagStyle(
         zigzagColor: Color(0xFFFF6E40),

@@ -37,8 +37,23 @@ class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
     double? value = entity.sar;
     if (value == null) return null;
     return TextSpan(
-      text: "SAR: ${formatNumber(value, precision)}",
-      style: getTextStyle(_colorFor(entity), base: indicatorStyle.textStyle),
+      children: [
+        TextSpan(
+          text: "SAR: ",
+          style: getTextStyle(
+            chartColors.defaultTextColor,
+            base: indicatorStyle.textStyle,
+          ),
+        ),
+        TextSpan(
+          text: formatNumber(value, precision),
+          style: getTextStyle(
+            _colorFor(entity),
+            base: indicatorStyle.textStyle,
+            forceColor: true,
+          ),
+        ),
+      ],
     );
   }
 
