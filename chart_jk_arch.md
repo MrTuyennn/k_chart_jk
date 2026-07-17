@@ -1,6 +1,6 @@
-# k_chart_wikex — Tài liệu tổng hợp
+# k_chart_jk — Tài liệu tổng hợp
 
-> Tổng hợp từ: `HANDBOOK.md`, `chart_wikex.md`, `chart_plush.md`, `CHANGELOG.md`, `chart_wikex_arch.md`.
+> Tổng hợp từ: `HANDBOOK.md`, `chart_jk.md`, `chart_plush.md`, `CHANGELOG.md`, `chart_jk_arch.md`.
 
 ---
 
@@ -114,7 +114,7 @@
 
 ### 0.0.1
 
-- Initial release of k_chart_wikex — a Flutter candlestick chart package.
+- Initial release of k_chart_jk — a Flutter candlestick chart package.
 - Candlestick and line chart rendering with smooth gesture support (pan, zoom, fling).
 - Main indicators: MA, EMA, BOLL, SAR, ZigZag.
 - Secondary indicators: MACD, KDJ, RSI, WR, CCI.
@@ -200,7 +200,7 @@ KChartWidget  (state + gesture)
 
 ```yaml
 dependencies:
-  k_chart_wikex:
+  k_chart_jk:
     git:
       url: <repo-url>
 ```
@@ -208,7 +208,7 @@ dependencies:
 ### Quick start tối thiểu
 
 ```dart
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 
 final data = [
   KLineEntity.fromCustom(
@@ -242,7 +242,7 @@ Widget tự chứa (copy-paste chạy được, chỉ cần cắm nguồn data t
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 
 class FullChartDemo extends StatefulWidget {
   const FullChartDemo({super.key});
@@ -425,7 +425,7 @@ DepthChart(
 
 ## 4. Entry point & exports
 
-File chính import: `package:k_chart_wikex/k_chart_plus.dart`. Re-export:
+File chính import: `package:k_chart_jk/k_chart_plus.dart`. Re-export:
 
 | Export                              | Chứa gì                                                                              |
 | ----------------------------------- | ------------------------------------------------------------------------------------ |
@@ -1637,7 +1637,7 @@ SingleChildScrollView(
 
 ## 16. Phân tích cơ chế Y Grid & Anchor Zoom (MEXC / TradingView)
 
-> Tổng hợp từ phân tích kỹ thuật `anchor_zoom.md` và `scroll_vertical_y.md`. Đây là tham khảo thiết kế — k_chart_wikex hiện dùng mô hình `mScaleY + mOffsetY` (canvas transform), không phải `visibleMinPrice / visibleMaxPrice`.
+> Tổng hợp từ phân tích kỹ thuật `anchor_zoom.md` và `scroll_vertical_y.md`. Đây là tham khảo thiết kế — k_chart_jk hiện dùng mô hình `mScaleY + mOffsetY` (canvas transform), không phải `visibleMinPrice / visibleMaxPrice`.
 
 ### 16.1 Vertical Scroll — di chuyển khoảng giá
 

@@ -1,4 +1,4 @@
-import 'package:k_chart_wikex/indicator/indicator_template.dart';
+import 'package:k_chart_jk/indicator/indicator_template.dart';
 
 /// Base Dimension
 class BaseDimension {

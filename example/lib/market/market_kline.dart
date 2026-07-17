@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 import 'package:meta/meta.dart';
 
 import 'realtime_frame.dart';

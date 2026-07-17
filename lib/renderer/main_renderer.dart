@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/indicator/indicator_template.dart';
+import 'package:k_chart_jk/indicator/indicator_template.dart';
 import '../entity/candle_entity.dart';
 import '../utils/number_util.dart';
 import 'base_chart_renderer.dart';

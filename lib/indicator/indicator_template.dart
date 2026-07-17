@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
-import 'package:k_chart_wikex/entity/index.dart';
-import 'package:k_chart_wikex/renderer/index.dart';
-import 'package:k_chart_wikex/utils/index.dart';
+import 'package:k_chart_jk/entity/index.dart';
+import 'package:k_chart_jk/renderer/index.dart';
+import 'package:k_chart_jk/utils/index.dart';
 
 import 'indicator_style.dart';
 export 'indicator_style.dart';

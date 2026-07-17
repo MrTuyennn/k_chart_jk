@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'dart:isolate';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 
 import '../market/market_env.dart';
 import '../market/market_history_api.dart';

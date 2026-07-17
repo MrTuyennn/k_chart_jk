@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 
 import 'chart_state.dart';
 

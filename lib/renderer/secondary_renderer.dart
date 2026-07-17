@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/indicator/indicator_template.dart';
+import 'package:k_chart_jk/indicator/indicator_template.dart';
 import '../entity/macd_entity.dart';
 import 'base_chart_renderer.dart';
 

@@ -38,7 +38,7 @@ Set `color` trong `textStyle` (vd `CandleStyle(textStyle: TextStyle(color: Color
 
 ### Breaking — `KChartColors`/`KChartStyle` refactor toàn bộ
 
-Gom màu/text rời rạc thành style theo khu vực, cho phép cấu hình màu indicator từ 1 chỗ duy nhất. Chi tiết đầy đủ: `chart_wikex_arch.md` §1 Unreleased + §8.2.
+Gom màu/text rời rạc thành style theo khu vực, cho phép cấu hình màu indicator từ 1 chỗ duy nhất. Chi tiết đầy đủ: `chart_jk_arch.md` §1 Unreleased + §8.2.
 
 - **`CandleStyle`/`VolumeStyle`** thay `kLineColor`, `kLineFillColors`, `upColor`, `dnColor`, `volColor` (xoá — dead field), `volUpColor`, `volDnColor`, `ma5Color`, `ma10Color` — mỗi class tự chứa cả màu lẫn `textStyle` riêng.
 - **16 field style indicator** (`avlStyle`, `maStyle`, `rsiStyle`, `macdStyle`...) thêm vào `KChartColors` — set màu toàn bộ indicator từ 1 nơi, cơ chế `applyIndicatorColorStyles()` tự áp cho instance nào chưa tự custom `indicatorStyle`.
@@ -103,7 +103,7 @@ _Ngày suy ra từ mtime file (thay đổi chưa commit tại thời điểm ghi
   - Trước: cumulative VWAP — `Σ(typicalPrice × vol) / Σ(vol)` cộng dồn từ nến đầu tiên (giá trị bị kéo dài/trôi theo toàn bộ lịch sử, không phản ánh đúng từng nến).
   - Sau: per-candle average — `avl = amount / vol` tính riêng cho từng nến; fallback `(H+L+C)/3` khi thiếu `amount` (luôn nằm trong range high-low của nến).
   - Mở rộng điều kiện fallback: coi `amount <= 0` (không chỉ `amount == null`) cũng là dữ liệu không đáng tin khi `vol > 0`, vì amount thật phải dương nếu đã có khớp lệnh.
-  - File: `lib/entity/avl_entity.dart`, `lib/indicator/main/avl_indicator.dart`, `chart_wikex_arch.md`
+  - File: `lib/entity/avl_entity.dart`, `lib/indicator/main/avl_indicator.dart`, `chart_jk_arch.md`
 
 - **StochRSI: fix RSI sai khi thị trường đi ngang tuyệt đối**
   - Trước: `avgGain == 0 && avgLoss == 0` (không tăng cũng không giảm) bị tính là `avgLoss == 0` → RSI = 100 (overbought giả).
@@ -158,7 +158,7 @@ _Ngày suy ra từ mtime file (thay đổi chưa commit tại thời điểm ghi
 
 ### 0.0.1
 
-* Initial release of k_chart_wikex — a Flutter candlestick chart package.
+* Initial release of k_chart_jk — a Flutter candlestick chart package.
 * Candlestick and line chart rendering with smooth gesture support (pan, zoom, fling).
 * Main indicators: MA, EMA, BOLL, SAR, ZigZag.
 * Secondary indicators: MACD, KDJ, RSI, WR, CCI.
@@ -261,11 +261,11 @@ File: `lib/depth_chart.dart`, `lib/renderer/base_chart_painter.dart`, `lib/rende
 
 ### 2026-07-02 — `a80f2ca` refactor: check perfomance render isLine
 
-Fix tiếp 3 lỗ hổng `shouldRepaint` phát hiện qua code review, có ghi lại đầy đủ trong `chart_wikex_arch.md`:
+Fix tiếp 3 lỗ hổng `shouldRepaint` phát hiện qua code review, có ghi lại đầy đủ trong `chart_jk_arch.md`:
 1. `isLine` (toggle nến ↔ line) bị thiếu trong `BaseChartPainter.shouldRepaint` — chuyển đổi loại chart không trigger repaint cho tới khi có field khác đổi kèm.
 2. `isTrendLine`/`selectY`/`lines` thiếu trong `ChartPainter.shouldRepaint`. Bug sâu hơn: `lines` (điểm trend line) bị `KChartWidget` **mutate in-place** (`lines.add(...)`) rồi truyền cùng reference vào `ChartPainter` mỗi build → `oldDelegate.lines != lines` không bao giờ đúng (cùng 1 object). Sửa bằng cách (1) truyền snapshot mới `List<TrendLine>.of(lines)` mỗi build, và (2) so sánh `lines` theo giá trị (`_trendLinesEqual`, so từng field) thay vì reference.
 3. Cache chuỗi ngày của `getDate()` (`_dateStringCache`) gần như bị clear mỗi frame: so sánh `mFormats` theo identity (`_cacheFormats != mFormats`), nhưng `initFormats()` luôn gán 1 list literal **mới** mỗi lần `ChartPainter` được dựng lại (mỗi build) dù nội dung format không đổi — cache coi như vô dụng. Sửa bằng so sánh theo giá trị (`_formatsEqual`).
 - Đây chính là cùng 1 lớp lỗi "mutate in-place → `!=` không bao giờ đúng → shouldRepaint không nhận ra thay đổi" đã ghi trong anti-pattern của `livePrice`/`datas` trong project memory — chỉ khác field.
-File: `chart_wikex_arch.md`, `lib/k_chart_widget.dart`, `lib/renderer/base_chart_painter.dart`, `lib/renderer/chart_painter.dart`
+File: `chart_jk_arch.md`, `lib/k_chart_widget.dart`, `lib/renderer/base_chart_painter.dart`, `lib/renderer/chart_painter.dart`
 
 *Chi tiết từng commit có thể xem bằng `git show <hash>` hoặc `git log -p <hash>^..<hash>`.*

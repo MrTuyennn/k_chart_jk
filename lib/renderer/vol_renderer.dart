@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/entity/index.dart';
-import 'package:k_chart_wikex/utils/index.dart';
-import 'package:k_chart_wikex/renderer/index.dart';
+import 'package:k_chart_jk/entity/index.dart';
+import 'package:k_chart_jk/utils/index.dart';
+import 'package:k_chart_jk/renderer/index.dart';
 
 /// VolRenderer
 ///

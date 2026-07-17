@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 
 import 'bloc/chart_bloc.dart';
 import 'bloc/chart_event.dart';
@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'K Chart Wikex Demo',
+      title: 'K Chart JK Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF217AFF)),
@@ -846,7 +846,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         builder: (context) {
           final size = MediaQuery.sizeOf(context).width / 12;
           return SvgPicture.asset(
-            'assets/logo_wikex.svg',
+            'assets/logo_jk.svg',
             width: size,
             height: size,
           );
@@ -933,7 +933,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 builder: (context) {
                   final size = MediaQuery.sizeOf(context).width / 12;
                   return SvgPicture.asset(
-                    'assets/logo_wikex.svg',
+                    'assets/logo_jk.svg',
                     width: size,
                     height: size,
                   );

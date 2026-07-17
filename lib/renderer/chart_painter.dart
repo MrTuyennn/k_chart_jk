@@ -1,8 +1,8 @@
 import 'dart:async' show StreamSink;
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/extension/canvas_extension.dart';
-import 'package:k_chart_wikex/indicator/indicator_template.dart';
-import 'package:k_chart_wikex/utils/index.dart';
+import 'package:k_chart_jk/extension/canvas_extension.dart';
+import 'package:k_chart_jk/indicator/indicator_template.dart';
+import 'package:k_chart_jk/utils/index.dart';
 import '../entity/info_window_entity.dart';
 import '../entity/k_line_entity.dart';
 import 'base_chart_painter.dart';

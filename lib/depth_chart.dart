@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:k_chart_wikex/chart_translations.dart';
-import 'package:k_chart_wikex/extension/canvas_extension.dart';
-import 'package:k_chart_wikex/styles/depth_chart_style.dart';
-import 'package:k_chart_wikex/utils/number_util.dart';
+import 'package:k_chart_jk/chart_translations.dart';
+import 'package:k_chart_jk/extension/canvas_extension.dart';
+import 'package:k_chart_jk/styles/depth_chart_style.dart';
+import 'package:k_chart_jk/utils/number_util.dart';
 import 'entity/depth_entity.dart';
 
 class DepthChart extends StatefulWidget {

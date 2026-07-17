@@ -31,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  k_chart_wikex:
+  k_chart_jk:
     path: ../
   flutter_svg: ^2.0.0
   flutter_bloc: ^8.1.6
@@ -64,7 +64,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/logo_wikex.svg
+    - assets/logo_jk.svg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

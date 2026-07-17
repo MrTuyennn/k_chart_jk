@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart'
     show Color, TextStyle, Rect, Canvas, Size, CustomPainter;
-import 'package:k_chart_wikex/indicator/indicator_template.dart';
-import 'package:k_chart_wikex/utils/index.dart';
+import 'package:k_chart_jk/indicator/indicator_template.dart';
+import 'package:k_chart_jk/utils/index.dart';
 import '../styles/k_chart_style.dart' show KChartStyle;
 import '../entity/k_line_entity.dart';
 import 'base_dimension.dart';

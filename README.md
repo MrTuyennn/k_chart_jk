@@ -1,4 +1,4 @@
-# k_chart_wikex
+# k_chart_jk
 
 A Flutter candlestick chart package with support for multiple technical indicators, smooth gesture interactions, and customizable themes.
 
@@ -32,9 +32,9 @@ In your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  k_chart_wikex:
+  k_chart_jk:
     git:
-      url: https://github.com/MrTuyennn/k_chart_wikex.git
+      url: https://github.com/MrTuyennn/k_chart_jk.git
 ```
 
 Then run:
@@ -50,7 +50,7 @@ flutter pub get
 ### 1. Import
 
 ```dart
-import 'package:k_chart_wikex/k_chart_plus.dart';
+import 'package:k_chart_jk/k_chart_plus.dart';
 ```
 
 ### 2. Prepare data
@@ -433,7 +433,7 @@ KChartWidget(
 )
 ```
 
-> Instance nào tự truyền `indicatorStyle` riêng (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) sẽ **không** bị `KChartColors` ghi đè — style ở instance luôn thắng. Chi tiết cơ chế + bảng đầy đủ 16 field: xem [`chart_wikex_arch.md` §8.2](chart_wikex_arch.md#82-kchartcolors).
+> Instance nào tự truyền `indicatorStyle` riêng (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) sẽ **không** bị `KChartColors` ghi đè — style ở instance luôn thắng. Chi tiết cơ chế + bảng đầy đủ 16 field: xem [`chart_jk_arch.md` §8.2](chart_jk_arch.md#82-kchartcolors).
 
 Mỗi `XxxStyle` (`AVLStyle`, `RSIStyle`, `MACDStyle`...) còn có `textStyle` riêng (mặc định fontSize 10) — chỉnh font label từng indicator độc lập nhau, không dùng chung `CandleStyle.textStyle`:
 
@@ -578,10 +578,10 @@ flutter run --dart-define-from-file=env.dev.json
 
 Thiếu file/thiếu giá trị → app hiển thị màn "Chưa cấu hình endpoint API" thay vì crash.
 
-Muốn 1 ví dụ tự chứa, không cần bloc/network, copy-paste chạy ngay (mock data) — xem [**Ví dụ đầy đủ** trong `chart_wikex_arch.md`](chart_wikex_arch.md#ví-dụ-đầy-đủ).
+Muốn 1 ví dụ tự chứa, không cần bloc/network, copy-paste chạy ngay (mock data) — xem [**Ví dụ đầy đủ** trong `chart_jk_arch.md`](chart_jk_arch.md#ví-dụ-đầy-đủ).
 
 ---
 
 ## License
 
-Copyright (c) 2026 Wikex. All rights reserved. See [LICENSE](LICENSE).
+Copyright (c) 2026 JK. All rights reserved. See [LICENSE](LICENSE).
