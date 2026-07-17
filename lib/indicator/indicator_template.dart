@@ -38,18 +38,22 @@ abstract class IndicatorTemplate<T, K> {
   /// khai báo trong `KChartColors` khi instance vẫn còn dùng default `const`.
   K indicatorStyle;
 
-  /// Snapshot của [indicatorStyle] tại thời điểm khởi tạo — dùng để phát hiện
-  /// "caller có tự truyền indicatorStyle riêng không", KHÔNG dùng giá trị
-  /// hiện tại của [indicatorStyle] (vì [applyIndicatorColorStyles] đã ghi đè
-  /// nó rồi thì so với giá trị hiện tại sẽ luôn sai — xem [applyIndicatorColorStyles]).
-  final K _originalIndicatorStyle;
+  /// true khi caller KHÔNG tự truyền `indicatorStyle` (constructor nhận `null`
+  /// và tự resolve về default `const XxxStyle()`) — dùng để phát hiện "caller
+  /// có tự truyền indicatorStyle riêng không". Cờ tường minh thay vì so sánh
+  /// `identical()` với 1 giá trị `const` mới dựng, vì Dart const-canonicalization
+  /// khiến `identical()` luôn đúng ngay cả khi caller CHỦ ĐỘNG truyền
+  /// `const XxxStyle()` với field y hệt default — trường hợp đó vẫn bị nhận
+  /// nhầm là "chưa customize" và bị [applyIndicatorColorStyles] ghi đè.
+  final bool isDefaultStyle;
 
   IndicatorTemplate({
     required this.name,
     required this.shortName,
     required this.calcParams,
     required this.indicatorStyle,
-  }) : _originalIndicatorStyle = indicatorStyle;
+    required this.isDefaultStyle,
+  });
 
   /// record.$1 : min value
   /// record.$2: max value
@@ -79,13 +83,11 @@ abstract class IndicatorTemplate<T, K> {
   /// tương ứng, vd K/D/J của KDJ, MACD/DIF/DEA) — không được đồng loạt bị
   /// `textStyle.color` ghi đè như prefix tên indicator (`"KDJ(9,1,3) "`...).
   TextStyle getTextStyle(
-    Color? color, [
+    Color? color, {
     TextStyle base = const TextStyle(fontSize: 10),
     bool forceColor = false,
-  ]) {
-    if (!forceColor && base.color != null) return base;
-    return base.copyWith(color: color);
-  }
+  }) =>
+      resolveTextStyle(base, color, forceColor: forceColor);
 
   String formatNumber(double value, int precision) {
     return NumberUtil.format(value, precision) ?? '--';
@@ -98,6 +100,7 @@ abstract class MainIndicator<T, K> extends IndicatorTemplate<T, K> {
     required super.shortName,
     required super.calcParams,
     required super.indicatorStyle,
+    required super.isDefaultStyle,
   });
 }
 
@@ -107,6 +110,7 @@ abstract class SecondaryIndicator<T, K> extends IndicatorTemplate<T, K> {
     required super.shortName,
     required super.calcParams,
     required super.indicatorStyle,
+    required super.isDefaultStyle,
   });
 
   /// Các mốc ngang tham chiếu vẽ nét đứt trong panel (vd [20, 80] cho StochRSI).
@@ -132,71 +136,86 @@ abstract class SecondaryIndicator<T, K> extends IndicatorTemplate<T, K> {
 ///
 /// Instance nào đã tự truyền `indicatorStyle` khác `const` mặc định (vd
 /// `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.purple))`) thì GIỮ
-/// NGUYÊN — không bị `KChartColors` ghi đè. Phát hiện qua `identical()` với
-/// [IndicatorTemplate._originalIndicatorStyle] — snapshot chụp 1 lần lúc khởi
-/// tạo, KHÔNG phải giá trị `indicatorStyle` hiện tại. Quan trọng vì hàm này
-/// chạy lại mỗi lần `ChartPainter` được dựng (mỗi build/repaint): nếu so với
-/// `indicatorStyle` hiện tại, sau lần gán đầu tiên nó không còn `identical`
-/// với default const nữa → các lần build sau sẽ không bao giờ áp lại màu mới
-/// dù `KChartColors` đã đổi (vd đổi theme). So với snapshot bất biến thì mỗi
-/// build đều tự quyết định lại đúng, không bị "đơ" màu sau lần đầu.
+/// NGUYÊN — không bị `KChartColors` ghi đè. Phát hiện qua cờ tường minh
+/// [IndicatorTemplate.isDefaultStyle] (set 1 lần lúc khởi tạo dựa trên
+/// constructor có nhận `null` hay không), KHÔNG so `identical()` với giá trị
+/// hiện tại của `indicatorStyle` — sau lần gán đầu tiên nó không còn giữ
+/// nguyên giá trị khởi tạo nữa nên so với hiện tại sẽ luôn sai. Hàm này chạy
+/// lại mỗi lần `ChartPainter` được dựng (mỗi build/repaint); vì `isDefaultStyle`
+/// bất biến, mỗi build đều tự quyết định lại đúng, không bị "đơ" màu sau lần đầu.
+///
+/// Bản thân hàm này (switch + gán) tốn chi phí không đáng kể mỗi lần gọi —
+/// nhưng `ChartPainter` được dựng lại mỗi build/tick giá, nên vẫn cache theo
+/// `identical()` của bộ 3 tham số để bỏ qua hoàn toàn khi
+/// `mainIndicators`/`secondaryIndicators`/`colors` chưa đổi giữa 2 lần gọi
+/// liên tiếp (trường hợp phổ biến nhất: rebuild do tick giá, không đổi style).
+List<MainIndicator>? _lastMainIndicators;
+List<SecondaryIndicator>? _lastSecondaryIndicators;
+KChartColors? _lastColors;
+
 void applyIndicatorColorStyles(
   List<MainIndicator> mainIndicators,
   List<SecondaryIndicator> secondaryIndicators,
   KChartColors colors,
 ) {
+  if (identical(_lastMainIndicators, mainIndicators) &&
+      identical(_lastSecondaryIndicators, secondaryIndicators) &&
+      identical(_lastColors, colors)) {
+    return;
+  }
+  _lastMainIndicators = mainIndicators;
+  _lastSecondaryIndicators = secondaryIndicators;
+  _lastColors = colors;
+
   for (final ind in mainIndicators) {
     switch (ind) {
       case MAIndicator m:
-        _applyDefaultStyle(m, const MAStyle(), colors.maStyle);
+        _applyDefaultStyle(m, colors.maStyle);
       case EMAIndicator m:
-        _applyDefaultStyle(m, const MAStyle(), colors.emaStyle);
+        _applyDefaultStyle(m, colors.emaStyle);
       case BOLLIndicator m:
-        _applyDefaultStyle(m, const BOLLStyle(), colors.bollStyle);
+        _applyDefaultStyle(m, colors.bollStyle);
       case SARIndicator m:
-        _applyDefaultStyle(m, const SARStyle(), colors.sarStyle);
+        _applyDefaultStyle(m, colors.sarStyle);
       case ZigZagIndicator m:
-        _applyDefaultStyle(m, const ZigZagStyle(), colors.zigzagStyle);
+        _applyDefaultStyle(m, colors.zigzagStyle);
       case SuperTrendIndicator m:
-        _applyDefaultStyle(m, const SuperTrendStyle(), colors.superTrendStyle);
+        _applyDefaultStyle(m, colors.superTrendStyle);
       case AVLIndicator m:
-        _applyDefaultStyle(m, const AVLStyle(), colors.avlStyle);
+        _applyDefaultStyle(m, colors.avlStyle);
     }
   }
   for (final ind in secondaryIndicators) {
     switch (ind) {
       case MACDIndicator s:
-        _applyDefaultStyle(s, const MACDStyle(), colors.macdStyle);
+        _applyDefaultStyle(s, colors.macdStyle);
       case KDJIndicator s:
-        _applyDefaultStyle(s, const KDJStyle(), colors.kdjStyle);
+        _applyDefaultStyle(s, colors.kdjStyle);
       case RSIIndicator s:
-        _applyDefaultStyle(s, const RSIStyle(), colors.rsiStyle);
+        _applyDefaultStyle(s, colors.rsiStyle);
       case WRIndicator s:
-        _applyDefaultStyle(s, const WRStyle(), colors.wrStyle);
+        _applyDefaultStyle(s, colors.wrStyle);
       case CCIIndicator s:
-        _applyDefaultStyle(s, const CCIStyle(), colors.cciStyle);
+        _applyDefaultStyle(s, colors.cciStyle);
       case OBVIndicator s:
-        _applyDefaultStyle(s, const OBVStyle(), colors.obvStyle);
+        _applyDefaultStyle(s, colors.obvStyle);
       case TRIXIndicator s:
-        _applyDefaultStyle(s, const TRIXStyle(), colors.trixStyle);
+        _applyDefaultStyle(s, colors.trixStyle);
       case MTMIndicator s:
-        _applyDefaultStyle(s, const MTMStyle(), colors.mtmStyle);
+        _applyDefaultStyle(s, colors.mtmStyle);
       case StochRSIIndicator s:
-        _applyDefaultStyle(s, const StochRSIStyle(), colors.stochRsiStyle);
+        _applyDefaultStyle(s, colors.stochRsiStyle);
     }
   }
 }
 
 /// Gán [override] vào `ind.indicatorStyle` chỉ khi instance chưa từng được
-/// caller tự truyền `indicatorStyle` riêng (so bằng `_originalIndicatorStyle`
-/// snapshot, không phải giá trị `indicatorStyle` hiện tại — xem giải thích ở
-/// [applyIndicatorColorStyles]).
+/// caller tự truyền `indicatorStyle` riêng (xem [IndicatorTemplate.isDefaultStyle]).
 void _applyDefaultStyle<K>(
   IndicatorTemplate<dynamic, K> ind,
-  K defaultStyle,
   K override,
 ) {
-  if (identical(ind._originalIndicatorStyle, defaultStyle)) {
+  if (ind.isDefaultStyle) {
     ind.indicatorStyle = override;
   }
 }

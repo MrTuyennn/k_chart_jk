@@ -155,6 +155,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         MainIndicatorType.ma,
         MainIndicatorType.boll,
         MainIndicatorType.ema,
+        MainIndicatorType.sar,
         MainIndicatorType.superTrend,
         MainIndicatorType.zigzag,
         MainIndicatorType.avl,
@@ -211,9 +212,9 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
 
   Future<void> _withRecalcLock(Future<void> Function() action) {
     final completer = Completer<void>();
-    final result = _recalcLock.then((_) => action()).whenComplete(
-      completer.complete,
-    );
+    final result = _recalcLock
+        .then((_) => action())
+        .whenComplete(completer.complete);
     _recalcLock = completer.future;
     return result;
   }
@@ -244,16 +245,19 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
     Emitter<ChartState> emit,
   ) async {
     if (!MarketEnv.isConfigured) {
-      emit(state.copyWith(
-        isFetching: false,
-        error: 'missing_env: chạy với --dart-define-from-file=env.dev.json',
-      ));
+      emit(
+        state.copyWith(
+          isFetching: false,
+          error: 'missing_env: chạy với --dart-define-from-file=env.dev.json',
+        ),
+      );
       return;
     }
     emit(state.copyWith(isFetching: true, error: null));
     try {
       final toMs = DateTime.now().toUtc().millisecondsSinceEpoch;
-      final fromMs = toMs -
+      final fromMs =
+          toMs -
           ChartState.initialBatchSize * timeframe.interval.inMilliseconds;
       final bars = await fetchMarketHistory(
         apiBaseUrl: MarketEnv.apiBaseUrl,
@@ -274,7 +278,8 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           error: null,
         );
         final computed = await _recalculateState(next);
-        if (isClosed || state.timeframe != timeframe) return; // đổi khung lúc chờ isolate
+        if (isClosed || state.timeframe != timeframe)
+          return; // đổi khung lúc chờ isolate
         next = next.copyWith(data: computed);
         emit(next);
       });
@@ -305,12 +310,14 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         symbol: MarketEnv.symbol,
         resolution: timeframe.restResolution,
         period: timeframe.wsPeriod,
-        fromMs: oldestMs -
+        fromMs:
+            oldestMs -
             ChartState.loadMoreBatchSize * timeframe.interval.inMilliseconds,
         toMs: oldestMs - 1, // tránh trùng bar cũ nhất đang có
       );
       if (isClosed) return;
-      if (state.timeframe != timeframe) return; // user đã đổi khung trong lúc chờ
+      if (state.timeframe != timeframe)
+        return; // user đã đổi khung trong lúc chờ
       await _withRecalcLock(() async {
         if (isClosed || state.timeframe != timeframe) return;
         // state.data đọc lại BÊN TRONG khoá, SAU await fetch — không mất các
@@ -318,8 +325,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         // lấn biên.
         final older = [
           for (final b in bars)
-            if (b.barCloseTime.millisecondsSinceEpoch <
-                state.data.first.time!)
+            if (b.barCloseTime.millisecondsSinceEpoch < state.data.first.time!)
               b.toEntity(),
         ];
         var next = state.copyWith(
@@ -328,7 +334,8 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
           hasMoreHistory: bars.isNotEmpty,
         );
         final computed = await _recalculateState(next);
-        if (isClosed || state.timeframe != timeframe) return; // đổi khung lúc chờ isolate
+        if (isClosed || state.timeframe != timeframe)
+          return; // đổi khung lúc chờ isolate
         next = next.copyWith(data: computed);
         emit(next);
       });

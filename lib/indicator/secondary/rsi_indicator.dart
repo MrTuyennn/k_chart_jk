@@ -5,16 +5,17 @@ part of '../indicator_template.dart';
 class RSIIndicator extends SecondaryIndicator<MACDEntity, RSIStyle> {
   late final Paint _linePaint;
 
-  RSIIndicator({ RSIStyle indicatorStyle = const RSIStyle() }): super(
+  RSIIndicator({ RSIStyle? indicatorStyle }): super(
     name: 'relativeStrengthIndex',
     shortName: 'RSI',
     calcParams: const [6, 12, 24],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const RSIStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -31,7 +32,7 @@ class RSIIndicator extends SecondaryIndicator<MACDEntity, RSIStyle> {
     if (entity.rsi == null) return null;
     return TextSpan(
       text: "RSI(14):${formatNumber(entity.rsi!, precision)}",
-      style: getTextStyle(indicatorStyle.rsiColor, indicatorStyle.textStyle),
+      style: getTextStyle(indicatorStyle.rsiColor, base: indicatorStyle.textStyle),
     );
   }
 

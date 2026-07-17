@@ -4,7 +4,7 @@ import 'package:k_chart_jk/k_chart_plus.dart';
 
 import '../market/order_book.dart';
 
-enum MainIndicatorType { ma, boll, ema, superTrend, zigzag, avl }
+enum MainIndicatorType { ma, boll, ema, sar, superTrend, zigzag, avl }
 
 enum SecondaryIndicatorType {
   macd,
@@ -24,6 +24,7 @@ MainIndicator buildMainIndicator(MainIndicatorType type) => switch (type) {
   MainIndicatorType.ma => MAIndicator(),
   MainIndicatorType.boll => BOLLIndicator(),
   MainIndicatorType.ema => EMAIndicator(),
+  MainIndicatorType.sar => SARIndicator(),
   MainIndicatorType.superTrend => SuperTrendIndicator(),
   MainIndicatorType.zigzag => ZigZagIndicator(),
   MainIndicatorType.avl => AVLIndicator(),
@@ -163,6 +164,7 @@ class ChartState extends Equatable {
     MainIndicatorType.ma,
     MainIndicatorType.boll,
     MainIndicatorType.ema,
+    MainIndicatorType.sar,
     MainIndicatorType.superTrend,
     MainIndicatorType.zigzag,
     MainIndicatorType.avl,

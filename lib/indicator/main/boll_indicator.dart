@@ -11,17 +11,18 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
   late final Paint _linePaint;
   late final Paint _fillPaint;
 
-  BOLLIndicator({BOLLStyle indicatorStyle = const BOLLStyle()})
+  BOLLIndicator({BOLLStyle? indicatorStyle})
     : super(
         name: 'bollingerBands',
         shortName: 'BOLL',
         calcParams: const [20, 2],
-        indicatorStyle: indicatorStyle,
+        indicatorStyle: indicatorStyle ?? const BOLLStyle(),
+        isDefaultStyle: indicatorStyle == null,
       ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
 
     _fillPaint = Paint();
   }
@@ -57,17 +58,17 @@ class BOLLIndicator extends MainIndicator<CandleEntity, BOLLStyle> {
         if (value.mid != null && value.mid != 0)
           TextSpan(
             text: "BOLL:${formatNumber(value.mid!, precision)}  ",
-            style: getTextStyle(indicatorStyle.bollColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.bollColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (value.up != null && value.up != 0)
           TextSpan(
             text: "UB:${formatNumber(value.up!, precision)}  ",
-            style: getTextStyle(indicatorStyle.ubColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.ubColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (value.dn != null && value.dn != 0)
           TextSpan(
             text: "LB:${formatNumber(value.dn!, precision)}",
-            style: getTextStyle(indicatorStyle.lbColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.lbColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
       ],
     );

@@ -10,21 +10,22 @@ class MACDIndicator extends SecondaryIndicator<MACDEntity, MACDStyle> {
   late final Paint _linePaint;
   late final Paint _rectPaint;
 
-  MACDIndicator({ MACDStyle indicatorStyle = const MACDStyle() }): super(
+  MACDIndicator({ MACDStyle? indicatorStyle }): super(
     name: 'movingAverageConvergenceDivergence',
     shortName: 'MACD',
     calcParams: const [12, 26, 9],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const MACDStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
 
     _rectPaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.strokeWidth;
+      ..strokeWidth = this.indicatorStyle.strokeWidth;
   }
 
   @override
@@ -50,22 +51,22 @@ class MACDIndicator extends SecondaryIndicator<MACDEntity, MACDStyle> {
       children: [
         TextSpan(
           text: "MACD(12,26,9) ",
-          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, base: indicatorStyle.textStyle),
         ),
         if (entity.macd != null && entity.macd != 0)
           TextSpan(
             text: "MACD:${formatNumber(entity.macd!, precision)}  ",
-            style: getTextStyle(indicatorStyle.macdColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.macdColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.dif != null && entity.dif != 0)
           TextSpan(
             text: "DIF:${formatNumber(entity.dif!, precision)}  ",
-            style: getTextStyle(indicatorStyle.difColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.difColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.dea != null && entity.dea != 0)
           TextSpan(
             text: "DEA:${formatNumber(entity.dea!, precision)}",
-            style: getTextStyle(indicatorStyle.deaColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.deaColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
       ],
     );

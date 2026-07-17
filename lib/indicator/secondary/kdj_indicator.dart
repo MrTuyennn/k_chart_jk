@@ -3,16 +3,17 @@ part of '../indicator_template.dart';
 class KDJIndicator extends SecondaryIndicator<MACDEntity, KDJStyle> {
   late final Paint _linePaint;
 
-  KDJIndicator({ KDJStyle indicatorStyle = const KDJStyle() }): super(
+  KDJIndicator({ KDJStyle? indicatorStyle }): super(
     name: 'stoch',
     shortName: 'KDJ',
     calcParams: const [],//[9, 3, 3], [9, 1, 3],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const KDJStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -38,22 +39,22 @@ class KDJIndicator extends SecondaryIndicator<MACDEntity, KDJStyle> {
       children: [
         TextSpan(
           text: "KDJ(9,1,3) ",
-          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, base: indicatorStyle.textStyle),
         ),
         if (entity.k != null && entity.k != 0)
           TextSpan(
             text: "K:${formatNumber(entity.k!, precision)}  ",
-            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.kColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.d != null && entity.d != 0)
           TextSpan(
             text: "D:${formatNumber(entity.d!, precision)}  ",
-            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.dColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.j != null && entity.j != 0)
           TextSpan(
             text: "J:${formatNumber(entity.j!, precision)}",
-            style: getTextStyle(indicatorStyle.jColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.jColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
       ],
     );
@@ -94,21 +95,21 @@ class KDJIndicator extends SecondaryIndicator<MACDEntity, KDJStyle> {
 
   @override
   void drawChart(MACDEntity lastPoint, MACDEntity curPoint, double lastX, double curX, GetYFunction getY, Canvas canvas, KChartColors chartColors) {
-    if (curPoint.k != null || lastPoint.k != null) {
+    if (curPoint.k != null && lastPoint.k != null) {
       canvas.drawLine(
         Offset(curX, getY(curPoint.k!)),
         Offset(lastX, getY(lastPoint.k!)),
         _linePaint..color = indicatorStyle.kColor,
       );
     }
-    if (curPoint.d != null || lastPoint.d != null) {
+    if (curPoint.d != null && lastPoint.d != null) {
       canvas.drawLine(
         Offset(curX, getY(curPoint.d!)),
         Offset(lastX, getY(lastPoint.d!)),
         _linePaint..color = indicatorStyle.dColor,
       );
     }
-    if (curPoint.j != null || lastPoint.j != null) {
+    if (curPoint.j != null && lastPoint.j != null) {
       canvas.drawLine(
         Offset(curX, getY(curPoint.j!)),
         Offset(lastX, getY(lastPoint.j!)),

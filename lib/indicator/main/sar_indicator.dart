@@ -3,55 +3,85 @@ part of '../indicator_template.dart';
 class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
   late final Paint _dotPaint;
 
-  SARIndicator({ SARStyle indicatorStyle = const SARStyle() }): super(
-    name: 'stopAndReverse',
-    shortName: 'SAR',
-    calcParams: const [2, 2, 20],
-    indicatorStyle: indicatorStyle,
-  ) {
+  SARIndicator({SARStyle? indicatorStyle})
+    : super(
+        name: 'stopAndReverse',
+        shortName: 'SAR',
+        calcParams: const [2, 2, 20],
+        indicatorStyle: indicatorStyle ?? const SARStyle(),
+        isDefaultStyle: indicatorStyle == null,
+      ) {
     _dotPaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
       ..style = PaintingStyle.stroke
-      ..strokeWidth = indicatorStyle.strokeWidth;
+      ..strokeWidth = this.indicatorStyle.strokeWidth;
   }
 
   @override
-  (double, double) getMaxMinValue(KLineEntity entity, double minV, double maxV) {
+  (double, double) getMaxMinValue(
+    KLineEntity entity,
+    double minV,
+    double maxV,
+  ) {
     if (entity.sar == null) return (minV, maxV);
-    return (
-      min(entity.sar!, minV),
-      max(entity.sar!, maxV),
-    );
+    return (min(entity.sar!, minV), max(entity.sar!, maxV));
   }
 
   @override
-  TextSpan? drawFigure(CandleEntity entity, int precision, KChartColors chartColors) {
+  TextSpan? drawFigure(
+    CandleEntity entity,
+    int precision,
+    KChartColors chartColors,
+  ) {
     double? value = entity.sar;
     if (value == null) return null;
     return TextSpan(
-      text: "SAR: ${formatNumber(value, precision)}",
-      style: getTextStyle(indicatorStyle.sarColor, indicatorStyle.textStyle),
+      children: [
+        TextSpan(
+          text: "SAR: ",
+          style: getTextStyle(
+            chartColors.defaultTextColor,
+            base: indicatorStyle.textStyle,
+          ),
+        ),
+        TextSpan(
+          text: formatNumber(value, precision),
+          style: getTextStyle(
+            _colorFor(entity),
+            base: indicatorStyle.textStyle,
+            forceColor: true,
+          ),
+        ),
+      ],
     );
   }
 
+  /// Màu theo xu hướng — SAR nằm dưới giá (`sar < halfHL`) = tăng, dùng
+  /// `upColor`; nằm trên giá = giảm, dùng `dnColor`. Bằng nhau (hiếm, đúng
+  /// lúc đảo chiều) coi là tăng.
+  Color _colorFor(CandleEntity entity) {
+    final sar = entity.sar!;
+    final halfHL = (entity.high + entity.low) / 2;
+    return sar <= halfHL ? indicatorStyle.upColor : indicatorStyle.dnColor;
+  }
+
   @override
-  void drawChart(CandleEntity lastPoint, CandleEntity curPoint, double lastX, double curX, GetYFunction getY, Canvas canvas, KChartColors chartColors) {
+  void drawChart(
+    CandleEntity lastPoint,
+    CandleEntity curPoint,
+    double lastX,
+    double curX,
+    GetYFunction getY,
+    Canvas canvas,
+    KChartColors chartColors,
+  ) {
     final sar = curPoint.sar;
     if (sar == null) return;
-    final halfHL = (curPoint.high + curPoint.low) / 2;
-    late final Color color;
-    if (sar == halfHL) {
-      color = chartColors.defaultTextColor;
-    } else if (sar < halfHL) {
-      color = chartColors.candleStyle.upColor;
-    } else {
-      color = chartColors.candleStyle.dnColor;
-    }
     canvas.drawCircle(
       Offset(curX, getY(sar)),
       indicatorStyle.radius,
-      _dotPaint..color = color,
+      _dotPaint..color = _colorFor(curPoint),
     );
   }
 

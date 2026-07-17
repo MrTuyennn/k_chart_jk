@@ -9,18 +9,19 @@ class SuperTrendIndicator extends MainIndicator<CandleEntity, SuperTrendStyle> {
   late final Paint _linePaint;
   late final Paint _fillPaint;
 
-  SuperTrendIndicator({SuperTrendStyle indicatorStyle = const SuperTrendStyle()})
+  SuperTrendIndicator({SuperTrendStyle? indicatorStyle})
     : super(
         name: 'superTrend',
         shortName: 'SUPER',
         calcParams: const [10, 30],
-        indicatorStyle: indicatorStyle,
+        indicatorStyle: indicatorStyle ?? const SuperTrendStyle(),
+        isDefaultStyle: indicatorStyle == null,
       ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
       ..style = PaintingStyle.stroke
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
 
     _fillPaint = Paint()..isAntiAlias = true;
   }
@@ -39,7 +40,7 @@ class SuperTrendIndicator extends MainIndicator<CandleEntity, SuperTrendStyle> {
     final color = st!.isUp == true ? indicatorStyle.upColor : indicatorStyle.dnColor;
     return TextSpan(
       text: "SUPER: ${formatNumber(st.value!, precision)}",
-      style: getTextStyle(color, indicatorStyle.textStyle),
+      style: getTextStyle(color, base: indicatorStyle.textStyle),
     );
   }
 

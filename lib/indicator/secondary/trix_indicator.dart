@@ -8,16 +8,17 @@ part of '../indicator_template.dart';
 class TRIXIndicator extends SecondaryIndicator<MACDEntity, TRIXStyle> {
   late final Paint _linePaint;
 
-  TRIXIndicator({ TRIXStyle indicatorStyle = const TRIXStyle() }): super(
+  TRIXIndicator({ TRIXStyle? indicatorStyle }): super(
     name: 'tripleExponentialAverage',
     shortName: 'TRIX',
     calcParams: const [12, 20],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const TRIXStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -39,17 +40,17 @@ class TRIXIndicator extends SecondaryIndicator<MACDEntity, TRIXStyle> {
       children: [
         TextSpan(
           text: "TRIX(${calcParams[0]},${calcParams[1]}) ",
-          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, base: indicatorStyle.textStyle),
         ),
         if (entity.trix != null)
           TextSpan(
             text: "TRIX:${formatNumber(entity.trix!, precision)}  ",
-            style: getTextStyle(indicatorStyle.trixColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.trixColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.trixMa != null)
           TextSpan(
             text: "MATRIX:${formatNumber(entity.trixMa!, precision)}",
-            style: getTextStyle(indicatorStyle.trixMaColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.trixMaColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
       ],
     );

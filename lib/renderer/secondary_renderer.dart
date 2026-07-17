@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:k_chart_jk/indicator/indicator_template.dart';
+import 'package:k_chart_jk/utils/index.dart';
 import '../entity/macd_entity.dart';
 import 'base_chart_renderer.dart';
 
@@ -27,7 +28,8 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
         gridColor: chartColors.gridColor,
       ) {
     _referencePaint = Paint()
-      ..color = chartColors.defaultTextColor.withAlpha(90)
+      ..color = chartColors.defaultTextColor
+          .withValues(alpha: chartColors.defaultTextColor.a * (90 / 255))
       ..strokeWidth = 0.5;
   }
 
@@ -78,12 +80,8 @@ class SecondaryRenderer extends BaseChartRenderer<MACDEntity> {
   /// (`indicator.indicatorStyle.textStyle`) — KHÔNG dùng chung `candleStyle.textStyle`
   /// của main chart, để mỗi panel (StochRSI/KDJ/MACD/...) tự chỉnh font/màu độc lập.
   @override
-  TextStyle getTextStyle(Color color) {
-    final TextStyle textStyle = indicator.indicatorStyle.textStyle;
-    return textStyle.color != null
-        ? textStyle
-        : textStyle.copyWith(color: color);
-  }
+  TextStyle getTextStyle(Color color) =>
+      resolveTextStyle(indicator.indicatorStyle.textStyle, color);
 
   @override
   void drawText(Canvas canvas, MACDEntity data, double x) {

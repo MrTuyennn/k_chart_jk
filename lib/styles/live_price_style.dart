@@ -45,17 +45,25 @@ class LivePriceBadgePainter extends CustomPainter {
   static const double _viewBoxWidth = 54.0;
   static const double _viewBoxHeight = 14.0;
 
+  static final Path _arrowPath = Path()
+    ..moveTo(0.486069, 6.1578)
+    ..cubicTo(-0.162253, 6.53211, -0.162253, 7.46789, 0.486069, 7.8422)
+    ..lineTo(2.06862, 8.75588)
+    ..cubicTo(2.71694, 9.13019, 3.52734, 8.6623, 3.52734, 7.91368)
+    ..lineTo(3.52734, 6.08632)
+    ..cubicTo(3.52734, 5.3377, 2.71694, 4.86981, 2.06862, 5.24412)
+    ..lineTo(0.486069, 6.1578)
+    ..close();
+
+  static final Paint _bgPaint = Paint()..style = PaintingStyle.fill;
+  static final Paint _arrowPaint = Paint()..style = PaintingStyle.fill;
+
   @override
   void paint(Canvas canvas, Size size) {
-    // SVG viewBox tự scale ĐỒNG BỘ mọi phần tử con theo tỉ lệ size thực tế
-    // so với viewBox gốc — nền và mũi tên phải nhân cùng scaleX/scaleY này,
-    // không phải mỗi phần tự chọn 1 kiểu chuẩn hoá khác nhau.
     final scaleX = size.width / _viewBoxWidth;
     final scaleY = size.height / _viewBoxHeight;
 
-    final bgPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = color;
+    _bgPaint.color = color;
     canvas.drawRRect(
       RRect.fromRectAndCorners(
         Rect.fromLTWH(2.27344 * scaleX, 0, 51 * scaleX, size.height),
@@ -64,26 +72,14 @@ class LivePriceBadgePainter extends CustomPainter {
         topLeft: Radius.circular(2 * scaleX),
         topRight: Radius.circular(2 * scaleX),
       ),
-      bgPaint,
+      _bgPaint,
     );
 
-    final arrowPath = Path()
-      ..moveTo(0.486069, 6.1578)
-      ..cubicTo(-0.162253, 6.53211, -0.162253, 7.46789, 0.486069, 7.8422)
-      ..lineTo(2.06862, 8.75588)
-      ..cubicTo(2.71694, 9.13019, 3.52734, 8.6623, 3.52734, 7.91368)
-      ..lineTo(3.52734, 6.08632)
-      ..cubicTo(3.52734, 5.3377, 2.71694, 4.86981, 2.06862, 5.24412)
-      ..lineTo(0.486069, 6.1578)
-      ..close();
-
-    final arrowPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = color;
+    _arrowPaint.color = color;
 
     canvas.save();
     canvas.scale(scaleX, scaleY);
-    canvas.drawPath(arrowPath, arrowPaint);
+    canvas.drawPath(_arrowPath, _arrowPaint);
     canvas.restore();
   }
 

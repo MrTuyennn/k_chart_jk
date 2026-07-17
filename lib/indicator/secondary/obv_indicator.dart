@@ -31,21 +31,22 @@ class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> {
   // Paint cho đường signal MA (màu signalColor)
   late final Paint _signalPaint;
 
-  OBVIndicator({OBVStyle indicatorStyle = const OBVStyle()})
+  OBVIndicator({OBVStyle? indicatorStyle})
     : super(
         name: 'onBalanceVolume',
         shortName: 'OBV',
         calcParams: const [5], // MA5 signal mặc định
-        indicatorStyle: indicatorStyle,
+        indicatorStyle: indicatorStyle ?? const OBVStyle(),
+        isDefaultStyle: indicatorStyle == null,
       ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
     _signalPaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   /// Trả về min/max trong vùng hiển thị để secondary renderer scale đúng
@@ -70,17 +71,17 @@ class OBVIndicator extends SecondaryIndicator<MACDEntity, OBVStyle> {
       children: [
         TextSpan(
           text: 'OBV(${calcParams[0]}) ',
-          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, base: indicatorStyle.textStyle),
         ),
         if (entity.obv != null)
           TextSpan(
             text: 'OBV:${NumberUtil.formatCompact(entity.obv!)}  ',
-            style: getTextStyle(indicatorStyle.obvColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.obvColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.obvSignal != null)
           TextSpan(
             text: 'MA${calcParams[0]}:${NumberUtil.formatCompact(entity.obvSignal!)}',
-            style: getTextStyle(indicatorStyle.signalColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.signalColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
       ],
     );

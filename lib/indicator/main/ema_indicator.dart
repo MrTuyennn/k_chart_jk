@@ -5,15 +5,17 @@ class EMAIndicator extends MainIndicator<CandleEntity, MAStyle> {
 
   EMAIndicator({
     super.calcParams = const [5, 10, 30, 60],
-    super.indicatorStyle = const MAStyle(),
+    MAStyle? indicatorStyle,
   }): super(
     name: 'exponentialMovingAverage',
     shortName: 'EMA',
+    indicatorStyle: indicatorStyle ?? const MAStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -39,8 +41,8 @@ class EMAIndicator extends MainIndicator<CandleEntity, MAStyle> {
           text: "EMA${calcParams[i]}:${formatNumber(entity.emaValueList![i], precision)}  ",
           style: getTextStyle(
             indicatorStyle.getMAColor(i),
-            indicatorStyle.textStyle,
-            true, // forceColor — mỗi đường EMA phải giữ đúng màu riêng
+            base: indicatorStyle.textStyle,
+            forceColor: true, // mỗi đường EMA phải giữ đúng màu riêng
           ),
         );
         result.add(item);

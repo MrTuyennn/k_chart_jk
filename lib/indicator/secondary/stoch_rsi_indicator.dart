@@ -9,16 +9,17 @@ part of '../indicator_template.dart';
 class StochRSIIndicator extends SecondaryIndicator<MACDEntity, StochRSIStyle> {
   late final Paint _linePaint;
 
-  StochRSIIndicator({ StochRSIStyle indicatorStyle = const StochRSIStyle() }): super(
+  StochRSIIndicator({ StochRSIStyle? indicatorStyle }): super(
     name: 'stochasticRSI',
     shortName: 'StochRSI',
     calcParams: const [14, 14, 3, 3],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const StochRSIStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   /// 2 mốc quá bán / quá mua — vẽ nét đứt như Binance.
@@ -46,17 +47,17 @@ class StochRSIIndicator extends SecondaryIndicator<MACDEntity, StochRSIStyle> {
       children: [
         TextSpan(
           text: "StochRSI(${calcParams[0]},${calcParams[1]},${calcParams[2]},${calcParams[3]}) ",
-          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, base: indicatorStyle.textStyle),
         ),
         if (entity.stochRsiK != null)
           TextSpan(
             text: "K:${formatNumber(entity.stochRsiK!, precision)}  ",
-            style: getTextStyle(indicatorStyle.kColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.kColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.stochRsiD != null)
           TextSpan(
             text: "D:${formatNumber(entity.stochRsiD!, precision)}",
-            style: getTextStyle(indicatorStyle.dColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.dColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
       ],
     );

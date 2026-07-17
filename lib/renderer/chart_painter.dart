@@ -117,12 +117,8 @@ class ChartPainter extends BaseChartPainter {
   }
 
   @override
-  TextStyle getTextStyle(Color color) {
-    final textStyle = chartColors.candleStyle.textStyle;
-    return textStyle.color != null
-        ? textStyle
-        : textStyle.copyWith(color: color);
-  }
+  TextStyle getTextStyle(Color color) =>
+      resolveTextStyle(chartColors.candleStyle.textStyle, color);
 
   @override
   void initChartRenderer() {
@@ -491,11 +487,13 @@ class ChartPainter extends BaseChartPainter {
       nowPriceLinePaint,
     );
 
-    // label vẽ giá
+    // label vẽ giá — nếu textStyle không tự set color thì fallback về trắng
+    // (mặc định của LivePriceStyle), tránh chữ dùng màu mặc định của
+    // TextPainter (đen) không đọc được trên nền badge màu upColor/dnColor.
     TextPainter tp = TextPainter(
       text: TextSpan(
         text: NumberUtil.formatFixed(value, fixedLength) ?? '',
-        style: chartColors.livePriceStyle.textStyle,
+        style: resolveTextStyle(chartColors.livePriceStyle.textStyle, Colors.white),
       ),
       textDirection: TextDirection.ltr,
     )..layout();

@@ -7,16 +7,17 @@ part of '../indicator_template.dart';
 class MTMIndicator extends SecondaryIndicator<MACDEntity, MTMStyle> {
   late final Paint _linePaint;
 
-  MTMIndicator({ MTMStyle indicatorStyle = const MTMStyle() }): super(
+  MTMIndicator({ MTMStyle? indicatorStyle }): super(
     name: 'momentum',
     shortName: 'MTM',
     calcParams: const [12, 6],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const MTMStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -38,17 +39,17 @@ class MTMIndicator extends SecondaryIndicator<MACDEntity, MTMStyle> {
       children: [
         TextSpan(
           text: "MTM(${calcParams[0]},${calcParams[1]}) ",
-          style: getTextStyle(chartColors.defaultTextColor, indicatorStyle.textStyle),
+          style: getTextStyle(chartColors.defaultTextColor, base: indicatorStyle.textStyle),
         ),
         if (entity.mtm != null)
           TextSpan(
             text: "MTM:${formatNumber(entity.mtm!, precision)}  ",
-            style: getTextStyle(indicatorStyle.mtmColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.mtmColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
         if (entity.mtmMa != null)
           TextSpan(
             text: "MTMMA:${formatNumber(entity.mtmMa!, precision)}",
-            style: getTextStyle(indicatorStyle.mtmMaColor, indicatorStyle.textStyle, true),
+            style: getTextStyle(indicatorStyle.mtmMaColor, base: indicatorStyle.textStyle, forceColor: true),
           ),
       ],
     );
