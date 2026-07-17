@@ -10,17 +10,19 @@ class AVLIndicator extends MainIndicator<CandleEntity, AVLStyle> {
   late final Paint _linePaint;
 
   AVLIndicator({
-    super.indicatorStyle = const AVLStyle(),
+    AVLStyle? indicatorStyle,
   }) : super(
           name: 'averageValueLine',
           shortName: 'AVL',
           calcParams: const [],
+          indicatorStyle: indicatorStyle ?? const AVLStyle(),
+          isDefaultStyle: indicatorStyle == null,
         ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
       ..style = PaintingStyle.stroke
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -39,7 +41,7 @@ class AVLIndicator extends MainIndicator<CandleEntity, AVLStyle> {
     if (aEntity.avl == null) return null;
     return TextSpan(
       text: "$shortName: ${formatNumber(aEntity.avl!, precision)}    ",
-      style: getTextStyle(indicatorStyle.avlColor, indicatorStyle.textStyle),
+      style: getTextStyle(indicatorStyle.avlColor, base: indicatorStyle.textStyle),
     );
   }
 

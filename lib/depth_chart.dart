@@ -4,6 +4,7 @@ import 'package:k_chart_jk/chart_translations.dart';
 import 'package:k_chart_jk/extension/canvas_extension.dart';
 import 'package:k_chart_jk/styles/depth_chart_style.dart';
 import 'package:k_chart_jk/utils/number_util.dart';
+import 'package:k_chart_jk/utils/text_style_util.dart';
 import 'entity/depth_entity.dart';
 
 class DepthChart extends StatefulWidget {
@@ -39,7 +40,7 @@ class DepthChart extends StatefulWidget {
   });
 
   @override
-  _DepthChartState createState() => _DepthChartState();
+  State<DepthChart> createState() => _DepthChartState();
 }
 
 class _DepthChartState extends State<DepthChart> {
@@ -503,9 +504,7 @@ class DepthChartPainter extends CustomPainter {
   TextPainter getTextPainter(String text) => TextPainter(
     text: TextSpan(
       text: text,
-      style: chartStyle.textStyle.color != null
-          ? chartStyle.textStyle
-          : chartStyle.textStyle.copyWith(color: chartColors.defaultTextColor),
+      style: resolveTextStyle(chartStyle.textStyle, chartColors.defaultTextColor),
     ),
     textDirection: TextDirection.ltr,
   );
@@ -571,11 +570,10 @@ class _PopupPainter {
   }
 
   TextPainter _getTextPainter(String label, String content) {
-    final style = chartStyle.annotationTextStyle.color != null
-        ? chartStyle.annotationTextStyle
-        : chartStyle.annotationTextStyle.copyWith(
-            color: chartColors.annotationColor,
-          );
+    final style = resolveTextStyle(
+      chartStyle.annotationTextStyle,
+      chartColors.annotationColor,
+    );
     return TextPainter(
       text: TextSpan(text: '$label $content', style: style),
       textAlign: TextAlign.start,

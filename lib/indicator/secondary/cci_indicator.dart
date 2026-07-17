@@ -3,17 +3,18 @@ part of '../indicator_template.dart';
 class CCIIndicator extends SecondaryIndicator<MACDEntity, CCIStyle> {
   late final Paint _linePaint;
 
-  CCIIndicator({CCIStyle indicatorStyle = const CCIStyle()})
+  CCIIndicator({CCIStyle? indicatorStyle})
     : super(
         name: 'commodityChannelIndex',
         shortName: 'CCI',
         calcParams: const [20],
-        indicatorStyle: indicatorStyle,
+        indicatorStyle: indicatorStyle ?? const CCIStyle(),
+        isDefaultStyle: indicatorStyle == null,
       ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -38,7 +39,7 @@ class CCIIndicator extends SecondaryIndicator<MACDEntity, CCIStyle> {
     if (entity.cci == null) return null;
     return TextSpan(
       text: "CCI(${calcParams.first}):${formatNumber(entity.cci!, precision)}",
-      style: getTextStyle(indicatorStyle.cciColor, indicatorStyle.textStyle),
+      style: getTextStyle(indicatorStyle.cciColor, base: indicatorStyle.textStyle),
     );
   }
 

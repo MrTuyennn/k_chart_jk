@@ -5,15 +5,17 @@ class MAIndicator extends MainIndicator<CandleEntity, MAStyle> {
 
   MAIndicator({
     super.calcParams = const [5, 10, 30, 60],
-    super.indicatorStyle = const MAStyle(),
+    MAStyle? indicatorStyle,
   }): super(
     name: 'movingAverage',
     shortName: 'MA',
+    indicatorStyle: indicatorStyle ?? const MAStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -39,8 +41,8 @@ class MAIndicator extends MainIndicator<CandleEntity, MAStyle> {
           text: "MA${calcParams[i]}:${formatNumber(entity.maValueList![i], precision)}  ",
           style: getTextStyle(
             indicatorStyle.getMAColor(i),
-            indicatorStyle.textStyle,
-            true, // forceColor — mỗi đường MA phải giữ đúng màu riêng
+            base: indicatorStyle.textStyle,
+            forceColor: true, // mỗi đường MA phải giữ đúng màu riêng
           ),
         );
         result.add(item);

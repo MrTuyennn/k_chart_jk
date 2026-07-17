@@ -6,15 +6,17 @@ class ZigZagIndicator extends MainIndicator<CandleEntity, ZigZagStyle> {
   ZigZagIndicator({
     // depth, backstep, deviation
     super.calcParams = const [12, 2, 5],
-    super.indicatorStyle = const ZigZagStyle(),
+    ZigZagStyle? indicatorStyle,
   }) : super(
           name: 'ZIGZAG',
           shortName: 'ZIGZAG',
+          indicatorStyle: indicatorStyle ?? const ZigZagStyle(),
+          isDefaultStyle: indicatorStyle == null,
         ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.stroke
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -34,7 +36,7 @@ class ZigZagIndicator extends MainIndicator<CandleEntity, ZigZagStyle> {
     return TextSpan(
       text:
           "$shortName(${calcParams[0]},${calcParams[1]},${calcParams[2]}): ${formatNumber(zEntity.zigzag!, precision)}    ",
-      style: getTextStyle(indicatorStyle.zigzagColor, indicatorStyle.textStyle),
+      style: getTextStyle(indicatorStyle.zigzagColor, base: indicatorStyle.textStyle),
     );
   }
 

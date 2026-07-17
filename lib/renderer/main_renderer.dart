@@ -100,7 +100,9 @@ class MainRenderer extends BaseChartRenderer<CandleEntity> {
           tp.width + offset.dx + 2,
           tp.height + offset.dy + 2,
         ),
-        Paint()..color = chartColors.bgColor.withAlpha(80),
+        Paint()
+          ..color = chartColors.bgColor
+              .withValues(alpha: chartColors.bgColor.a * (80 / 255)),
       );
 
       tp.paint(canvas, offset);

@@ -3,16 +3,17 @@ part of '../indicator_template.dart';
 class WRIndicator extends SecondaryIndicator<MACDEntity, WRStyle> {
   late final Paint _linePaint;
 
-  WRIndicator({ WRStyle indicatorStyle = const WRStyle() }): super(
+  WRIndicator({ WRStyle? indicatorStyle }): super(
     name: 'volumeRatio',
     shortName: 'WR',
     calcParams: const [26, 6],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const WRStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _linePaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
-      ..strokeWidth = indicatorStyle.lineWidth;
+      ..strokeWidth = this.indicatorStyle.lineWidth;
   }
 
   @override
@@ -25,7 +26,7 @@ class WRIndicator extends SecondaryIndicator<MACDEntity, WRStyle> {
     if (entity.r == null) return null;
     return TextSpan(
       text: "WR(14):${formatNumber(entity.r!, precision)}",
-      style: getTextStyle(indicatorStyle.wrColor, indicatorStyle.textStyle),
+      style: getTextStyle(indicatorStyle.wrColor, base: indicatorStyle.textStyle),
     );
   }
 

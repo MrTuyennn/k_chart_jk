@@ -3,17 +3,18 @@ part of '../indicator_template.dart';
 class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
   late final Paint _dotPaint;
 
-  SARIndicator({ SARStyle indicatorStyle = const SARStyle() }): super(
+  SARIndicator({ SARStyle? indicatorStyle }): super(
     name: 'stopAndReverse',
     shortName: 'SAR',
     calcParams: const [2, 2, 20],
-    indicatorStyle: indicatorStyle,
+    indicatorStyle: indicatorStyle ?? const SARStyle(),
+    isDefaultStyle: indicatorStyle == null,
   ) {
     _dotPaint = Paint()
       ..isAntiAlias = true
       ..filterQuality = FilterQuality.high
       ..style = PaintingStyle.stroke
-      ..strokeWidth = indicatorStyle.strokeWidth;
+      ..strokeWidth = this.indicatorStyle.strokeWidth;
   }
 
   @override
@@ -31,7 +32,7 @@ class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
     if (value == null) return null;
     return TextSpan(
       text: "SAR: ${formatNumber(value, precision)}",
-      style: getTextStyle(indicatorStyle.sarColor, indicatorStyle.textStyle),
+      style: getTextStyle(indicatorStyle.sarColor, base: indicatorStyle.textStyle),
     );
   }
 
@@ -39,19 +40,10 @@ class SARIndicator extends MainIndicator<CandleEntity, SARStyle> {
   void drawChart(CandleEntity lastPoint, CandleEntity curPoint, double lastX, double curX, GetYFunction getY, Canvas canvas, KChartColors chartColors) {
     final sar = curPoint.sar;
     if (sar == null) return;
-    final halfHL = (curPoint.high + curPoint.low) / 2;
-    late final Color color;
-    if (sar == halfHL) {
-      color = chartColors.defaultTextColor;
-    } else if (sar < halfHL) {
-      color = chartColors.candleStyle.upColor;
-    } else {
-      color = chartColors.candleStyle.dnColor;
-    }
     canvas.drawCircle(
       Offset(curX, getY(sar)),
       indicatorStyle.radius,
-      _dotPaint..color = color,
+      _dotPaint..color = indicatorStyle.sarColor,
     );
   }
 

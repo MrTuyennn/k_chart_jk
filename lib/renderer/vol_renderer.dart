@@ -97,11 +97,12 @@ class VolRenderer extends BaseChartRenderer<VolumeEntity> {
       (maxValue - y) * (chartRect.height / maxValue) + chartRect.top;
 
   @override
-  TextStyle getTextStyle(Color color, {bool forceColor = false}) {
-    final textStyle = chartColors.volumeStyle.textStyle;
-    if (!forceColor && textStyle.color != null) return textStyle;
-    return textStyle.copyWith(color: color);
-  }
+  TextStyle getTextStyle(Color color, {bool forceColor = false}) =>
+      resolveTextStyle(
+        chartColors.volumeStyle.textStyle,
+        color,
+        forceColor: forceColor,
+      );
 
   @override
   void drawText(Canvas canvas, VolumeEntity data, double x) {
