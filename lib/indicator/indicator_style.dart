@@ -54,12 +54,17 @@ class BOLLStyle extends IndicatorStyle {
 }
 
 class SARStyle extends IndicatorStyle {
-  final Color sarColor;
+  /// Màu chấm/label khi SAR đang ở dưới giá (xu hướng tăng).
+  final Color upColor;
+
+  /// Màu chấm/label khi SAR đang ở trên giá (xu hướng giảm).
+  final Color dnColor;
 
   final double radius;
 
   const SARStyle({
-    this.sarColor = const Color(0xFFFFC634),
+    this.upColor = const Color(0xFF14AD8F),
+    this.dnColor = const Color(0xFFD5405D),
     this.radius = 2.0,
     super.strokeWidth = 0.8,
     super.textStyle,

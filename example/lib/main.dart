@@ -756,7 +756,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         textStyle: TextStyle(color: Colors.white),
       ),
       sarStyle: const SARStyle(
-        sarColor: Color(0xFF00BFA5),
+        upColor: Color(0xFF00BFA5),
+        dnColor: Color(0xFFFF5252),
         textStyle: TextStyle(color: Colors.white),
       ),
       zigzagStyle: const ZigZagStyle(
@@ -1092,6 +1093,14 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 state.isDark,
                 () => context.read<ChartBloc>().add(
                   const ChartMainIndicatorToggled(MainIndicatorType.ema),
+                ),
+              ),
+              _chip(
+                'SAR',
+                state.mainTypes.contains(MainIndicatorType.sar),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.sar),
                 ),
               ),
               _chip(

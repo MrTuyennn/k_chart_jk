@@ -32,8 +32,8 @@
 
 - **fix:** KDJ `drawChart` dùng `||` thay `&&` trong guard null-check K/D/J rồi force-unwrap cả 2 điểm bằng `!` — nến mới chưa kịp `calc()` lại (vd tick live) có thể crash `Null check operator used on a null value`. Sửa: đổi sang `&&`, khớp pattern mọi secondary indicator khác (RSI/WR/MTM/TRIX/StochRSI).
   - File: `lib/indicator/secondary/kdj_indicator.dart`
-- **fix:** `SARIndicator.drawChart` không đọc `indicatorStyle.sarColor` cho chấm SAR vẽ trên chart (hard-code theo trend `candleStyle.upColor`/`dnColor`), chỉ label `"SAR: ..."` đọc `sarColor` — set màu qua `KChartColors.sarStyle` không có tác dụng lên chấm. Sửa: chấm dùng thẳng `indicatorStyle.sarColor`.
-  - File: `lib/indicator/main/sar_indicator.dart`
+- **fix:** `SARIndicator.drawChart` hard-code màu chấm SAR theo `candleStyle.upColor`/`dnColor`/`defaultTextColor` của MAIN CHART, bỏ qua hẳn `indicatorStyle` — set màu qua `KChartColors.sarStyle` không có tác dụng lên chấm vẽ, chỉ đổi được label `"SAR: ..."`. Sửa: `SARStyle` đổi field `sarColor` (1 màu) thành `upColor`/`dnColor` (theo convention `SuperTrendStyle`) — cả chấm lẫn label giờ tự chọn màu theo xu hướng (`sar <= (high+low)/2` = tăng → `upColor`, ngược lại → `dnColor`), độc lập với `candleStyle`.
+  - File: `lib/indicator/main/sar_indicator.dart`, `lib/indicator/indicator_style.dart`
 - **fix:** `LivePriceStyle.textStyle` không có guard fallback màu như 5 chỗ khác trong codebase — `textStyle` không tự set `color` sẽ ra chữ đen mặc định của `TextPainter`, gần như vô hình trên nền badge màu `upColor`/`dnColor`. Gom guard này (và 5 chỗ khác) vào 1 helper dùng chung `resolveTextStyle(base, fallback, {forceColor})`.
   - File: `lib/renderer/chart_painter.dart`, `lib/utils/text_style_util.dart` (mới) — áp dụng luôn cho `vol_renderer.dart`, `secondary_renderer.dart`, `indicator_template.dart`, `depth_chart.dart`
 - **fix:** Alpha bị `.withAlpha()` ghi đè vô điều kiện thay vì nhân dồn — cùng lớp lỗi `VolRenderer` đã fix ở mục dưới, còn sót ở `MainRenderer` (`bgColor.withAlpha(80)` cho nền label indicator) và `SecondaryRenderer` (`defaultTextColor.withAlpha(90)` cho đường tham chiếu nét đứt). Sửa theo cùng pattern nhân dồn `color.withValues(alpha: color.a * factor)`.
@@ -831,7 +831,7 @@ IndicatorTemplate<T, K>   ← abstract
 
 #### SAR — main
 
-- **Style:** `SARStyle({ sarColor, radius, strokeWidth })`
+- **Style:** `SARStyle({ upColor, dnColor, radius, strokeWidth })` — chấm + label tô theo xu hướng: `sar <= (high+low)/2` (SAR nằm dưới giá) = tăng → `upColor`; ngược lại = giảm → `dnColor`.
 - **Output:** `entity.sar = double?`
 
 #### ZigZag — main
