@@ -170,6 +170,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         SecondaryIndicatorType.trix,
         SecondaryIndicatorType.mtm,
         SecondaryIndicatorType.stochRsi,
+        SecondaryIndicatorType.brar,
       },
       savedChartScale: KChartScaleState(),
       isLine: false,

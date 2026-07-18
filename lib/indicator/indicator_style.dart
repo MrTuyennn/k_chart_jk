@@ -192,6 +192,17 @@ class MTMStyle extends IndicatorStyle {
   });
 }
 
+class BRARStyle extends IndicatorStyle {
+  final Color arColor;
+  final Color brColor;
+
+  const BRARStyle({
+    this.arColor = const Color(0xFFFFC634),
+    this.brColor = const Color(0xff35cdac),
+    super.textStyle,
+  });
+}
+
 class OBVStyle extends IndicatorStyle {
   final Color obvColor;
   final Color signalColor;

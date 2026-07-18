@@ -813,6 +813,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         dColor: Color(0xFF00BFA5),
         textStyle: TextStyle(color: Colors.green),
       ),
+      brarStyle: const BRARStyle(
+        arColor: Color(0xFFFFD600),
+        brColor: Color(0xFF00E5FF),
+        textStyle: TextStyle(color: Colors.red),
+      ),
     );
   }
 
@@ -1223,6 +1228,16 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 () => context.read<ChartBloc>().add(
                   const ChartSecondaryIndicatorToggled(
                     SecondaryIndicatorType.stochRsi,
+                  ),
+                ),
+              ),
+              _chip(
+                'BRAR',
+                state.secondaryTypes.contains(SecondaryIndicatorType.brar),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.brar,
                   ),
                 ),
               ),

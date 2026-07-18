@@ -16,6 +16,7 @@ enum SecondaryIndicatorType {
   trix,
   mtm,
   stochRsi,
+  brar,
 }
 
 /// Tách khỏi getter để tái dùng được từ isolate compute (DataUtil.calculateAll
@@ -41,6 +42,7 @@ SecondaryIndicator buildSecondaryIndicator(SecondaryIndicatorType type) =>
       SecondaryIndicatorType.trix => TRIXIndicator(),
       SecondaryIndicatorType.mtm => MTMIndicator(),
       SecondaryIndicatorType.stochRsi => StochRSIIndicator(),
+      SecondaryIndicatorType.brar => BRARIndicator(),
     };
 
 enum ChartTimeframe {
@@ -180,6 +182,7 @@ class ChartState extends Equatable {
     SecondaryIndicatorType.trix,
     SecondaryIndicatorType.mtm,
     SecondaryIndicatorType.stochRsi,
+    SecondaryIndicatorType.brar,
   ];
 
   /// Instance indicator MỚI mỗi lần gọi — cố ý KHÔNG đưa vào [props], vì
