@@ -24,6 +24,8 @@ part 'secondary/obv_indicator.dart';
 part 'secondary/trix_indicator.dart';
 part 'secondary/mtm_indicator.dart';
 part 'secondary/stoch_rsi_indicator.dart';
+part 'secondary/brar_indicator.dart';
+part 'secondary/bias_indicator.dart';
 
 typedef GetYFunction = double Function(double y);
 
@@ -205,6 +207,10 @@ void applyIndicatorColorStyles(
         _applyDefaultStyle(s, colors.mtmStyle);
       case StochRSIIndicator s:
         _applyDefaultStyle(s, colors.stochRsiStyle);
+      case BRARIndicator s:
+        _applyDefaultStyle(s, colors.brarStyle);
+      case BIASIndicator s:
+        _applyDefaultStyle(s, colors.biasStyle);
     }
   }
 }

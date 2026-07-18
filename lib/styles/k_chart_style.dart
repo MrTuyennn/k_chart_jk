@@ -163,6 +163,12 @@ class KChartColors {
   /// Style cho `StochRSIIndicator`.
   final StochRSIStyle stochRsiStyle;
 
+  /// Style cho `BRARIndicator`.
+  final BRARStyle brarStyle;
+
+  /// Style cho `BIASIndicator`.
+  final BIASStyle biasStyle;
+
   /// constructor chart color
   const KChartColors({
     this.bgColor = const Color(0xffffffff),
@@ -208,6 +214,8 @@ class KChartColors {
     this.trixStyle = const TRIXStyle(),
     this.mtmStyle = const MTMStyle(),
     this.stochRsiStyle = const StochRSIStyle(),
+    this.brarStyle = const BRARStyle(),
+    this.biasStyle = const BIASStyle(),
   });
 
   /// Trả về bản sao, override đúng field được truyền vào, giữ nguyên phần
@@ -243,6 +251,8 @@ class KChartColors {
     TRIXStyle? trixStyle,
     MTMStyle? mtmStyle,
     StochRSIStyle? stochRsiStyle,
+    BRARStyle? brarStyle,
+    BIASStyle? biasStyle,
   }) {
     return KChartColors(
       bgColor: bgColor ?? this.bgColor,
@@ -274,6 +284,8 @@ class KChartColors {
       trixStyle: trixStyle ?? this.trixStyle,
       mtmStyle: mtmStyle ?? this.mtmStyle,
       stochRsiStyle: stochRsiStyle ?? this.stochRsiStyle,
+      brarStyle: brarStyle ?? this.brarStyle,
+      biasStyle: biasStyle ?? this.biasStyle,
     );
   }
 }

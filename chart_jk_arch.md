@@ -30,6 +30,11 @@
 
 ### Unreleased
 
+- **feat:** `BIASIndicator` (BIAS) — secondary indicator mới, Bias Ratio / 乖离率. `calcParams: [6, 12, 24]` — nhiều chu kỳ cùng lúc (cùng pattern `MAStyle.maColors`/`getMAColor`, không giới hạn đúng 3). `BIAS(n) = (close - MA(close,n))/MA(close,n) × 100%`, rolling-sum O(n). Output `entity.biasValueList = List<double?>` dùng `double?` (không phải sentinel `0` như MA) vì BIAS hợp lệ đi qua 0 rất thường xuyên.
+  - File: `lib/entity/bias_entity.dart` (mới), `lib/entity/macd_entity.dart` + `lib/entity/k_entity.dart` (nối `BIASEntity` vào mixin chain, trước `MACDEntity`), `lib/indicator/indicator_style.dart` (`BIASStyle`), `lib/indicator/secondary/bias_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`biasStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
+- **feat:** `BRARIndicator` (BRAR) — secondary indicator mới, Popularity/Willingness Index (人气意愿指标). `calcParams: [26]`. `AR = Σ(high-open,26)/Σ(open-low,26)×100`, `BR = Σmax(0,high-prevClose,26)/Σmax(0,prevClose-low,26)×100`, tính bằng rolling-sum O(n), guard chia 0 → 0. Xem chi tiết công dụng/công thức tại [9.2](#92-built-in-indicators) và `indicator.md` (mới, ở root repo — tổng hợp công dụng + công thức toàn bộ 7 main + 11 secondary indicator, đọc trực tiếp từ `calc()` trong source).
+  - File: `lib/entity/brar_entity.dart` (mới), `lib/entity/macd_entity.dart` + `lib/entity/k_entity.dart` (nối `BRAREntity` vào mixin chain, trước `MACDEntity`), `lib/indicator/indicator_style.dart` (`BRARStyle`), `lib/indicator/secondary/brar_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`brarStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
+- **revert:** Ichimoku Cloud (main indicator, gồm cả V1 và V2 chiếu cloud ra tương lai) đã gỡ hoàn toàn khỏi codebase theo yêu cầu — không còn field/class/wiring nào sót lại, kể cả cơ chế chung `requiredFutureBars`/`getFutureMaxMinValue`/`drawFutureSegment` (hook no-op thêm vào `IndicatorTemplate`/`base_chart_painter.dart`/`main_renderer.dart` cho V2) cũng đã bị gỡ theo (đã rà lại toàn bộ `lib/` + `example/`, không còn tham chiếu nào).
 - **fix:** KDJ `drawChart` dùng `||` thay `&&` trong guard null-check K/D/J rồi force-unwrap cả 2 điểm bằng `!` — nến mới chưa kịp `calc()` lại (vd tick live) có thể crash `Null check operator used on a null value`. Sửa: đổi sang `&&`, khớp pattern mọi secondary indicator khác (RSI/WR/MTM/TRIX/StochRSI).
   - File: `lib/indicator/secondary/kdj_indicator.dart`
 - **fix:** `SARIndicator.drawChart` hard-code màu chấm SAR theo `candleStyle.upColor`/`dnColor`/`defaultTextColor` của MAIN CHART, bỏ qua hẳn `indicatorStyle` — set màu qua `KChartColors.sarStyle` không có tác dụng lên chấm vẽ, chỉ đổi được label `"SAR: ..."`. Sửa: `SARStyle` đổi field `sarColor` (1 màu) thành `upColor`/`dnColor` (theo convention `SuperTrendStyle`) — cả chấm lẫn label giờ tự chọn màu theo xu hướng (`sar <= (high+low)/2` = tăng → `upColor`, ngược lại → `dnColor`), độc lập với `candleStyle`.
@@ -741,12 +746,14 @@ Constructor: `const KChartStyle([List<String>? dateTimeFormat, double volBarOpac
 | `trixStyle`     | `TRIXStyle`        | TRIX           |
 | `mtmStyle`      | `MTMStyle`         | MTM            |
 | `stochRsiStyle` | `StochRSIStyle`    | StochRSI       |
+| `brarStyle`     | `BRARStyle`        | BRAR           |
+| `biasStyle`     | `BIASStyle`        | BIAS           |
 
 **Cơ chế áp dụng — `applyIndicatorColorStyles()`** (`lib/indicator/indicator_template.dart`):
 
 - Chạy 1 lần trong constructor của `ChartPainter`, nhận `mainIndicators`, `secondaryIndicators`, `chartColors`.
 - Dùng Dart 3 pattern-matching `switch` theo runtime type (vd `case AVLIndicator m:`) để biết field `KChartColors` nào tương ứng.
-- **Chỉ ghi đè** `indicator.indicatorStyle` khi instance đó còn dùng đúng style `const` mặc định — phát hiện qua `identical(ind.indicatorStyle, const AVLStyle())`, tận dụng việc Dart canonical hoá mọi `const` instantiation giống hệt nhau về cùng 1 object. Nếu instance tự truyền `indicatorStyle` khác mặc định (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) thì **giữ nguyên**, không bị `KChartColors` ghi đè — instance-level luôn thắng.
+- **Chỉ ghi đè** `indicator.indicatorStyle` khi instance đó còn dùng đúng style mặc định — phát hiện qua field tường minh `IndicatorTemplate.isDefaultStyle` (`= indicatorStyle == null` tại constructor, vì mọi indicator giờ nhận `XxxStyle?` nullable). Nếu instance tự truyền `indicatorStyle` khác mặc định (vd `AVLIndicator(indicatorStyle: AVLStyle(avlColor: Colors.red))`) thì **giữ nguyên**, không bị `KChartColors` ghi đè — instance-level luôn thắng. *(Trước đây dùng `identical(ind.indicatorStyle, const AVLStyle())` — bỏ vì không phân biệt được "không truyền" với "truyền const y hệt default", xem mục Unreleased.)*
 - Kéo theo: `IndicatorTemplate.indicatorStyle` không còn `final` (mutable field), để cho phép gán lại.
 
 ```dart
@@ -957,6 +964,28 @@ IndicatorTemplate<T, K>   ← abstract
   - Edge case `MAX == MIN` (RSI đi ngang tuyệt đối trong N2 nến): StochRSI = 0 theo convention TradingView.
   - StochRSI nhạy hơn RSI nhiều — thường xuyên chạm 0/100 là hành vi đúng, không phải bug.
   - **Đường tham chiếu 20/80** (quá bán/quá mua, kiểu Binance): khai báo qua `referenceValues => [20, 80]`; `getMaxMinValue` ép range bao luôn `[20, 80]` để 2 vạch không bao giờ nằm ngoài panel. Cơ chế vẽ: `SecondaryRenderer.drawReferenceLines()` — nét đứt 4px-4px, màu `defaultTextColor` alpha 90, vẽ ở screen space TRƯỚC translate/scale trong `ChartPainter.drawChart()` (nên không giãn theo scaleX, nằm sau đường K/D, và vẫn hiện khi `hideGrid = true`). Indicator phụ khác muốn có vạch tham chiếu chỉ cần override `referenceValues`.
+
+#### BRAR — secondary
+
+- **Style:** `BRARStyle({ arColor, brColor })`
+- **calcParams:** `[26]` — chu kỳ cửa sổ trượt (N)
+- **Output:** `entity.ar`, `entity.br` (mixin `BRAREntity` — nối vào `on` clause của `MACDEntity`, đứng trước `MACDEntity` trong `KEntity`'s `with` chain, cùng vị trí với `StochRSIEntity`)
+- **Công thức:**
+  ```
+  AR = Σ(HIGH - OPEN, N) / Σ(OPEN - LOW, N) × 100
+  BR = Σmax(0, HIGH - REF(CLOSE,1), N) / Σmax(0, REF(CLOSE,1) - LOW, N) × 100
+  ```
+  Tính bằng rolling-sum O(n) (không brute-force lại tổng mỗi nến). Chia cho 0 (mẫu số = 0) → trả `0.0` thay vì để NaN/Infinity.
+- **Công dụng:** đo tâm lý/động lực thị trường qua BIÊN ĐỘ nến (high/low/open) thay vì chỉ giá đóng cửa như RSI — AR đo "năng lượng" quanh giá mở cửa, BR đo ý chí mua/bán so với giá đóng cửa phiên trước. Cả 2 cùng cao (>150-200) → quá hưng phấn, dễ điều chỉnh giảm; cả 2 cùng thấp (<50) → quá bi quan, dễ hồi phục. BR cắt AR hoặc 2 đường phân kỳ mạnh báo hiệu đổi momentum. Không phải chỉ báo xu hướng — chỉ dùng lọc tín hiệu kèm indicator xu hướng khác (MA/SuperTrend...).
+- **Lưu ý:** `BR` cần `prevClose` nên bắt đầu trễ hơn `AR` đúng 1 nến trong giai đoạn warm-up (AR đủ N tại `i=N-1`, BR đủ N tại `i=N`) — không phải bug, do bản chất công thức cần dữ liệu nến trước đó.
+
+#### BIAS — secondary
+
+- **Style:** `BIASStyle({ biasColors })` — `List<Color>`, mặc định 3 màu, `getBiasColor(i)` cùng pattern `MAStyle.getMAColor(i)`.
+- **calcParams:** `[6, 12, 24]` — nhiều chu kỳ cùng lúc (không giới hạn đúng 3, thêm/bớt phần tử tự áp dụng).
+- **Output:** `entity.biasValueList = List<double?>` (mixin `BIASEntity` — nối vào `on` clause của `MACDEntity`, đứng trước `MACDEntity`, cùng vị trí `BRAREntity`) — song song 1:1 với `calcParams`, dùng `double?` (không phải sentinel `0` như `MAStyle.maValueList`) vì BIAS hợp lệ đi qua 0 (giá cắt MA) rất thường xuyên.
+- **Công thức:** `BIAS(n) = (close - MA(close,n)) / MA(close,n) × 100%`, tính bằng rolling-sum O(n) (không brute-force lại tổng mỗi nến, cùng kỹ thuật `MA.calc()`). Chia cho 0 (MA=0) → trả `0.0`.
+- **Công dụng:** đo % lệch giá so với MA cùng chu kỳ — lệch dương/âm lớn báo hiệu giá đang chạy quá xa MA, dễ điều chỉnh về; 3 đường hội tụ gần 0 thường báo hiệu sắp biến động mạnh.
 
 ### 9.3 Custom indicator
 

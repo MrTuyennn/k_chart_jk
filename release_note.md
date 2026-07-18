@@ -2,6 +2,47 @@
 
 Tổng hợp toàn bộ thay đổi/fix của package: nội dung từ `CHANGELOG.md` (theo version publish), các commit `fix:` lẻ chưa lên CHANGELOG, và các thay đổi đang làm việc (chưa commit) trong session gần đây.
 
+## 2026-07-18 (tiếp)
+
+### Revert — Ichimoku Cloud gỡ hoàn toàn khỏi codebase
+
+Ichimoku Cloud (main indicator, cả V1 tính đúng công thức lẫn V2 chiếu cloud ra vùng "tương lai" — xem lịch sử bên dưới) đã được gỡ sạch theo yêu cầu, không chỉ tắt trong demo. Đã rà lại toàn bộ `lib/` + `example/`, xác nhận không còn field/class/wiring nào sót — kể cả 3 hook chung `requiredFutureBars`/`getFutureMaxMinValue`/`drawFutureSegment` (thêm vào `IndicatorTemplate`/`BaseChartPainter`/`MainRenderer` cho riêng V2, dù là no-op mặc định không ảnh hưởng indicator khác) cũng đã bị gỡ theo, `getMinTranslateX()`/`calculateValue()` trở lại đúng nguyên bản trước khi có Ichimoku.
+
+### Feat — `BRARIndicator` (secondary indicator mới)
+
+Thêm BRAR (人气意愿指标 — Popularity/Willingness Index) — secondary indicator thứ 10. `calcParams: [26]`, 2 đường AR/BR tính bằng rolling-sum O(n) (không brute-force lại tổng mỗi nến, cùng kỹ thuật với BOLL's `_calcbollMa`/MTM's `mtmWindow`):
+
+```
+AR = Σ(high-open, 26) / Σ(open-low, 26) × 100
+BR = Σmax(0, high-prevClose, 26) / Σmax(0, prevClose-low, 26) × 100
+```
+
+Guard chia cho 0 → trả `0.0` thay vì để NaN/Infinity lan ra `drawChart`. `BR` cần `prevClose` nên đủ dữ liệu trễ hơn `AR` đúng 1 nến trong giai đoạn warm-up — không phải bug, do bản chất công thức.
+
+Công dụng: đo tâm lý thị trường qua biên độ nến (high/low/open), khác RSI chỉ nhìn giá đóng cửa — AR/BR cùng cao (>150-200) → quá hưng phấn dễ điều chỉnh; cùng thấp (<50) → quá bi quan dễ hồi phục. Không phải chỉ báo xu hướng, chỉ dùng lọc tín hiệu kèm indicator xu hướng khác.
+
+- File: `lib/entity/brar_entity.dart` (mới — mixin `BRAREntity`, nối vào `on` clause `MACDEntity` + `with` chain `KEntity`, đứng trước `MACDEntity` cùng vị trí `StochRSIEntity`), `lib/indicator/indicator_style.dart` (`BRARStyle`), `lib/indicator/secondary/brar_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`brarStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
+
+### Feat — `BIASIndicator` (secondary indicator mới)
+
+Thêm BIAS (乖离率 — Bias Ratio) — secondary indicator thứ 11. `calcParams: [6, 12, 24]` — nhiều chu kỳ cùng lúc thay vì cố định, cùng pattern `MAStyle.maColors`/`getMAColor(i)` (main indicator) — điểm khác biệt so với các secondary khác (KDJ/BRAR... đều dùng field cố định K/D/J, AR/BR) vì BIAS vốn là nhiều đường ĐỒNG NHẤT công thức, chỉ khác chu kỳ, giống MA hơn là giống KDJ.
+
+```
+BIAS(n) = (close - MA(close, n)) / MA(close, n) × 100%
+```
+
+Tính bằng rolling-sum O(n) (không brute-force). Output `entity.biasValueList = List<double?>` — dùng `double?` (KHÔNG dùng sentinel `0` như `MAStyle.maValueList`) vì BIAS hợp lệ đi qua 0 rất thường xuyên (giá cắt MA) — tái dùng sentinel `0` ở đây sẽ là bug thật (nhầm "giá == MA đúng lúc đó" với "chưa tính xong"), khác MA/EMA nơi giá trị 0 gần như không bao giờ xảy ra thật với dữ liệu giá thực.
+
+Công dụng: đo % lệch giá so với MA cùng chu kỳ — lệch dương/âm lớn báo hiệu giá chạy quá xa MA, dễ điều chỉnh về; 3 đường (6/12/24) hội tụ gần 0 thường báo hiệu sắp có biến động mạnh.
+
+- File: `lib/entity/bias_entity.dart` (mới — mixin `BIASEntity`, nối vào `on` clause `MACDEntity` + `with` chain `KEntity`, đứng trước `MACDEntity` cùng vị trí `BRAREntity`), `lib/indicator/indicator_style.dart` (`BIASStyle`), `lib/indicator/secondary/bias_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`biasStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
+
+### Docs — `indicator.md` (mới, root repo)
+
+Tổng hợp công dụng + công thức toàn bộ 7 main (MA/EMA/BOLL/SAR/SuperTrend/ZigZag/AVL) + 11 secondary (MACD/KDJ/RSI/WR/CCI/OBV/TRIX/MTM/StochRSI/BRAR/BIAS) indicator. Công thức đọc trực tiếp từ `calc()` trong source, không chép lý thuyết sách vở. Phát hiện đáng chú ý khi viết: `RSI`/`WR` khai `calcParams` (`[6,12,24]`/`[26,6]`) nhưng `calc()` thực tế hard-code chu kỳ 14 cho cả hai — `calcParams` không được dùng tới, dễ gây nhầm tưởng đổi được chu kỳ qua constructor.
+
+---
+
 ## 2026-07-17
 
 ### Fixed — 4 bug correctness phát hiện qua `/code-review` high effort (8 finder angle + verify)
