@@ -12,10 +12,11 @@ import 'stoch_rsi_entity.dart';
 import 'zigzag_entity.dart';
 import 'avl_entity.dart';
 import 'brar_entity.dart';
+import 'bias_entity.dart';
 
-// Thứ tự mixin quan trọng — OBVEntity/TRIXEntity/MTMEntity/StochRSIEntity/BRAREntity
-// phải đứng trước MACDEntity vì MACDEntity khai báo `on OBVEntity, TRIXEntity,
-// MTMEntity, StochRSIEntity, BRAREntity` (xem macd_entity.dart).
+// Thứ tự mixin quan trọng — OBVEntity/TRIXEntity/MTMEntity/StochRSIEntity/BRAREntity/
+// BIASEntity phải đứng trước MACDEntity vì MACDEntity khai báo `on OBVEntity,
+// TRIXEntity, MTMEntity, StochRSIEntity, BRAREntity, BIASEntity` (xem macd_entity.dart).
 // Dart yêu cầu mixin trong `on` clause phải được apply trước.
 class KEntity
     with
@@ -30,6 +31,7 @@ class KEntity
         MTMEntity,      // phải trước MACDEntity
         StochRSIEntity, // phải trước MACDEntity
         BRAREntity,     // phải trước MACDEntity
+        BIASEntity,     // phải trước MACDEntity
         MACDEntity,
         ZigZagEntity,
         AVLEntity {}

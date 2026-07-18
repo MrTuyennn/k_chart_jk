@@ -203,6 +203,27 @@ class BRARStyle extends IndicatorStyle {
   });
 }
 
+class BIASStyle extends IndicatorStyle {
+  final List<Color> biasColors;
+
+  const BIASStyle({
+    this.biasColors = const [
+      Color(0xFFFFC634),
+      Color(0xff35cdac),
+      Color(0xffb48ee3),
+    ],
+    super.textStyle,
+  });
+
+  /// get BIAS color via index — cùng pattern `MAStyle.getMAColor`.
+  Color getBiasColor(int index) {
+    if (index >= biasColors.length) {
+      return biasColors[index % biasColors.length];
+    }
+    return biasColors[index];
+  }
+}
+
 class OBVStyle extends IndicatorStyle {
   final Color obvColor;
   final Color signalColor;

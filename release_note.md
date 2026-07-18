@@ -23,9 +23,23 @@ Công dụng: đo tâm lý thị trường qua biên độ nến (high/low/open)
 
 - File: `lib/entity/brar_entity.dart` (mới — mixin `BRAREntity`, nối vào `on` clause `MACDEntity` + `with` chain `KEntity`, đứng trước `MACDEntity` cùng vị trí `StochRSIEntity`), `lib/indicator/indicator_style.dart` (`BRARStyle`), `lib/indicator/secondary/brar_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`brarStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
 
+### Feat — `BIASIndicator` (secondary indicator mới)
+
+Thêm BIAS (乖离率 — Bias Ratio) — secondary indicator thứ 11. `calcParams: [6, 12, 24]` — nhiều chu kỳ cùng lúc thay vì cố định, cùng pattern `MAStyle.maColors`/`getMAColor(i)` (main indicator) — điểm khác biệt so với các secondary khác (KDJ/BRAR... đều dùng field cố định K/D/J, AR/BR) vì BIAS vốn là nhiều đường ĐỒNG NHẤT công thức, chỉ khác chu kỳ, giống MA hơn là giống KDJ.
+
+```
+BIAS(n) = (close - MA(close, n)) / MA(close, n) × 100%
+```
+
+Tính bằng rolling-sum O(n) (không brute-force). Output `entity.biasValueList = List<double?>` — dùng `double?` (KHÔNG dùng sentinel `0` như `MAStyle.maValueList`) vì BIAS hợp lệ đi qua 0 rất thường xuyên (giá cắt MA) — tái dùng sentinel `0` ở đây sẽ là bug thật (nhầm "giá == MA đúng lúc đó" với "chưa tính xong"), khác MA/EMA nơi giá trị 0 gần như không bao giờ xảy ra thật với dữ liệu giá thực.
+
+Công dụng: đo % lệch giá so với MA cùng chu kỳ — lệch dương/âm lớn báo hiệu giá chạy quá xa MA, dễ điều chỉnh về; 3 đường (6/12/24) hội tụ gần 0 thường báo hiệu sắp có biến động mạnh.
+
+- File: `lib/entity/bias_entity.dart` (mới — mixin `BIASEntity`, nối vào `on` clause `MACDEntity` + `with` chain `KEntity`, đứng trước `MACDEntity` cùng vị trí `BRAREntity`), `lib/indicator/indicator_style.dart` (`BIASStyle`), `lib/indicator/secondary/bias_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`biasStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
+
 ### Docs — `indicator.md` (mới, root repo)
 
-Tổng hợp công dụng + công thức toàn bộ 7 main (MA/EMA/BOLL/SAR/SuperTrend/ZigZag/AVL) + 10 secondary (MACD/KDJ/RSI/WR/CCI/OBV/TRIX/MTM/StochRSI/BRAR) indicator. Công thức đọc trực tiếp từ `calc()` trong source, không chép lý thuyết sách vở. Phát hiện đáng chú ý khi viết: `RSI`/`WR` khai `calcParams` (`[6,12,24]`/`[26,6]`) nhưng `calc()` thực tế hard-code chu kỳ 14 cho cả hai — `calcParams` không được dùng tới, dễ gây nhầm tưởng đổi được chu kỳ qua constructor.
+Tổng hợp công dụng + công thức toàn bộ 7 main (MA/EMA/BOLL/SAR/SuperTrend/ZigZag/AVL) + 11 secondary (MACD/KDJ/RSI/WR/CCI/OBV/TRIX/MTM/StochRSI/BRAR/BIAS) indicator. Công thức đọc trực tiếp từ `calc()` trong source, không chép lý thuyết sách vở. Phát hiện đáng chú ý khi viết: `RSI`/`WR` khai `calcParams` (`[6,12,24]`/`[26,6]`) nhưng `calc()` thực tế hard-code chu kỳ 14 cho cả hai — `calcParams` không được dùng tới, dễ gây nhầm tưởng đổi được chu kỳ qua constructor.
 
 ---
 

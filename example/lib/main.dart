@@ -818,6 +818,10 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         brColor: Color(0xFF00E5FF),
         textStyle: TextStyle(color: Colors.red),
       ),
+      biasStyle: const BIASStyle(
+        biasColors: [Color(0xFFFFC107), Color(0xFF00E676), Color(0xFFFF4081)],
+        textStyle: TextStyle(color: Colors.black),
+      ),
     );
   }
 
@@ -1238,6 +1242,16 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 () => context.read<ChartBloc>().add(
                   const ChartSecondaryIndicatorToggled(
                     SecondaryIndicatorType.brar,
+                  ),
+                ),
+              ),
+              _chip(
+                'BIAS',
+                state.secondaryTypes.contains(SecondaryIndicatorType.bias),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.bias,
                   ),
                 ),
               ),

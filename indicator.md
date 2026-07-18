@@ -107,6 +107,11 @@ Tổng hợp toàn bộ indicator hiện có trong `k_chart_jk`: 7 main (vẽ đ
   ```
   (guard chia 0 → 0, tránh NaN/Infinity).
 
+### BIAS — Bias Ratio / 乖离率 (`bias_indicator.dart`)
+- **Công dụng**: đo % lệch giá hiện tại so với đường MA cùng chu kỳ — lệch dương lớn = giá đang chạy quá xa MA lên trên (dễ điều chỉnh giảm về MA), lệch âm lớn = giá chạy quá xa xuống dưới (dễ hồi phục lên MA). Vẽ nhiều chu kỳ cùng lúc (mặc định 6/12/24) để so sánh độ lệch ngắn/trung/dài hạn — 3 đường hội tụ về gần 0 thường báo hiệu sắp có biến động mạnh.
+- **calcParams**: `[6, 12, 24]` — nhiều chu kỳ cùng lúc, giống MA (mỗi phần tử là 1 đường riêng, không giới hạn đúng 3).
+- **Công thức**: `BIAS(n) = (close - MA(close, n)) / MA(close, n) × 100%`.
+
 ---
 
 ## Ghi chú chung
