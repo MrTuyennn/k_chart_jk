@@ -37,9 +37,28 @@ Công dụng: đo % lệch giá so với MA cùng chu kỳ — lệch dương/â
 
 - File: `lib/entity/bias_entity.dart` (mới — mixin `BIASEntity`, nối vào `on` clause `MACDEntity` + `with` chain `KEntity`, đứng trước `MACDEntity` cùng vị trí `BRAREntity`), `lib/indicator/indicator_style.dart` (`BIASStyle`), `lib/indicator/secondary/bias_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`biasStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
 
+### Feat — `PSYIndicator` (secondary indicator mới)
+
+Thêm PSY (心理线 — Psychological Line) — secondary indicator thứ 12. `calcParams: [12, 6]` (N: chu kỳ đếm phiên tăng, M: chu kỳ MA tín hiệu) — cùng cấu trúc 2-đường-signal như MTM/TRIX (khác BIAS ở trên, vốn nhiều đường đồng nhất công thức):
+
+```
+PSY = COUNT(close > REF(close,1), N) / N × 100
+MAPSY = MA(PSY, M)
+```
+
+`PSY` cần `REF(close,1)` (giá phiên trước) nên bắt đầu đủ dữ liệu tại `i=N` (không phải `i=N-1`) — cùng loại "trễ 1 nến khởi tạo" như `BR` của BRAR (cả 2 đều cần giá trị nến TRƯỚC đó, không chỉ nến hiện tại).
+
+Công dụng: đo % số phiên tăng trong N phiên gần nhất — phản ánh tâm lý đám đông lạc quan/bi quan. PSY quá cao (>75-83) → quá lạc quan, dễ điều chỉnh giảm; quá thấp (<25-17) → quá bi quan, dễ hồi phục. MAPSY cắt PSY dùng lọc tín hiệu, giảm nhiễu so với dùng PSY một mình.
+
+- File: `lib/entity/psy_entity.dart` (mới — mixin `PSYEntity`, nối vào `on` clause `MACDEntity` + `with` chain `KEntity`, đứng trước `MACDEntity` cùng vị trí `BIASEntity`), `lib/indicator/indicator_style.dart` (`PSYStyle`), `lib/indicator/secondary/psy_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`psyStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
+
 ### Docs — `indicator.md` (mới, root repo)
 
-Tổng hợp công dụng + công thức toàn bộ 7 main (MA/EMA/BOLL/SAR/SuperTrend/ZigZag/AVL) + 11 secondary (MACD/KDJ/RSI/WR/CCI/OBV/TRIX/MTM/StochRSI/BRAR/BIAS) indicator. Công thức đọc trực tiếp từ `calc()` trong source, không chép lý thuyết sách vở. Phát hiện đáng chú ý khi viết: `RSI`/`WR` khai `calcParams` (`[6,12,24]`/`[26,6]`) nhưng `calc()` thực tế hard-code chu kỳ 14 cho cả hai — `calcParams` không được dùng tới, dễ gây nhầm tưởng đổi được chu kỳ qua constructor.
+Tổng hợp công dụng + công thức toàn bộ 7 main (MA/EMA/BOLL/SAR/SuperTrend/ZigZag/AVL) + 12 secondary (MACD/KDJ/RSI/WR/CCI/OBV/TRIX/MTM/StochRSI/BRAR/BIAS/PSY) indicator. Công thức đọc trực tiếp từ `calc()` trong source, không chép lý thuyết sách vở. Phát hiện đáng chú ý khi viết: `RSI`/`WR` khai `calcParams` (`[6,12,24]`/`[26,6]`) nhưng `calc()` thực tế hard-code chu kỳ 14 cho cả hai — `calcParams` không được dùng tới, dễ gây nhầm tưởng đổi được chu kỳ qua constructor.
+
+### Lưu ý session — bỏ qua verify bằng screenshot
+
+Không chạy visual-verify bằng screenshot cho PSY (khác các indicator trước) — 2 lần thử foreground cửa sổ app test qua `osascript`/`open` trong máy này đều vô tình chụp trúng cửa sổ khác đang mở (ChatGPT, rồi Telegram team chat có nội dung nội bộ nhạy cảm) do focus bị app khác giành mất giữa lúc activate và lúc chụp. Đã xoá cả 2 ảnh chụp nhầm ngay lập tức, dừng hẳn cách verify này cho phần còn lại của session — chỉ dựa vào `flutter analyze` (sạch) + `flutter test` (pass) để xác nhận PSY compile/chạy đúng.
 
 ---
 
