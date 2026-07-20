@@ -822,6 +822,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         biasColors: [Color(0xFFFFC107), Color(0xFF00E676), Color(0xFFFF4081)],
         textStyle: TextStyle(color: Colors.black),
       ),
+      psyStyle: const PSYStyle(
+        psyColor: Color(0xFF00E5FF),
+        maPsyColor: Color(0xFFFF6D00),
+        textStyle: TextStyle(color: Colors.white),
+      ),
     );
   }
 
@@ -1252,6 +1257,16 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 () => context.read<ChartBloc>().add(
                   const ChartSecondaryIndicatorToggled(
                     SecondaryIndicatorType.bias,
+                  ),
+                ),
+              ),
+              _chip(
+                'PSY',
+                state.secondaryTypes.contains(SecondaryIndicatorType.psy),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.psy,
                   ),
                 ),
               ),

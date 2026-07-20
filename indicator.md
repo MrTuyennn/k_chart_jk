@@ -112,6 +112,11 @@ Tổng hợp toàn bộ indicator hiện có trong `k_chart_jk`: 7 main (vẽ đ
 - **calcParams**: `[6, 12, 24]` — nhiều chu kỳ cùng lúc, giống MA (mỗi phần tử là 1 đường riêng, không giới hạn đúng 3).
 - **Công thức**: `BIAS(n) = (close - MA(close, n)) / MA(close, n) × 100%`.
 
+### PSY — Psychological Line / 心理线 (`psy_indicator.dart`)
+- **Công dụng**: đo % số phiên TĂNG trong N phiên gần nhất — phản ánh tâm lý đám đông đang lạc quan hay bi quan. PSY quá cao (>75-83) → thị trường quá lạc quan, dễ điều chỉnh giảm; quá thấp (<25-17) → quá bi quan, dễ hồi phục. MAPSY (signal MA) cắt PSY dùng lọc tín hiệu, giảm nhiễu so với dùng PSY một mình.
+- **calcParams**: `[12, 6]` — (N: chu kỳ đếm phiên tăng, M: chu kỳ MA tín hiệu).
+- **Công thức**: `PSY = COUNT(close > REF(close,1), N) / N × 100`; `MAPSY = MA(PSY, M)`.
+
 ---
 
 ## Ghi chú chung

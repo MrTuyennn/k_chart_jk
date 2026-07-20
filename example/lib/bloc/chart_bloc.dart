@@ -172,6 +172,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         SecondaryIndicatorType.stochRsi,
         SecondaryIndicatorType.brar,
         SecondaryIndicatorType.bias,
+        SecondaryIndicatorType.psy,
       },
       savedChartScale: KChartScaleState(),
       isLine: false,

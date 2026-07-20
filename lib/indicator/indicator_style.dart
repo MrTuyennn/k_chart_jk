@@ -224,6 +224,17 @@ class BIASStyle extends IndicatorStyle {
   }
 }
 
+class PSYStyle extends IndicatorStyle {
+  final Color psyColor;
+  final Color maPsyColor;
+
+  const PSYStyle({
+    this.psyColor = const Color(0xFFFFC634),
+    this.maPsyColor = const Color(0xff35cdac),
+    super.textStyle,
+  });
+}
+
 class OBVStyle extends IndicatorStyle {
   final Color obvColor;
   final Color signalColor;

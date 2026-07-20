@@ -13,11 +13,12 @@ import 'zigzag_entity.dart';
 import 'avl_entity.dart';
 import 'brar_entity.dart';
 import 'bias_entity.dart';
+import 'psy_entity.dart';
 
 // Thứ tự mixin quan trọng — OBVEntity/TRIXEntity/MTMEntity/StochRSIEntity/BRAREntity/
-// BIASEntity phải đứng trước MACDEntity vì MACDEntity khai báo `on OBVEntity,
-// TRIXEntity, MTMEntity, StochRSIEntity, BRAREntity, BIASEntity` (xem macd_entity.dart).
-// Dart yêu cầu mixin trong `on` clause phải được apply trước.
+// BIASEntity/PSYEntity phải đứng trước MACDEntity vì MACDEntity khai báo `on
+// OBVEntity, TRIXEntity, MTMEntity, StochRSIEntity, BRAREntity, BIASEntity, PSYEntity`
+// (xem macd_entity.dart). Dart yêu cầu mixin trong `on` clause phải được apply trước.
 class KEntity
     with
         CandleEntity,
@@ -32,6 +33,7 @@ class KEntity
         StochRSIEntity, // phải trước MACDEntity
         BRAREntity,     // phải trước MACDEntity
         BIASEntity,     // phải trước MACDEntity
+        PSYEntity,      // phải trước MACDEntity
         MACDEntity,
         ZigZagEntity,
         AVLEntity {}
