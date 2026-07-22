@@ -2,6 +2,44 @@
 
 Tổng hợp toàn bộ thay đổi/fix của package: nội dung từ `CHANGELOG.md` (theo version publish), các commit `fix:` lẻ chưa lên CHANGELOG, và các thay đổi đang làm việc (chưa commit) trong session gần đây.
 
+## 2026-07-22
+
+### Feat (thêm lại sau revert) — Ichimoku Kinko Hyo
+
+Ichimoku Cloud từng được thêm rồi gỡ hoàn toàn theo yêu cầu ngày 2026-07-18 (xem mục "Revert" bên dưới). Session này thêm lại theo yêu cầu, dựa trên spec `ichimoku.md` (root repo) — main indicator thứ 8, dùng cơ chế đơn giản hơn hẳn bản V2 cũ.
+
+5 đường: Tenkan-sen/Kijun-sen (vẽ tại index gốc), Senkou Span A/B (dịch **tới trước** `shift` nến — mây), Chikou (dịch **lùi** `shift` nến, = `close`). `calcParams: [9, 26, 52]`, `shift` luôn = `calcParams[1]` — không hardcode `26`.
+
+**Khác biệt cốt lõi so với V1/V2 đã gỡ**: Span A/B/Chikou vẫn lưu 1 giá trị/nến TẠI INDEX GỐC (giống mọi indicator khác, vd `entity.boll`) thay vì mảng dài `n+shift` như V2 cũ. Phần dịch `±shift` chỉ là phép cộng/trừ `shift × pointWidth` vào toạ độ X **ngay tại draw-time** (`IchimokuIndicator.drawChart`), tận dụng tính tuyến tính của `getX(i)`. Nhờ vậy không cần kéo dài entity/mảng dữ liệu, và cơ chế mở rộng trục X dùng chung rút gọn còn đúng 1 property `MainIndicator.futureShift` (mặc định `0`) thay vì 3 hook riêng `requiredFutureBars`/`getFutureMaxMinValue`/`drawFutureSegment` của V2 cũ. Renderer tự tính `mFutureSlots = max(futureShift)`, tự mở rộng `mDataLen`/biên scroll/binary-search index — indicator dịch trục tương lai khác chỉ cần override `futureShift`, không phải sửa renderer lần nữa.
+
+`calc()` dùng sliding-window monotonic deque O(n) cho cả 3 chu kỳ HH/LL (không phải vòng lặp naive O(n×52) — tránh giật khi pan/zoom trên chart nhiều nến). Kumo tách polygon tại điểm Span A/B giao nhau (nội suy tuyến tính) để tô đúng 2 màu tăng/giảm.
+
+- File: `lib/entity/candle_entity.dart` (field `ichimoku`), `lib/indicator/indicator_style.dart` (`IchimokuStyle`), `lib/indicator/indicator_template.dart` (`part`, `futureShift` getter, switch case), `lib/indicator/main/ichimoku_indicator.dart` (mới), `lib/styles/k_chart_style.dart` (`ichimokuStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip)
+
+### Fixed — 7 bug phát hiện qua `/code-review` (high effort, 8 finder angle) trên phần Ichimoku ở trên
+
+Tất cả đều cùng 1 nguyên nhân gốc: vòng quét/vẽ dùng để chừa đủ nến nguồn cho đường bị dịch (rộng hơn viewport `mFutureSlots` mỗi phía, gọi là `mRealStartIndex`/`mRealStopIndex`) bị tái sử dụng nhầm cho những việc PHẢI gắn chặt với "nến đang thực sự hiển thị" — off-screen candle rò rỉ vào chỗ không nên rò rỉ.
+
+- **Label max/min giá (`drawMaxAndMin`) có thể lệch vị trí hoặc vô hình**: `mMainMaxIndex`/`mMainMinIndex` được set từ vòng quét rộng, có thể trỏ vào 1 nến off-screen — `translateXtoX(getX(mMainMaxIndex))` ra toạ độ ngoài `[0, mWidth]`, bị `clipRect` cắt mất, label biến mất hoặc lệch chỗ.
+- **Label chỉ số góc trên hiện sai nến khi cuộn giữa lịch sử**: `drawText(canvas, getItem(mRealStopIndex), ...)` — khi user không cuộn gần mép mới nhất, `mRealStopIndex` trỏ tới 1 nến off-screen (xa hơn nến phải-nhất-đang-thấy tới `mFutureSlots` vị trí), phá đúng mục đích dòng code (hiện đúng nến đang xem).
+- **Autoscale trục Y main chart bị nến off-screen ảnh hưởng**: `mMainMaxValue`/`mMainMinValue` (set `scaleY` của `MainRenderer`) cộng dồn cả high/low của nến ngoài viewport — nến hiển thị bị nén/giãn sai dù giá trên màn hình không đổi gì.
+- **Autoscale panel volume bị ảnh hưởng tương tự** — `mVolMaxValue`/`mVolMinValue` cộng dồn volume của nến off-screen, dù volume chẳng liên quan gì tới cơ chế dịch trục.
+- **Autoscale + reference-line mọi panel secondary (MACD/RSI/KDJ...) bị ảnh hưởng tương tự** — cùng nguyên nhân, dù các panel đó cũng chẳng liên quan gì tới Ichimoku.
+- **`currentStartIndex` (field `static` public) có thể vượt bound dữ liệu thật**: field được doc là "an toàn để dùng làm index", nhưng `mStartIndex` (nguồn gán) giờ có thể vượt `itemCount-1` khi cả viewport nằm trong vùng tương lai (zoom sâu + scroll hết cỡ) — consumer bên ngoài package (package không publish lên pub.dev nhưng vẫn dùng được qua git/path dependency) tin theo doc có thể bị `RangeError`.
+- **`IchimokuIndicator.pointWidth` có nguy cơ lệch khỏi `KChartStyle.pointWidth`**: `IchimokuIndicator` tự giữ 1 hằng số `pointWidth` riêng (mặc định 11.0) thay vì đọc từ `KChartStyle` thật — an toàn CHỈ VÌ `KChartStyle` trước đó không phải `final class`, về lý thuyết subclass được và override `pointWidth` khác 11.0, khiến mây/Chikou lệch pixel khỏi nến mà không có tín hiệu lỗi nào.
+
+**Sửa**: tách `mVisibleStartIndex`/`mVisibleStopIndex` (hẹp, đúng = viewport ∩ dữ liệu thật) ra khỏi `mRealStartIndex`/`mRealStopIndex` (rộng, giữ nguyên chỉ để phục vụ vẽ + Y-range riêng của indicator có dịch trục) — mọi chỗ cần "nến đang hiển thị" (high/low, volume, secondary, label header, crosshair clamp) chuyển sang dùng phạm vi hẹp; `currentStartIndex` clamp về `[0, itemCount-1]` trước khi publish; `KChartStyle` đổi thành `final class` để khoá hẳn khả năng subclass ghi đè `pointWidth`. Vòng lặp vẽ volume/secondary trong `chart_painter.dart` cũng đổi sang dùng phạm vi hẹp — nhân tiện fix luôn phần lãng phí `2×mFutureSlots` draw call/frame mà finder "efficiency" phát hiện.
+
+- File: `lib/renderer/base_chart_painter.dart`, `lib/renderer/chart_painter.dart`, `lib/styles/k_chart_style.dart`, `lib/indicator/main/ichimoku_indicator.dart`
+
+### Docs — `architecture.md`, `ichimoku.md`, `chart_jk_arch.md` cập nhật theo Ichimoku
+
+- `architecture.md`: thêm §3.5 "Vùng tương lai" (cơ chế dịch trục dùng chung, bảng 3 phạm vi index, cảnh báo `MUST MATCH` cho lớp bug vừa fix ở trên), mục Ichimoku trong catalogue §9.1, field `ichimoku` vào bảng §2.2, checklist port §12, đếm lại 19→20 indicator.
+- `ichimoku.md`: check lại checklist §6 theo đúng thực tế đã ship, thêm §7 ghi chú khác biệt giữa bản thật và spec gốc (draw-time pixel-shift thay vì mảng đã dịch sẵn, không làm phần crosshair-trong-vùng-tương-lai).
+- `chart_jk_arch.md`: bullet Ichimoku + annotate lại bullet "revert" cũ trong §1 Unreleased, mục Ichimoku đầy đủ trong §9.2, subsection "Vùng tương lai" trong §12 (bảng 3 phạm vi index rút gọn bản thực dụng hơn `architecture.md`).
+
+---
+
 ## 2026-07-18 (tiếp)
 
 ### Revert — Ichimoku Cloud gỡ hoàn toàn khỏi codebase

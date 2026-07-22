@@ -159,6 +159,7 @@ class ChartBloc extends Bloc<ChartEvent, ChartState> {
         MainIndicatorType.superTrend,
         MainIndicatorType.zigzag,
         MainIndicatorType.avl,
+        MainIndicatorType.ichimoku,
       },
       secondaryTypes: {
         SecondaryIndicatorType.macd,

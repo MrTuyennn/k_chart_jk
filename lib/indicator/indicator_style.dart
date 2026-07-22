@@ -235,6 +235,35 @@ class PSYStyle extends IndicatorStyle {
   });
 }
 
+class IchimokuStyle extends IndicatorStyle {
+  final Color tenkanColor;
+  final Color kijunColor;
+  final Color chikouColor;
+
+  /// màu viền Span A — cũng dùng khi mây tăng (Span A > Span B).
+  final Color spanAColor;
+
+  /// màu viền Span B — cũng dùng khi mây giảm (Span B > Span A).
+  final Color spanBColor;
+
+  /// màu tô mây khi Span A > Span B (mây tăng).
+  final Color cloudUpColor;
+
+  /// màu tô mây khi Span B > Span A (mây giảm).
+  final Color cloudDownColor;
+
+  const IchimokuStyle({
+    this.tenkanColor = const Color(0xFFFFC634),
+    this.kijunColor = const Color(0xffb48ee3),
+    this.chikouColor = const Color(0xff35cdac),
+    this.spanAColor = const Color(0xFF14AD8F),
+    this.spanBColor = const Color(0xFFD5405D),
+    this.cloudUpColor = const Color(0x2614AD8F),
+    this.cloudDownColor = const Color(0x26D5405D),
+    super.textStyle,
+  });
+}
+
 class OBVStyle extends IndicatorStyle {
   final Color obvColor;
   final Color signalColor;

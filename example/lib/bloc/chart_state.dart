@@ -4,7 +4,7 @@ import 'package:k_chart_jk/k_chart_plus.dart';
 
 import '../market/order_book.dart';
 
-enum MainIndicatorType { ma, boll, ema, sar, superTrend, zigzag, avl }
+enum MainIndicatorType { ma, boll, ema, sar, superTrend, zigzag, avl, ichimoku }
 
 enum SecondaryIndicatorType {
   macd,
@@ -31,6 +31,7 @@ MainIndicator buildMainIndicator(MainIndicatorType type) => switch (type) {
   MainIndicatorType.superTrend => SuperTrendIndicator(),
   MainIndicatorType.zigzag => ZigZagIndicator(),
   MainIndicatorType.avl => AVLIndicator(),
+  MainIndicatorType.ichimoku => IchimokuIndicator(),
 };
 
 SecondaryIndicator buildSecondaryIndicator(SecondaryIndicatorType type) =>
@@ -174,6 +175,7 @@ class ChartState extends Equatable {
     MainIndicatorType.superTrend,
     MainIndicatorType.zigzag,
     MainIndicatorType.avl,
+    MainIndicatorType.ichimoku,
   ];
 
   static const List<SecondaryIndicatorType> _secondaryOrder = [
