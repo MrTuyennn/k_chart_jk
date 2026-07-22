@@ -30,13 +30,21 @@
 
 ### Unreleased
 
+- **feat (thêm lại sau revert):** `IchimokuIndicator` (Ichimoku Kinko Hyo) — main indicator, thêm lại theo yêu cầu sau khi đã revert hoàn toàn ở mục "revert" bên dưới (07-18). Lần này dựng lại từ đầu với cơ chế đơn giản hơn bản V2 cũ (1 property `futureShift` thay vì 3 hook `requiredFutureBars`/`getFutureMaxMinValue`/`drawFutureSegment`). Xem chi tiết công thức/API tại [9.2](#92-built-in-indicators) và cơ chế renderer dùng chung tại [12](#12-renderer-internals) mục "Vùng tương lai".
+  - `calcParams: [9, 26, 52]` (tenkanPeriod, kijunPeriod, spanBPeriod) — bộ cổ điển; `shift` LUÔN = `calcParams[1]` (kijun period), không hardcode `26`.
+  - 5 đường: Tenkan/Kijun (vẽ tại index gốc, không dịch), Senkou Span A/B (dịch **tới trước** `shift` nến), Chikou (dịch **lùi** `shift` nến, = `close`, không lưu field riêng). Mây (Kumo) tô giữa Span A/B, tách polygon tại điểm giao (nội suy tuyến tính) để đổi màu đúng đoạn tăng/giảm.
+  - **Khác biệt cốt lõi so với V1/V2 cũ**: Span A/B/Chikou vẫn lưu 1 giá trị/nến TẠI INDEX GỐC (giống mọi indicator khác) — phần dịch `±shift` chỉ là phép cộng/trừ `shift × pointWidth` vào toạ độ X **ngay tại draw-time** (`IchimokuIndicator.drawChart`), không lưu mảng đã dịch sẵn `spanA[n+shift]`, không kéo dài entity/mảng dữ liệu.
+  - `calc()` dùng sliding-window monotonic deque O(n) cho cả 3 chu kỳ HH/LL — không phải vòng lặp naive O(n×52).
+  - `MainIndicator.futureShift` (getter mới, mặc định `0`) — hook chung cho MỌI main indicator cần dịch trục, không riêng Ichimoku; `IchimokuIndicator.futureShift = shift`. Renderer tự tính `mFutureSlots = max(futureShift)` và mở rộng `mDataLen`/biên scroll theo đó — xem [12](#12-renderer-internals).
+  - **7 bug phát hiện qua `/code-review` (high effort, 8 finder angle) trên lần thêm lại này** — đã fix hết, đều xoay quanh việc renderer conflate "vùng cần quét để có đủ nến nguồn vẽ đường dịch" (rộng hơn viewport `mFutureSlots` mỗi phía) với "vùng nến đang thực sự hiển thị" (hẹp hơn): label max/min giá lệch vị trí/vô hình khi extreme nằm ngoài viewport; label chỉ số góc trên hiện sai nến khi cuộn giữa lịch sử; autoscale trục Y main/volume/secondary bị nến off-screen ảnh hưởng; field public `currentStartIndex` có thể vượt bound dữ liệu thật; `IchimokuIndicator.pointWidth` có nguy cơ lệch khỏi `KChartStyle.pointWidth` nếu class này từng cho phép subclass. Sửa bằng cách tách riêng `mVisibleStartIndex/mVisibleStopIndex` (hẹp, đúng viewport) khỏi `mRealStartIndex/mRealStopIndex` (rộng, chỉ dùng cho vẽ + Y-range của riêng indicator có dịch trục), clamp `currentStartIndex`, và đổi `KChartStyle` thành `final class`.
+    - File: `lib/entity/candle_entity.dart` (field `ichimoku`), `lib/indicator/indicator_style.dart` (`IchimokuStyle`), `lib/indicator/indicator_template.dart` (`part`, `futureShift` getter, switch case), `lib/indicator/main/ichimoku_indicator.dart` (mới), `lib/styles/k_chart_style.dart` (`ichimokuStyle` field/default/`copyWith`, `KChartStyle` → `final class`), `lib/renderer/base_chart_painter.dart` (`mFutureSlots`/`mVisibleStartIndex`/`mVisibleStopIndex`/`mRealStartIndex`/`mRealStopIndex`, `timeAt()`), `lib/renderer/chart_painter.dart`, `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip)
 - **feat:** `PSYIndicator` (PSY) — secondary indicator mới, Psychological Line / 心理线. `calcParams: [12, 6]` (N: đếm phiên tăng, M: MA tín hiệu). `PSY = COUNT(close>prevClose,N)/N×100`; `MAPSY = MA(PSY,M)`. Cùng cấu trúc 2-đường-signal như MTM/TRIX. `PSY` cần `prevClose` nên bắt đầu trễ 1 nến (`i=N`, không phải `i=N-1`) — cùng loại trễ như `BR` của BRAR.
   - File: `lib/entity/psy_entity.dart` (mới), `lib/entity/macd_entity.dart` + `lib/entity/k_entity.dart` (nối `PSYEntity` vào mixin chain, trước `MACDEntity`), `lib/indicator/indicator_style.dart` (`PSYStyle`), `lib/indicator/secondary/psy_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`psyStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
 - **feat:** `BIASIndicator` (BIAS) — secondary indicator mới, Bias Ratio / 乖离率. `calcParams: [6, 12, 24]` — nhiều chu kỳ cùng lúc (cùng pattern `MAStyle.maColors`/`getMAColor`, không giới hạn đúng 3). `BIAS(n) = (close - MA(close,n))/MA(close,n) × 100%`, rolling-sum O(n). Output `entity.biasValueList = List<double?>` dùng `double?` (không phải sentinel `0` như MA) vì BIAS hợp lệ đi qua 0 rất thường xuyên.
   - File: `lib/entity/bias_entity.dart` (mới), `lib/entity/macd_entity.dart` + `lib/entity/k_entity.dart` (nối `BIASEntity` vào mixin chain, trước `MACDEntity`), `lib/indicator/indicator_style.dart` (`BIASStyle`), `lib/indicator/secondary/bias_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`biasStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
 - **feat:** `BRARIndicator` (BRAR) — secondary indicator mới, Popularity/Willingness Index (人气意愿指标). `calcParams: [26]`. `AR = Σ(high-open,26)/Σ(open-low,26)×100`, `BR = Σmax(0,high-prevClose,26)/Σmax(0,prevClose-low,26)×100`, tính bằng rolling-sum O(n), guard chia 0 → 0. Xem chi tiết công dụng/công thức tại [9.2](#92-built-in-indicators) và `indicator.md` (mới, ở root repo — tổng hợp công dụng + công thức toàn bộ 7 main + 12 secondary indicator, đọc trực tiếp từ `calc()` trong source).
   - File: `lib/entity/brar_entity.dart` (mới), `lib/entity/macd_entity.dart` + `lib/entity/k_entity.dart` (nối `BRAREntity` vào mixin chain, trước `MACDEntity`), `lib/indicator/indicator_style.dart` (`BRARStyle`), `lib/indicator/secondary/brar_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`brarStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
-- **revert:** Ichimoku Cloud (main indicator, gồm cả V1 và V2 chiếu cloud ra tương lai) đã gỡ hoàn toàn khỏi codebase theo yêu cầu — không còn field/class/wiring nào sót lại, kể cả cơ chế chung `requiredFutureBars`/`getFutureMaxMinValue`/`drawFutureSegment` (hook no-op thêm vào `IndicatorTemplate`/`base_chart_painter.dart`/`main_renderer.dart` cho V2) cũng đã bị gỡ theo (đã rà lại toàn bộ `lib/` + `example/`, không còn tham chiếu nào).
+- **revert:** Ichimoku Cloud (main indicator, gồm cả V1 và V2 chiếu cloud ra tương lai) đã gỡ hoàn toàn khỏi codebase theo yêu cầu — không còn field/class/wiring nào sót lại, kể cả cơ chế chung `requiredFutureBars`/`getFutureMaxMinValue`/`drawFutureSegment` (hook no-op thêm vào `IndicatorTemplate`/`base_chart_painter.dart`/`main_renderer.dart` cho V2) cũng đã bị gỡ theo (đã rà lại toàn bộ `lib/` + `example/`, không còn tham chiếu nào). *(Cập nhật: thêm lại theo yêu cầu — xem bullet đầu Unreleased.)*
 - **fix:** KDJ `drawChart` dùng `||` thay `&&` trong guard null-check K/D/J rồi force-unwrap cả 2 điểm bằng `!` — nến mới chưa kịp `calc()` lại (vd tick live) có thể crash `Null check operator used on a null value`. Sửa: đổi sang `&&`, khớp pattern mọi secondary indicator khác (RSI/WR/MTM/TRIX/StochRSI).
   - File: `lib/indicator/secondary/kdj_indicator.dart`
 - **fix:** `SARIndicator.drawChart` hard-code màu chấm SAR theo `candleStyle.upColor`/`dnColor`/`defaultTextColor` của MAIN CHART, bỏ qua hẳn `indicatorStyle` — set màu qua `KChartColors.sarStyle` không có tác dụng lên chấm vẽ, chỉ đổi được label `"SAR: ..."`. Sửa: `SARStyle` đổi field `sarColor` (1 màu) thành `upColor`/`dnColor` (theo convention `SuperTrendStyle`) — cả chấm lẫn label giờ tự chọn màu theo xu hướng (`sar <= (high+low)/2` = tăng → `upColor`, ngược lại → `dnColor`), độc lập với `candleStyle`.
@@ -879,6 +887,29 @@ IndicatorTemplate<T, K>   ← abstract
   ```
 - **Lưu ý:** cần API trả `amount` (quote volume) trong `KLineEntity` để có giá trị thực; thiếu thì fallback typical price — đường vẫn bám nến nhưng không phản ánh volume-weighting thực. Các biến thể từng thử và bỏ: cumulative VWAP (đường trôi xa khỏi cụm nến khi giá chạy dài, kéo giãn trục Y vì `getMaxMinValue` phải bao giá trị AVL) và rolling VWAP N nến (mượt hơn nhưng vẫn lệch khỏi nến, không giống Binance).
 
+#### Ichimoku Kinko Hyo — main
+
+- **Style:** `IchimokuStyle({ tenkanColor, kijunColor, chikouColor, spanAColor, spanBColor, cloudUpColor, cloudDownColor })`
+- **calcParams:** `[9, 26, 52]` — (tenkanPeriod, kijunPeriod, spanBPeriod); bộ crypto thường dùng `[20, 60, 120]`. `shift` LUÔN = `calcParams[1]` (kijun period) — đổi param thì shift đổi theo, không hardcode `26`.
+- **Output:** `entity.ichimoku = Ichimoku { tenkan, kijun, spanA, spanB }` (field trực tiếp trên `CandleEntity`, giống `boll`/`sar` — không cần entity mixin riêng). Không lưu `chikou` — luôn `= close`, dịch ở draw-time.
+- **Công thức:**
+  ```
+  HH(p)/LL(p) = cao/thấp nhất trong p nến gần nhất (bao gồm nến hiện tại) — sliding-window monotonic deque O(n)
+  tenkan[i] = i >= tenkanP-1 ? (HH(tenkanP)+LL(tenkanP))/2 : null
+  kijun[i]  = i >= kijunP-1  ? (HH(kijunP)+LL(kijunP))/2  : null
+  spanA[i]  = (tenkan[i] != null && kijun[i] != null) ? (tenkan[i]+kijun[i])/2 : null
+  spanB[i]  = i >= spanBP-1 ? (HH(spanBP)+LL(spanBP))/2 : null
+  ```
+- **Vẽ (draw-time, không phải trong `calc()`)** — đây là điểm khác biệt lớn nhất so với mọi indicator khác trong bảng này:
+  ```
+  Tenkan/Kijun:    (lastX, curX)                                          — không dịch
+  Senkou Span A/B: (lastX + shift×pointWidth, curX + shift×pointWidth)    — dịch TỚI TRƯỚC
+  Chikou:          (lastX - shift×pointWidth, curX - shift×pointWidth), y = close  — dịch LÙI
+  ```
+  Mây (Kumo) tô giữa Span A/B đã dịch; nếu dấu `(spanA-spanB)` đổi giữa `lastPoint`/`curPoint` → tách polygon tại điểm giao (nội suy tuyến tính `t = lastDiff/(lastDiff-curDiff)`), tô 2 nửa 2 màu (`cloudUpColor`/`cloudDownColor`) — không tách sẽ tô sai màu cả đoạn giao nhau.
+- **`futureShift`:** `IchimokuIndicator.futureShift = shift` — indicator đầu tiên trong thư viện khai báo giá trị này (`MainIndicator.futureShift` mặc định `0`, no-op cho mọi indicator khác). Kích hoạt cơ chế mở rộng trục X ở [12](#12-renderer-internals) mục "Vùng tương lai" — chart tự chừa `shift` nến trống bên phải nến cuối để mây không bị cắt cụt, tự mở rộng biên scroll/zoom tương ứng.
+- **Lưu ý:** với chart `itemCount < 52` (chưa đủ nến cho Span B), các field vẫn `null` đúng vị trí warm-up thay vì sentinel `0` — không vẽ đường/mây rác kéo về 0. Crosshair/tap-selection bị clamp về nến thật đang hiển thị, KHÔNG cho chọn vào vùng tương lai trống (đơn giản hoá có chủ đích, xem `ichimoku.md` §7 mục 4 ở root repo).
+
 #### MACD — secondary
 
 - **Style:** `MACDStyle({ upColor, dnColor, macdColor, difColor, deaColor, macdWidth })`
@@ -1180,6 +1211,28 @@ double _applyScaleY(double rawY) {
       .clamp(mMainRect.top, mMainRect.bottom);
 }
 ```
+
+### Vùng tương lai (future zone) — indicator dịch trục (Ichimoku)
+
+Thêm khi implement Ichimoku ([9.2](#92-built-in-indicators)) — cơ chế dùng chung, không hardcode riêng cho 1 indicator. Bất kỳ `MainIndicator` nào override `futureShift` (mặc định `0`) đều tự động được renderer chừa chỗ:
+
+```dart
+mFutureSlots = max(futureShift trên toàn bộ mainIndicators đang bật)   // 0 nếu không indicator nào cần
+mDataLen     = (mItemCount + mFutureSlots) * mPointWidth               // thay vì chỉ mItemCount * mPointWidth
+// → getMinTranslateX()/maxScrollX tự mở rộng, indexOfTranslateX() tự dò được vào vùng tương lai
+```
+
+**3 phạm vi index — dùng lẫn nhau là nguồn bug chính** (đã xảy ra thật khi thêm Ichimoku lần này, xem Unreleased §1, fix xong):
+
+| Phạm vi | Có thể vượt `itemCount-1`? | Dùng cho |
+|---|---|---|
+| `mStartIndex`/`mStopIndex` (viewport thô) | Có | Chỉ dùng nội bộ để tính 2 phạm vi dưới, KHÔNG index thẳng vào `datas!` |
+| `mVisibleStartIndex`/`mVisibleStopIndex` (= viewport ∩ dữ liệu thật) | Không | Label max/min giá + index của nó, autoscale trục Y main/volume/secondary, nến hiển thị label chỉ số góc trên, clamp crosshair |
+| `mRealStartIndex`/`mRealStopIndex` (= vùng hiển thị, nới rộng `mFutureSlots` mỗi phía) | Không | CHỈ 2 việc: vòng lặp vẽ của main renderer (cần nến nguồn cho đường bị dịch), và đóng góp Y-range của riêng indicator có `futureShift > 0` |
+
+Volume/secondary renderer **không** cần vùng "real" mở rộng — dùng `mVisibleStartIndex`/`mVisibleStopIndex` là đủ, dùng nhầm vùng rộng hơn chỉ tốn thêm draw call vô ích cho nến off-screen (bị clip nên không sai hình, nhưng lãng phí).
+
+`timeAt(index)` — ngoại suy timestamp tuyến tính cho vùng tương lai (`lastTime + k × interval`, `interval` = khoảng cách 2 nến thật cuối cùng) — đủ cho thị trường 24/7, không xử lý lịch phiên nghỉ.
 
 ### Padding phải tỷ lệ
 

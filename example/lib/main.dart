@@ -1141,6 +1141,14 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                   const ChartMainIndicatorToggled(MainIndicatorType.avl),
                 ),
               ),
+              _chip(
+                'Ichimoku',
+                state.mainTypes.contains(MainIndicatorType.ichimoku),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartMainIndicatorToggled(MainIndicatorType.ichimoku),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),

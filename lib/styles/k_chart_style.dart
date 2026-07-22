@@ -136,6 +136,9 @@ class KChartColors {
   /// Style cho `AVLIndicator`.
   final AVLStyle avlStyle;
 
+  /// Style cho `IchimokuIndicator`.
+  final IchimokuStyle ichimokuStyle;
+
   /// Style cho `MACDIndicator`.
   final MACDStyle macdStyle;
 
@@ -208,6 +211,7 @@ class KChartColors {
     this.zigzagStyle = const ZigZagStyle(),
     this.superTrendStyle = const SuperTrendStyle(),
     this.avlStyle = const AVLStyle(),
+    this.ichimokuStyle = const IchimokuStyle(),
     this.macdStyle = const MACDStyle(),
     this.kdjStyle = const KDJStyle(),
     this.rsiStyle = const RSIStyle(),
@@ -246,6 +250,7 @@ class KChartColors {
     ZigZagStyle? zigzagStyle,
     SuperTrendStyle? superTrendStyle,
     AVLStyle? avlStyle,
+    IchimokuStyle? ichimokuStyle,
     MACDStyle? macdStyle,
     KDJStyle? kdjStyle,
     RSIStyle? rsiStyle,
@@ -280,6 +285,7 @@ class KChartColors {
       zigzagStyle: zigzagStyle ?? this.zigzagStyle,
       superTrendStyle: superTrendStyle ?? this.superTrendStyle,
       avlStyle: avlStyle ?? this.avlStyle,
+      ichimokuStyle: ichimokuStyle ?? this.ichimokuStyle,
       macdStyle: macdStyle ?? this.macdStyle,
       kdjStyle: kdjStyle ?? this.kdjStyle,
       rsiStyle: rsiStyle ?? this.rsiStyle,
@@ -296,7 +302,12 @@ class KChartColors {
   }
 }
 
-class KChartStyle {
+/// `final` — không cho subclass override các hằng số layout (đặc biệt
+/// [pointWidth]). Nhiều nơi trong renderer (vd `IchimokuIndicator.pointWidth`
+/// trong lib/indicator/main/ichimoku_indicator.dart) giả định `pointWidth`
+/// LUÔN là 11.0 bất kể instance nào; nếu cho phép subclass đổi giá trị này,
+/// những chỗ đó sẽ lệch pixel âm thầm không có tín hiệu lỗi nào.
+final class KChartStyle {
   final double topPadding = 20.0;
 
   final double bottomPadding = 16.0;

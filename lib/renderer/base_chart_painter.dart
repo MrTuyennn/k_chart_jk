@@ -49,6 +49,28 @@ abstract class BaseChartPainter extends CustomPainter {
       mPaddingMainChild = 10.0;
   int mGridRows = 4, mGridColumns = 4;
   int mStartIndex = 0, mStopIndex = 0;
+
+  /// Vùng nến THẬT đang thực sự hiển thị trên màn hình — giao giữa viewport
+  /// (`mStartIndex..mStopIndex`, có thể trỏ vào vùng tương lai) và dữ liệu
+  /// thật (`0..mItemCount-1`). Luôn nằm trong `[0, mItemCount-1]` — an toàn
+  /// để dùng làm index vào `datas!`. Dùng cho MỌI thứ phải phản ánh đúng
+  /// "nến nào đang thấy trên màn hình": high/low nến (`mMainHighMaxValue`/
+  /// `mMainMaxIndex`, dùng bởi `drawMaxAndMin`), volume, secondary, và
+  /// candle dùng cho label header (`drawText`). KHÔNG dùng
+  /// [mRealStartIndex]/[mRealStopIndex] (rộng hơn) cho các mục đích này —
+  /// xem giải thích ở đó.
+  int mVisibleStartIndex = 0, mVisibleStopIndex = 0;
+
+  /// Vùng nến THẬT cần quét để có đủ dữ liệu nguồn cho các đường bị dịch
+  /// (vd Ichimoku: Span A/B dịch tới trước, Chikou dịch lùi `futureShift`
+  /// nến) — rộng hơn [mVisibleStartIndex]/[mVisibleStopIndex] thêm
+  /// `mFutureSlots` mỗi phía. CHỈ dùng cho: (a) draw loop main chart (cần đủ
+  /// nến nguồn để đường dịch vẽ được vào vùng đang hiển thị), (b) quét phần
+  /// "margin" trong `calculateValue()` để lấy đóng góp Y-range của riêng các
+  /// đường bị dịch. KHÔNG dùng cho high/low nến, volume, secondary, hay bất
+  /// cứ chỗ nào cần "nến đang thực sự hiển thị" — nến trong vùng margin có
+  /// thể hoàn toàn nằm ngoài màn hình.
+  int mRealStartIndex = 0, mRealStopIndex = 0;
   double mMainMaxValue = double.minPositive, mMainMinValue = double.maxFinite;
   double mVolMaxValue = double.minPositive, mVolMinValue = double.maxFinite;
   double mTranslateX = double.minPositive;
@@ -56,6 +78,13 @@ abstract class BaseChartPainter extends CustomPainter {
   double mMainHighMaxValue = double.minPositive,
       mMainLowMinValue = double.maxFinite;
   int mItemCount = 0;
+
+  /// Số slot "tương lai" (chưa có nến) cần chừa bên phải nến cuối, do main
+  /// indicator nào đó cần dịch tới trước để vẽ đúng (vd Ichimoku — xem
+  /// `MainIndicator.futureShift`). `0` khi không có indicator nào yêu cầu →
+  /// mọi tính toán bên dưới thu gọn về đúng hành vi cũ, không ảnh hưởng
+  /// chart không dùng indicator loại này.
+  int mFutureSlots = 0;
   double mDataLen = 0.0; // the data occupies the total length of the screen
   final KChartStyle chartStyle;
   late double mPointWidth;
@@ -96,7 +125,10 @@ abstract class BaseChartPainter extends CustomPainter {
     mChildPadding = chartStyle.childPadding;
     mGridRows = chartStyle.gridRows;
     mGridColumns = chartStyle.gridColumns;
-    mDataLen = mItemCount * mPointWidth;
+    for (final ind in mainIndicators) {
+      if (ind.futureShift > mFutureSlots) mFutureSlots = ind.futureShift;
+    }
+    mDataLen = (mItemCount + mFutureSlots) * mPointWidth;
     initFormats();
   }
 
@@ -146,9 +178,11 @@ abstract class BaseChartPainter extends CustomPainter {
       drawVerticalText(canvas);
       drawDate(canvas, size);
 
-      // Dùng candle phải nhất đang hiển thị (mStopIndex) thay vì datas!.last
-      // → label MA/VOL/secondary cập nhật theo vị trí scroll, không cố định ở nến cuối
-      drawText(canvas, getItem(mStopIndex), chartStyle.space);
+      // Dùng candle phải nhất đang hiển thị (mVisibleStopIndex, clamp về
+      // nến thật VÀ trong viewport — mStopIndex có thể trỏ vào vùng tương
+      // lai, mRealStopIndex rộng hơn viewport nên KHÔNG dùng ở đây) → label
+      // MA/VOL/secondary cập nhật theo vị trí scroll, không cố định ở nến cuối
+      drawText(canvas, getItem(mVisibleStopIndex), chartStyle.space);
       drawMaxAndMin(canvas);
       drawNowPrice(canvas);
 
@@ -254,13 +288,39 @@ abstract class BaseChartPainter extends CustomPainter {
     setTranslateXFromScrollX(scrollX);
     mStartIndex = indexOfTranslateX(xToTranslateX(0));
     mStopIndex = indexOfTranslateX(xToTranslateX(mWidth));
-    currentStartIndex = mStartIndex;
-    for (int i = mStartIndex; i <= mStopIndex; i++) {
+    // mStartIndex có thể vượt mItemCount-1 khi cả viewport nằm trong vùng
+    // tương lai (zoom sâu + scroll hết cỡ, xem mFutureSlots) — clamp để giữ
+    // đúng cam kết "safe index" của field public này.
+    currentStartIndex = min(max(mStartIndex, 0), mItemCount - 1);
+
+    // mStartIndex/mStopIndex có thể trỏ vào vùng tương lai (> mItemCount-1)
+    // khi có indicator dùng mFutureSlots (vd Ichimoku).
+    mVisibleStartIndex = max(mStartIndex, 0);
+    mVisibleStopIndex = min(mStopIndex, mItemCount - 1);
+    mRealStartIndex = max(0, mStartIndex - mFutureSlots);
+    mRealStopIndex = min(mStopIndex + mFutureSlots, mItemCount - 1);
+
+    for (int i = mRealStartIndex; i <= mRealStopIndex; i++) {
       var item = datas![i];
-      getMainMaxMinValue(item, i);
-      if (mVolRect != null) getVolMaxMinValue(item);
-      for (int idx = 0; idx < mSecondaryRectList.length; ++idx) {
-        getSecondaryMaxMinValue(idx, item);
+      if (i >= mVisibleStartIndex && i <= mVisibleStopIndex) {
+        getMainMaxMinValue(item, i);
+        if (mVolRect != null) getVolMaxMinValue(item);
+        for (int idx = 0; idx < mSecondaryRectList.length; ++idx) {
+          getSecondaryMaxMinValue(idx, item);
+        }
+      } else {
+        // Nến trong phần "margin" (ngoài viewport, chỉ có mặt để cấp dữ liệu
+        // nguồn cho đường bị dịch) — CHỈ những main indicator có futureShift
+        // > 0 mới có thể có phần vẽ dịch rơi vào vùng đang hiển thị, nên chỉ
+        // chúng mới được góp vào Y-range ở đây. Không đụng tới high/low nến
+        // (mMainHighMaxValue/mMainMaxIndex), volume, hay secondary — những
+        // thứ đó không bị dịch nên nến ngoài viewport không liên quan.
+        for (final ind in mainIndicators) {
+          if (ind.futureShift <= 0) continue;
+          final value = ind.getMaxMinValue(item, mMainMinValue, mMainMaxValue);
+          mMainMinValue = min(mMainMinValue, value.$1);
+          mMainMaxValue = max(mMainMaxValue, value.$2);
+        }
       }
     }
   }
@@ -324,7 +384,7 @@ abstract class BaseChartPainter extends CustomPainter {
   double xToTranslateX(double x) => -mTranslateX + x / scaleX;
 
   int indexOfTranslateX(double translateX) =>
-      _indexOfTranslateX(translateX, 0, mItemCount - 1);
+      _indexOfTranslateX(translateX, 0, mItemCount + mFutureSlots - 1);
 
   /// Using binary search for the index of the current value
   int _indexOfTranslateX(double translateX, int start, int end) {
@@ -355,6 +415,19 @@ abstract class BaseChartPainter extends CustomPainter {
   double getX(int position) => position * mPointWidth + mPointWidth / 2;
 
   KLineEntity getItem(int position) => datas![position];
+
+  /// Timestamp tại [index] — ngoại suy tuyến tính (`lastTime + k*interval`)
+  /// cho vùng tương lai (`index >= mItemCount`, xem [mFutureSlots]). Đủ cho
+  /// thị trường 24/7 (crypto); KHÔNG xử lý lịch phiên nghỉ (chứng khoán).
+  int timeAt(int index) {
+    if (index < mItemCount) return datas![index].time ?? 0;
+    final lastTime = datas![mItemCount - 1].time ?? 0;
+    final prevTime = mItemCount >= 2
+        ? (datas![mItemCount - 2].time ?? lastTime)
+        : lastTime;
+    final interval = lastTime - prevTime;
+    return lastTime + (index - mItemCount + 1) * interval;
+  }
 
   /// scrollX convert to TranslateX
   void setTranslateXFromScrollX(double scrollX) =>
@@ -387,13 +460,18 @@ abstract class BaseChartPainter extends CustomPainter {
   }
 
   /// calculate the value of x after long pressing and convert to [index]
+  ///
+  /// Clamp về [mVisibleStartIndex]/[mVisibleStopIndex] (nến thật ĐANG HIỂN
+  /// THỊ) — không cho chọn vào vùng tương lai trống, cũng không cho chọn
+  /// nến "margin" ngoài viewport (xem [mRealStartIndex]), vì crosshair/
+  /// tooltip cần 1 `KLineEntity` thật VÀ đang thấy trên màn hình.
   int calculateSelectedX(double selectX) {
     int mSelectedIndex = indexOfTranslateX(xToTranslateX(selectX));
-    if (mSelectedIndex < mStartIndex) {
-      mSelectedIndex = mStartIndex;
+    if (mSelectedIndex < mVisibleStartIndex) {
+      mSelectedIndex = mVisibleStartIndex;
     }
-    if (mSelectedIndex > mStopIndex) {
-      mSelectedIndex = mStopIndex;
+    if (mSelectedIndex > mVisibleStopIndex) {
+      mSelectedIndex = mVisibleStopIndex;
     }
     return mSelectedIndex;
   }

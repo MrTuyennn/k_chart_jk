@@ -236,7 +236,12 @@ class ChartPainter extends BaseChartPainter {
     // offsetY dịch chuyển chart dọc (pan Y), neo tại centerY để scaleY không bị lệch
     canvas.translate(0, centerY * (1 - scaleY) + offsetY);
     canvas.scale(1.0, scaleY);
-    for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
+    // mRealStartIndex/mRealStopIndex (không phải mStartIndex/mStopIndex) —
+    // 2 biến sau có thể trỏ vào vùng tương lai (chưa có nến) khi 1 main
+    // indicator dùng futureShift (vd Ichimoku), truy cập datas![i] ở đó sẽ
+    // RangeError. mRealStartIndex/mRealStopIndex đã clamp về nến thật và
+    // mở rộng thêm futureShift mỗi phía để vẫn đủ nến nguồn vẽ đường dịch.
+    for (int i = mRealStartIndex; datas != null && i <= mRealStopIndex; i++) {
       KLineEntity? curPoint = datas?[i];
       if (curPoint == null) continue;
       KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
@@ -248,7 +253,12 @@ class ChartPainter extends BaseChartPainter {
 
     // VolRenderer + SecondaryRenderer cùng nằm ngoài scope scaleY của main
     // → panel volume + indicator phụ không bị giãn khi user zoom dọc nến.
-    for (int i = mStartIndex; datas != null && i <= mStopIndex; i++) {
+    // Dùng mVisibleStartIndex/mVisibleStopIndex (không phải mRealStartIndex/
+    // mRealStopIndex) — vol/secondary không có khái niệm đường bị dịch nên
+    // không cần vùng margin rộng hơn viewport, chỉ tốn thêm draw call vô ích.
+    for (int i = mVisibleStartIndex;
+        datas != null && i <= mVisibleStopIndex;
+        i++) {
       KLineEntity? curPoint = datas?[i];
       if (curPoint == null) continue;
       KLineEntity lastPoint = i == 0 ? curPoint : datas![i - 1];
@@ -306,7 +316,7 @@ class ChartPainter extends BaseChartPainter {
       if (translateX < startX || translateX > stopX) continue;
 
       int index = indexOfTranslateX(translateX);
-      TextPainter tp = getTextPainter(getDate(datas![index].time), null);
+      TextPainter tp = getTextPainter(getDate(timeAt(index)), null);
       y = mDateRect.top + (mBottomPadding - tp.height) / 2;
       x = columnSpace * i - tp.width / 2;
       if (x < 0) x = 0;

@@ -19,4 +19,7 @@ mixin CandleEntity {
 
   // superTrend
   SuperTrend? superTrend;
+
+  // ichimoku
+  Ichimoku? ichimoku;
 }

@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:k_chart_jk/entity/index.dart';
@@ -14,6 +15,7 @@ part 'main/ema_indicator.dart';
 part 'main/zigzag_indicator.dart';
 part 'main/super_trend_indicator.dart';
 part 'main/avl_indicator.dart';
+part 'main/ichimoku_indicator.dart';
 
 part 'secondary/macd_indicator.dart';
 part 'secondary/cci_indicator.dart';
@@ -105,6 +107,11 @@ abstract class MainIndicator<T, K> extends IndicatorTemplate<T, K> {
     required super.indicatorStyle,
     required super.isDefaultStyle,
   });
+
+  /// Số slot "tương lai" (chưa có nến) mà indicator cần chừa chỗ bên phải nến
+  /// cuối để vẽ đúng (vd Ichimoku dịch Span A/B tới trước `shift` nến). `0`
+  /// (mặc định) = không cần mở rộng trục X — không ảnh hưởng chart hiện có.
+  int get futureShift => 0;
 }
 
 abstract class SecondaryIndicator<T, K> extends IndicatorTemplate<T, K> {
@@ -186,6 +193,8 @@ void applyIndicatorColorStyles(
         _applyDefaultStyle(m, colors.superTrendStyle);
       case AVLIndicator m:
         _applyDefaultStyle(m, colors.avlStyle);
+      case IchimokuIndicator m:
+        _applyDefaultStyle(m, colors.ichimokuStyle);
     }
   }
   for (final ind in secondaryIndicators) {
