@@ -117,6 +117,17 @@ Tổng hợp toàn bộ indicator hiện có trong `k_chart_jk`: 7 main (vẽ đ
 - **calcParams**: `[12, 6]` — (N: chu kỳ đếm phiên tăng, M: chu kỳ MA tín hiệu).
 - **Công thức**: `PSY = COUNT(close > REF(close,1), N) / N × 100`; `MAPSY = MA(PSY, M)`.
 
+### ATR — Average True Range (`atr_indicator.dart`)
+- **Công dụng**: đo độ biến động (volatility) thị trường, không đo hướng xu hướng. ATR cao → thị trường biến động mạnh (nến dao động rộng); ATR thấp → thị trường yên tĩnh. Thường dùng để đặt stop-loss theo % biến động thực tế (vd `stop = giá - 2×ATR`) hoặc điều chỉnh kích thước vị thế, thay vì để so sánh xu hướng tăng/giảm.
+- **calcParams**: `[14, 6]` — (N: chu kỳ làm mượt Wilder của ATR, M: chu kỳ MA tín hiệu MAATR).
+- **Công thức**:
+  ```
+  TR    = max(high-low, |high-prevClose|, |low-prevClose|)
+  ATR[N-1] = SMA(TR, N)                         (seed)
+  ATR[i]   = (TR[i] + (N-1) × ATR[i-1]) / N     (i >= N, Wilder smoothing)
+  MAATR    = MA(ATR, M)
+  ```
+
 ---
 
 ## Ghi chú chung

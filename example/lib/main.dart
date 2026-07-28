@@ -827,6 +827,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         maPsyColor: Color(0xFFFF6D00),
         textStyle: TextStyle(color: Colors.white),
       ),
+      atrStyle: const ATRStyle(
+        atrColor: Color(0xFFFF9800),
+        atrMaColor: Color(0xFF00BCD4),
+        textStyle: TextStyle(color: Colors.white),
+      ),
     );
   }
 
@@ -1275,6 +1280,16 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 () => context.read<ChartBloc>().add(
                   const ChartSecondaryIndicatorToggled(
                     SecondaryIndicatorType.psy,
+                  ),
+                ),
+              ),
+              _chip(
+                'ATR',
+                state.secondaryTypes.contains(SecondaryIndicatorType.atr),
+                state.isDark,
+                () => context.read<ChartBloc>().add(
+                  const ChartSecondaryIndicatorToggled(
+                    SecondaryIndicatorType.atr,
                   ),
                 ),
               ),

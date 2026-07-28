@@ -2,6 +2,11 @@
 
 Tổng hợp toàn bộ thay đổi/fix của package: nội dung từ `CHANGELOG.md` (theo version publish), các commit `fix:` lẻ chưa lên CHANGELOG, và các thay đổi đang làm việc (chưa commit) trong session gần đây.
 
+## 2026-07-28
+
+- **feat:** `ATRIndicator` (ATR) — secondary indicator mới, Average True Range (Wilder). `calcParams: [14, 6]` (N: chu kỳ làm mượt Wilder, M: chu kỳ MA tín hiệu). `TR = max(high-low, |high-prevClose|, |low-prevClose|)`; `ATR` seed bằng `SMA(TR,N)` rồi làm mượt kiểu Wilder `ATR[i] = (TR[i] + (N-1)×ATR[i-1])/N`; `MAATR = MA(ATR,M)`. Đo độ biến động, không đo hướng xu hướng.
+  - File: `lib/entity/atr_entity.dart` (mới), `lib/entity/macd_entity.dart` + `lib/entity/k_entity.dart` (nối `ATREntity` vào mixin chain, trước `MACDEntity`), `lib/indicator/indicator_style.dart` (`ATRStyle`), `lib/indicator/secondary/atr_indicator.dart` (mới), `lib/indicator/indicator_template.dart` (`part` + switch case), `lib/styles/k_chart_style.dart` (`atrStyle` field/default/`copyWith`), `example/lib/bloc/chart_state.dart`, `example/lib/bloc/chart_bloc.dart`, `example/lib/main.dart` (chip + `_demoColors`)
+
 ## 2026-07-22
 
 ### Feat (thêm lại sau revert) — Ichimoku Kinko Hyo

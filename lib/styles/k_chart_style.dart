@@ -175,6 +175,9 @@ class KChartColors {
   /// Style cho `PSYIndicator`.
   final PSYStyle psyStyle;
 
+  /// Style cho `ATRIndicator`.
+  final ATRStyle atrStyle;
+
   /// constructor chart color
   const KChartColors({
     this.bgColor = const Color(0xffffffff),
@@ -224,6 +227,7 @@ class KChartColors {
     this.brarStyle = const BRARStyle(),
     this.biasStyle = const BIASStyle(),
     this.psyStyle = const PSYStyle(),
+    this.atrStyle = const ATRStyle(),
   });
 
   /// Trả về bản sao, override đúng field được truyền vào, giữ nguyên phần
@@ -263,6 +267,7 @@ class KChartColors {
     BRARStyle? brarStyle,
     BIASStyle? biasStyle,
     PSYStyle? psyStyle,
+    ATRStyle? atrStyle,
   }) {
     return KChartColors(
       bgColor: bgColor ?? this.bgColor,
@@ -298,6 +303,7 @@ class KChartColors {
       brarStyle: brarStyle ?? this.brarStyle,
       biasStyle: biasStyle ?? this.biasStyle,
       psyStyle: psyStyle ?? this.psyStyle,
+      atrStyle: atrStyle ?? this.atrStyle,
     );
   }
 }

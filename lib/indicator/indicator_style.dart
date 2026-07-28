@@ -274,3 +274,14 @@ class OBVStyle extends IndicatorStyle {
     super.textStyle,
   });
 }
+
+class ATRStyle extends IndicatorStyle {
+  final Color atrColor;
+  final Color atrMaColor;
+
+  const ATRStyle({
+    this.atrColor = const Color(0xFFFF9800),
+    this.atrMaColor = const Color(0xFF00BCD4),
+    super.textStyle,
+  });
+}
