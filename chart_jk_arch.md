@@ -759,6 +759,7 @@ Constructor: `const KChartStyle([List<String>? dateTimeFormat, double volBarOpac
 | `brarStyle`     | `BRARStyle`        | BRAR           |
 | `biasStyle`     | `BIASStyle`        | BIAS           |
 | `psyStyle`      | `PSYStyle`         | PSY            |
+| `atrStyle`      | `ATRStyle`         | ATR            |
 
 **Cơ chế áp dụng — `applyIndicatorColorStyles()`** (`lib/indicator/indicator_template.dart`):
 
@@ -1029,6 +1030,22 @@ IndicatorTemplate<T, K>   ← abstract
 - **Công thức:** `PSY = COUNT(close > REF(close,1), N) / N × 100`; `MAPSY = MA(PSY, M)` — cả 2 tính bằng rolling window (đếm tăng + rolling-sum), không brute-force lại mỗi nến.
 - **Công dụng:** đo % số phiên tăng trong N phiên — phản ánh tâm lý đám đông. PSY quá cao (>75-83) → quá lạc quan, dễ điều chỉnh; quá thấp (<25-17) → quá bi quan, dễ hồi phục. MAPSY cắt PSY dùng lọc tín hiệu.
 - **Lưu ý:** `PSY` cần `REF(close,1)` (giá phiên trước) nên bắt đầu tại `i=N` (không phải `i=N-1`) — cùng loại "trễ 1 nến khởi tạo" như `BR` của BRAR.
+
+#### ATR — secondary
+
+- **Style:** `ATRStyle({ atrColor, atrMaColor })`
+- **calcParams:** `[14, 6]` — (N: chu kỳ làm mượt Wilder của ATR, M: chu kỳ MA tín hiệu MAATR)
+- **Output:** `entity.atr`, `entity.atrMa` (mixin `ATREntity` — nối vào `on` clause của `MACDEntity`, đứng trước `MACDEntity`, cùng vị trí `PSYEntity`)
+- **Công thức:**
+  ```
+  TR       = max(HIGH-LOW, |HIGH-REF(CLOSE,1)|, |LOW-REF(CLOSE,1)|)
+  ATR[N-1] = SMA(TR, N)                          (seed Wilder smoothing)
+  ATR[i]   = (TR[i] + (N-1) × ATR[i-1]) / N       (i >= N)
+  MAATR    = MA(ATR, M)
+  ```
+  Wilder smoothing giống cách `RSIIndicator` làm mượt RMax/RAbs — khác rolling-sum thuần của BRAR/BIAS vì ATR cần trọng số giảm dần theo thời gian (EMA-like) thay vì trung bình cộng đơn giản trong cửa sổ trượt.
+- **Công dụng:** đo độ biến động (volatility), không đo hướng. ATR cao = nến dao động rộng (biến động mạnh); ATR thấp = thị trường yên tĩnh. Không phải chỉ báo xu hướng — dùng để đặt stop-loss theo biến động thực tế hoặc điều chỉnh kích thước vị thế.
+- **Lưu ý:** `TR` tại nến đầu tiên (`i=0`) không có `prevClose` nên chỉ dùng `high-low`; `ATR` bắt đầu có giá trị từ `i=N-1` (seed bằng SMA của N giá trị TR đầu, không phải Wilder smoothing ngay từ đầu) — cùng convention warm-up như RSI.
 
 ### 9.3 Custom indicator
 
