@@ -25,8 +25,8 @@ class CandleStyle {
   final TextStyle textStyle;
 
   const CandleStyle({
-    this.upColor = const Color(0xFF14AD8F),
-    this.dnColor = const Color(0xFFD5405D),
+    this.upColor = const Color(0xFF0ABE82),
+    this.dnColor = const Color(0xFFF54B55),
     this.kLineColor = const Color(0xFF217AFF),
     this.kLineFillColors = const [Color(0x80217aff), Color(0x00217AFF)],
     this.textStyle = const TextStyle(fontSize: 10),
@@ -54,8 +54,8 @@ class VolumeStyle {
   final TextStyle textStyle;
 
   const VolumeStyle({
-    this.upColor = const Color(0xFF14AD8F),
-    this.dnColor = const Color(0xFFD5405D),
+    this.upColor = const Color(0xFF0ABE82),
+    this.dnColor = const Color(0xFFF54B55),
     this.ma5Color = const Color(0xFFFFC634),
     this.ma10Color = const Color(0xff35cdac),
     this.textStyle = const TextStyle(fontSize: 10),

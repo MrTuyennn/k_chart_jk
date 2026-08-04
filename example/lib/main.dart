@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
       title: 'K Chart JK Demo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF217AFF)),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFF0B90B)),
         useMaterial3: true,
       ),
       home: BlocProvider(
@@ -214,11 +214,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
       builder: (context, state) {
         return Scaffold(
           backgroundColor: state.isDark
-              ? const Color(0xFF1C1C1E)
+              ? const Color(0xFF0B0E11)
               : Colors.white,
           appBar: AppBar(
             backgroundColor: state.isDark
-                ? const Color(0xFF1C1C1E)
+                ? const Color(0xFF0B0E11)
                 : Colors.white,
             elevation: 0,
             title: Column(
@@ -242,8 +242,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                       color:
                           (state.livePrice ?? state.data.last.close) >=
                               state.data.last.open
-                          ? const Color(0xFF14AD8F)
-                          : const Color(0xFFD5405D),
+                          ? const Color(0xFF0ECB81)
+                          : const Color(0xFFF6465D),
                     ),
                   ),
               ],
@@ -368,8 +368,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
   }
 
   Widget _buildOrderBook(ChartState state) {
-    final upColor = const Color(0xFF14AD8F);
-    final dnColor = const Color(0xFFD5405D);
+    final upColor = const Color(0xFF0ECB81);
+    final dnColor = const Color(0xFFF6465D);
     final textColor = state.isDark ? Colors.white70 : Colors.black87;
     final mutedColor = state.isDark ? Colors.white38 : Colors.black38;
 
@@ -588,7 +588,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: state.isFetching ? 28 : 0,
-          color: const Color(0xFF217AFF),
+          color: const Color(0xFFF0B90B),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -597,13 +597,13 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 height: 12,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 'Đang tải thêm ${ChartState.loadMoreBatchSize} nến...',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: const TextStyle(color: Colors.black, fontSize: 12),
               ),
             ],
           ),
@@ -655,7 +655,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: _scaleYActive
-                      ? const Color(0xFF217AFF).withValues(alpha: 0.15)
+                      ? const Color(0xFFF0B90B).withValues(alpha: 0.15)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -665,7 +665,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: _scaleYActive
-                        ? const Color(0xFF217AFF)
+                        ? const Color(0xFFF0B90B)
                         : (state.isDark ? Colors.white38 : Colors.black38),
                   ),
                 ),
@@ -690,147 +690,130 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
     );
   }
 
-  /// Palette "random" để demo CandleStyle/VolumeStyle/indicator style mới —
-  /// cố tình chọn màu chói, khác hẳn default để thấy rõ sự khác biệt.
-  /// bg/text/grid vẫn lấy từ `state.colors` (theo dark/light mode thật),
-  /// chỉ đổi màu vẽ (nến/volume/indicator).
+  /// Palette kiểu Binance: xanh #0ECB81 / đỏ #F6465D cho up/down, vàng
+  /// #F0B90B làm màu nhấn chính (đường giá, MA1, RSI...), teal #35CDAC và
+  /// tím #B48EE3 làm màu phụ cho các đường thứ 2/3 — cùng bộ tông đã dùng
+  /// làm default trong lib/. bg/text/grid vẫn lấy từ `state.colors` (theo
+  /// dark/light mode thật), chỉ đổi màu vẽ (nến/volume/indicator).
   KChartColors _demoColors(ChartState state) {
+    const upColor = Color(0xFF0ECB81);
+    const dnColor = Color(0xFFF6465D);
+    const accentColor = Color(0xFFF0B90B);
+    const tealColor = Color(0xFF35CDAC);
+    const purpleColor = Color(0xFFB48EE3);
+    final textColor = state.isDark
+        ? const Color(0xFFEAECEF)
+        : const Color(0xFF1E2329);
+    final textStyle = TextStyle(color: textColor);
+
     return state.colors.copyWith(
-      livePriceStyle: const LivePriceStyle(
-        upColor: Colors.blueAccent,
-        dnColor: Colors.red,
-        textStyle: TextStyle(
+      livePriceStyle: LivePriceStyle(
+        upColor: upColor,
+        dnColor: dnColor,
+        textStyle: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-      candleStyle: const CandleStyle(
-        upColor: Color(0xFF00E5FF),
-        dnColor: Color(0xFFFF3D00),
-        kLineColor: Color(0xFFAA00FF),
-        kLineFillColors: [Color(0x80AA00FF), Color(0x00AA00FF)],
-        textStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w100,
           color: Colors.black,
         ),
       ),
-      volumeStyle: const VolumeStyle(
-        upColor: Color(0xFF76FF03),
-        dnColor: Color(0xFFFF1744),
-        ma5Color: Color(0xFFFFEA00),
-        ma10Color: Color(0xFFFF6D00),
+      candleStyle: CandleStyle(
+        upColor: upColor,
+        dnColor: dnColor,
+        kLineColor: accentColor,
+        kLineFillColors: const [Color(0x33F0B90B), Color(0x00F0B90B)],
+        textStyle: TextStyle(fontSize: 10, color: textColor),
+      ),
+      volumeStyle: VolumeStyle(
+        upColor: upColor,
+        dnColor: dnColor,
+        ma5Color: accentColor,
+        ma10Color: purpleColor,
         // forceColor bảo vệ ma5Color/ma10Color — chỉ "VOL:" prefix đổi màu.
-        textStyle: TextStyle(
-          fontSize: 11,
-          fontStyle: FontStyle.italic,
-          color: Colors.red,
-        ),
+        textStyle: TextStyle(fontSize: 10, color: textColor),
       ),
-      // Mọi indicator dưới đây: textStyle.color = trắng đồng nhất — chỉ áp
-      // cho prefix/label chung (vd "KDJ(9,1,3) "); các màu riêng từng giá trị
-      // (kColor/dColor/macdColor/...) LUÔN giữ nguyên nhờ forceColor, không
-      // bị textStyle.color đè — xem indicator_template.dart getTextStyle().
-      avlStyle: const AVLStyle(
-        avlColor: Color(0xFFEA80FC), // hồng tím
-        textStyle: TextStyle(color: Colors.white),
+      // Mọi indicator dưới đây: textStyle.color = textColor đồng nhất — chỉ
+      // áp cho prefix/label chung (vd "KDJ(9,1,3) "); các màu riêng từng giá
+      // trị (kColor/dColor/macdColor/...) LUÔN giữ nguyên nhờ forceColor,
+      // không bị textStyle.color đè — xem indicator_template.dart getTextStyle().
+      avlStyle: AVLStyle(avlColor: accentColor, textStyle: textStyle),
+      maStyle: MAStyle(
+        maColors: const [accentColor, tealColor, purpleColor, dnColor],
+        textStyle: textStyle,
       ),
-      maStyle: const MAStyle(
-        maColors: [
-          Color(0xFFFFAB00),
-          Color(0xFF00B8D4),
-          Color(0xFFD500F9),
-          Color(0xFF64DD17),
-        ],
-        textStyle: TextStyle(color: Colors.white),
+      emaStyle: MAStyle(
+        maColors: const [accentColor, tealColor, purpleColor],
+        textStyle: textStyle,
       ),
-      emaStyle: const MAStyle(
-        maColors: [Color(0xFF00E5FF), Color(0xFFFF4081), Color(0xFFFFEB3B)],
-        textStyle: TextStyle(color: Colors.red),
+      bollStyle: BOLLStyle(
+        bollColor: accentColor,
+        ubColor: tealColor,
+        lbColor: purpleColor,
+        textStyle: textStyle,
       ),
-      bollStyle: const BOLLStyle(
-        bollColor: Color(0xFF6200EA),
-        ubColor: Color(0xFF00BFA5),
-        lbColor: Color(0xFFFF6D00),
-        textStyle: TextStyle(color: Colors.white),
+      sarStyle: SARStyle(
+        upColor: upColor,
+        dnColor: dnColor,
+        textStyle: textStyle,
       ),
-      sarStyle: const SARStyle(
-        upColor: Color(0xFF00BFA5),
-        dnColor: Color(0xFFFF5252),
-        textStyle: TextStyle(color: Colors.black),
+      zigzagStyle: ZigZagStyle(zigzagColor: accentColor, textStyle: textStyle),
+      superTrendStyle: SuperTrendStyle(
+        upColor: upColor,
+        dnColor: dnColor,
+        textStyle: textStyle,
       ),
-      zigzagStyle: const ZigZagStyle(
-        zigzagColor: Color(0xFFFF6E40),
-        textStyle: TextStyle(color: Colors.white),
+      rsiStyle: RSIStyle(rsiColor: accentColor, textStyle: textStyle),
+      macdStyle: MACDStyle(
+        macdColor: accentColor,
+        difColor: tealColor,
+        deaColor: purpleColor,
+        textStyle: textStyle,
       ),
-      superTrendStyle: const SuperTrendStyle(
-        upColor: Color(0xFF00E676),
-        dnColor: Color(0xFFFF1744),
-        textStyle: TextStyle(color: Colors.white),
+      kdjStyle: KDJStyle(
+        kColor: accentColor,
+        dColor: tealColor,
+        jColor: purpleColor,
+        textStyle: textStyle,
       ),
-      rsiStyle: const RSIStyle(
-        rsiColor: Color(0xFFFF4081),
-        textStyle: TextStyle(color: Colors.green),
+      wrStyle: WRStyle(wrColor: accentColor, textStyle: textStyle),
+      cciStyle: CCIStyle(cciColor: tealColor, textStyle: textStyle),
+      obvStyle: OBVStyle(
+        obvColor: accentColor,
+        signalColor: purpleColor,
+        textStyle: textStyle,
       ),
-      macdStyle: const MACDStyle(
-        macdColor: Color(0xFF00E676),
-        difColor: Color(0xFFFFD600),
-        deaColor: Color(0xFF2979FF),
-        textStyle: TextStyle(color: Colors.white),
+      trixStyle: TRIXStyle(
+        trixColor: accentColor,
+        trixMaColor: tealColor,
+        textStyle: textStyle,
       ),
-      kdjStyle: const KDJStyle(
-        kColor: Color(0xFFFFD600),
-        dColor: Color(0xFF00E5FF),
-        jColor: Color(0xFFD500F9),
-        textStyle: TextStyle(color: Colors.white),
+      mtmStyle: MTMStyle(
+        mtmColor: accentColor,
+        mtmMaColor: tealColor,
+        textStyle: textStyle,
       ),
-      wrStyle: const WRStyle(
-        wrColor: Color(0xFF64DD17),
-        textStyle: TextStyle(color: Colors.white),
+      stochRsiStyle: StochRSIStyle(
+        kColor: accentColor,
+        dColor: tealColor,
+        textStyle: textStyle,
       ),
-      cciStyle: const CCIStyle(
-        cciColor: Color(0xFFFF6D00),
-        textStyle: TextStyle(color: Colors.white),
+      brarStyle: BRARStyle(
+        arColor: accentColor,
+        brColor: tealColor,
+        textStyle: textStyle,
       ),
-      obvStyle: const OBVStyle(
-        obvColor: Color(0xFF2979FF),
-        signalColor: Color(0xFFFF4081),
-        textStyle: TextStyle(color: Colors.white),
+      biasStyle: BIASStyle(
+        biasColors: const [accentColor, tealColor, purpleColor],
+        textStyle: textStyle,
       ),
-      trixStyle: const TRIXStyle(
-        trixColor: Color(0xFF00E5FF),
-        trixMaColor: Color(0xFFFFAB00),
-        textStyle: TextStyle(color: Colors.white),
+      psyStyle: PSYStyle(
+        psyColor: accentColor,
+        maPsyColor: tealColor,
+        textStyle: textStyle,
       ),
-      mtmStyle: const MTMStyle(
-        mtmColor: Color(0xFFD500F9),
-        mtmMaColor: Color(0xFF76FF03),
-        textStyle: TextStyle(color: Colors.white),
-      ),
-      stochRsiStyle: const StochRSIStyle(
-        kColor: Color(0xFFFF3D00),
-        dColor: Color(0xFF00BFA5),
-        textStyle: TextStyle(color: Colors.green),
-      ),
-      brarStyle: const BRARStyle(
-        arColor: Color(0xFFFFD600),
-        brColor: Color(0xFF00E5FF),
-        textStyle: TextStyle(color: Colors.red),
-      ),
-      biasStyle: const BIASStyle(
-        biasColors: [Color(0xFFFFC107), Color(0xFF00E676), Color(0xFFFF4081)],
-        textStyle: TextStyle(color: Colors.black),
-      ),
-      psyStyle: const PSYStyle(
-        psyColor: Color(0xFF00E5FF),
-        maPsyColor: Color(0xFFFF6D00),
-        textStyle: TextStyle(color: Colors.white),
-      ),
-      atrStyle: const ATRStyle(
-        atrColor: Color(0xFFFF9800),
-        atrMaColor: Color(0xFF00BCD4),
-        textStyle: TextStyle(color: Colors.white),
+      atrStyle: ATRStyle(
+        atrColor: accentColor,
+        atrMaColor: tealColor,
+        textStyle: textStyle,
       ),
     );
   }
@@ -969,11 +952,11 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
 
   Widget _buildInfoCard(KLineEntity entity, bool isDark) {
     final isUp = entity.close >= entity.open;
-    final color = isUp ? const Color(0xFF14AD8F) : const Color(0xFFD5405D);
+    final color = isUp ? const Color(0xFF0ECB81) : const Color(0xFFF6465D);
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+        color: isDark ? const Color(0xFF1E2329) : Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.4)),
         boxShadow: [
@@ -1320,8 +1303,8 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFF217AFF)
-              : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F3F5)),
+              ? const Color(0xFFF0B90B)
+              : (isDark ? const Color(0xFF1E2329) : const Color(0xFFF2F3F5)),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -1330,7 +1313,7 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             color: selected
-                ? Colors.white
+                ? Colors.black
                 : (isDark ? Colors.white60 : Colors.black54),
           ),
         ),
@@ -1346,9 +1329,9 @@ class _ChartDemoPageState extends State<ChartDemoPage> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: state.isLive
-              ? const Color(0xFFD5405D)
+              ? const Color(0xFFF6465D)
               : (state.isDark
-                    ? const Color(0xFF2C2C2E)
+                    ? const Color(0xFF1E2329)
                     : const Color(0xFFF2F3F5)),
           borderRadius: BorderRadius.circular(20),
         ),

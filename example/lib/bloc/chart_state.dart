@@ -209,15 +209,15 @@ class ChartState extends Equatable {
 
   KChartColors get colors => isDark
       ? const KChartColors(
-          bgColor: Color(0xFF1C1C1E),
-          defaultTextColor: Color(0xFF8E8E93),
-          gridColor: Color.fromARGB(255, 187, 187, 187),
-          selectFillColor: Color(0xFF2C2C2E),
-          selectBorderColor: Color(0xFF636366),
-          crossColor: Color(0xFFEBEBF5),
-          crossTextColor: Color(0xFFEBEBF5),
-          maxColor: Color(0xFFEBEBF5),
-          minColor: Color(0xFFEBEBF5),
+          bgColor: Color(0xFF0B0E11),
+          defaultTextColor: Color(0xFF848E9C),
+          gridColor: Color(0xFF1E2329),
+          selectFillColor: Color(0xFF1E2329),
+          selectBorderColor: Color(0xFF474D57),
+          crossColor: Color(0xFFEAECEF),
+          crossTextColor: Color(0xFFEAECEF),
+          maxColor: Color(0xFFEAECEF),
+          minColor: Color(0xFFEAECEF),
         )
       : const KChartColors(gridColor: Color.fromARGB(255, 237, 237, 237));
 
