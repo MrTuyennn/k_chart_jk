@@ -39,3 +39,8 @@ migrate_working_dir/
 
 # Claude Code config/skill nội bộ
 /.claude/
+
+# Chỉ publish README*.md — các file md khác giữ local, không đẩy lên git
+*.md
+!README.md
+!**/README.md
